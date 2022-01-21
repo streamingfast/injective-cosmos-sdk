@@ -5,7 +5,6 @@ import (
 	"io"
 	"sort"
 	"sync"
-	"time"
 
 	dbm "github.com/tendermint/tm-db"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/store/listenkv"
 	"github.com/cosmos/cosmos-sdk/store/tracekv"
 	"github.com/cosmos/cosmos-sdk/store/types"
-	"github.com/cosmos/cosmos-sdk/telemetry"
 	"github.com/cosmos/cosmos-sdk/types/kv"
 )
 
@@ -32,6 +30,8 @@ type Store struct {
 	unsortedCache map[string]struct{}
 	sortedCache   *dbm.MemDB // always ascending sorted
 	parent        types.KVStore
+
+	activeIterators int
 }
 
 var _ types.CacheKVStore = (*Store)(nil)
@@ -91,7 +91,6 @@ func (store *Store) Has(key []byte) bool {
 func (store *Store) Delete(key []byte) {
 	store.mtx.Lock()
 	defer store.mtx.Unlock()
-	defer telemetry.MeasureSince(time.Now(), "store", "cachekv", "delete")
 
 	types.AssertValidKey(key)
 	store.setCacheValue(key, nil, true, true)
@@ -101,7 +100,6 @@ func (store *Store) Delete(key []byte) {
 func (store *Store) Write() {
 	store.mtx.Lock()
 	defer store.mtx.Unlock()
-	defer telemetry.MeasureSince(time.Now(), "store", "cachekv", "write")
 
 	// We need a copy of all of the keys.
 	// Not the best, but probably not a bottleneck depending.
@@ -180,6 +178,7 @@ func (store *Store) ReverseIterator(start, end []byte) types.Iterator {
 func (store *Store) iterator(start, end []byte, ascending bool) types.Iterator {
 	store.mtx.Lock()
 	defer store.mtx.Unlock()
+	store.activeIterators += 1
 
 	var parent, cache types.Iterator
 
@@ -192,88 +191,14 @@ func (store *Store) iterator(start, end []byte, ascending bool) types.Iterator {
 	store.dirtyItems(start, end)
 	cache = newMemIterator(start, end, store.sortedCache, store.deleted, ascending)
 
-	return newCacheMergeIterator(parent, cache, ascending)
+	return newCacheMergeIterator(store, parent, cache, ascending)
 }
 
-func findStartIndex(strL []string, startQ string) int {
-	// Modified binary search to find the very first element in >=startQ.
-	if len(strL) == 0 {
-		return -1
-	}
-
-	var left, right, mid int
-	right = len(strL) - 1
-	for left <= right {
-		mid = (left + right) >> 1
-		midStr := strL[mid]
-		if midStr == startQ {
-			// Handle condition where there might be multiple values equal to startQ.
-			// We are looking for the very first value < midStL, that i+1 will be the first
-			// element >= midStr.
-			for i := mid - 1; i >= 0; i-- {
-				if strL[i] != midStr {
-					return i + 1
-				}
-			}
-			return 0
-		}
-		if midStr < startQ {
-			left = mid + 1
-		} else { // midStrL > startQ
-			right = mid - 1
-		}
-	}
-	if left >= 0 && left < len(strL) && strL[left] >= startQ {
-		return left
-	}
-	return -1
+func (store *Store) decrementActiveIteratorCount() {
+	store.mtx.Lock()
+	defer store.mtx.Unlock()
+	store.activeIterators -= 1
 }
-
-func findEndIndex(strL []string, endQ string) int {
-	if len(strL) == 0 {
-		return -1
-	}
-
-	// Modified binary search to find the very first element <endQ.
-	var left, right, mid int
-	right = len(strL) - 1
-	for left <= right {
-		mid = (left + right) >> 1
-		midStr := strL[mid]
-		if midStr == endQ {
-			// Handle condition where there might be multiple values equal to startQ.
-			// We are looking for the very first value < midStL, that i+1 will be the first
-			// element >= midStr.
-			for i := mid - 1; i >= 0; i-- {
-				if strL[i] < midStr {
-					return i + 1
-				}
-			}
-			return 0
-		}
-		if midStr < endQ {
-			left = mid + 1
-		} else { // midStrL > startQ
-			right = mid - 1
-		}
-	}
-
-	// Binary search failed, now let's find a value less than endQ.
-	for i := right; i >= 0; i-- {
-		if strL[i] < endQ {
-			return i
-		}
-	}
-
-	return -1
-}
-
-type sortState int
-
-const (
-	stateUnsorted sortState = iota
-	stateAlreadySorted
-)
 
 // Constructs a slice of dirty items, to use w/ memIterator.
 func (store *Store) dirtyItems(start, end []byte) {
@@ -283,73 +208,66 @@ func (store *Store) dirtyItems(start, end []byte) {
 		return
 	}
 
-	n := len(store.unsortedCache)
-	unsorted := make([]*kv.Pair, 0)
-	// If the unsortedCache is too big, its costs too much to determine
-	// whats in the subset we are concerned about.
-	// If you are interleaving iterator calls with writes, this can easily become an
-	// O(N^2) overhead.
-	// Even without that, too many range checks eventually becomes more expensive
-	// than just not having the cache.
-	if n < 1024 {
-		for key := range store.unsortedCache {
+	// dirty items needs to clear the unsorted items from the unsortedCache, then put them into the sortedCache.
+	// Subsequently an iterator is constructed using the sorted cache and parent store.
+	//
+	// However:
+	// if we have multiple iterators open, we have to avoid writes to the store.sortedCache MemDB.
+	// This is because a write to mem-db will definitely cause deadlocks in tm-db's memdb abstractions.
+	// (Though it could potentially be thread-safe per golang btree's docs)
+	// Thus we can only safely clear the unsorted cache to construct an iterator if we are:
+	// - only doing one iterator at a time
+	// - doing multiple iterators, over the same data, and you didn't write to the subset between
+	//   first iterator creation and current iterator creation
+	// - doing multiple iterators over disjoint pieces of data,
+	//   and have done no writes over any iterated component since first iterator creation
+	//
+	// To reword, in order to better accomodate multiple iterators,
+	// every time we construct an iterator when no others are active, we clear the entire unsorted cache.
+	// otherwise we don't do any clearing of the unsorted cache,
+	// and panic if we would be constructing an invalid iterator.
+	// TODO: Come back and vastly simplify the cacheKV store / iterator architecture,
+	// so we don't have these messy issues.
+
+	numUnsortedEntries := len(store.unsortedCache)
+	if store.activeIterators > 1 {
+		numUnsortedEntries = 0
+	}
+	unsorted := make([]*kv.Pair, 0, numUnsortedEntries)
+	for key := range store.unsortedCache {
+		cacheValue := store.cache[key]
+		keyBz := conv.UnsafeStrToBytes(key)
+		if store.activeIterators == 1 {
+			// if we have one iterator, build a list of every KV pair thats not sorted.
+			unsorted = append(unsorted, &kv.Pair{Key: keyBz, Value: cacheValue.value})
+		} else if store.activeIterators > 1 {
+			// if we have more than one iterator we can't clear unsorted.
+			// therefore we check here if any of the unsorted values are in our iterator range, and if so panic.
 			if dbm.IsKeyInDomain(conv.UnsafeStrToBytes(key), start, end) {
-				cacheValue := store.cache[key]
-				unsorted = append(unsorted, &kv.Pair{Key: []byte(key), Value: cacheValue.value})
+				panic("Invalid concurrent iterator construction!" +
+					" If you are using multiple iterators concurrently, there must be no writes after the first" + "concurrent iterator's creations over data ranges you will iterate over." +
+					" Writes over these data ranges can resume once all concurrent iterators have been created," + " or the iterators have been closed.")
 			}
 		}
-		store.clearUnsortedCacheSubset(unsorted, stateUnsorted)
-		return
 	}
 
-	// Otherwise it is large so perform a modified binary search to find
-	// the target ranges for the keys that we should be looking for.
-	strL := make([]string, 0, n)
-	for key := range store.unsortedCache {
-		strL = append(strL, key)
+	if store.activeIterators == 1 {
+		store.clearEntireUnsortedCache()
+		store.updateSortedCache(unsorted)
 	}
-	sort.Strings(strL)
-
-	// Now find the values within the domain
-	//  [start, end)
-	startIndex := findStartIndex(strL, startStr)
-	endIndex := findEndIndex(strL, endStr)
-
-	if endIndex < 0 {
-		endIndex = len(strL) - 1
-	}
-	if startIndex < 0 {
-		startIndex = 0
-	}
-
-	kvL := make([]*kv.Pair, 0)
-	for i := startIndex; i <= endIndex; i++ {
-		key := strL[i]
-		cacheValue := store.cache[key]
-		kvL = append(kvL, &kv.Pair{Key: []byte(key), Value: cacheValue.value})
-	}
-
-	// kvL was already sorted so pass it in as is.
-	store.clearUnsortedCacheSubset(kvL, stateAlreadySorted)
 }
 
-func (store *Store) clearUnsortedCacheSubset(unsorted []*kv.Pair, sortState sortState) {
-	n := len(store.unsortedCache)
-	if len(unsorted) == n { // This pattern allows the Go compiler to emit the map clearing idiom for the entire map.
-		for key := range store.unsortedCache {
-			delete(store.unsortedCache, key)
-		}
-	} else { // Otherwise, normally delete the unsorted keys from the map.
-		for _, kv := range unsorted {
-			delete(store.unsortedCache, conv.UnsafeBytesToStr(kv.Key))
-		}
+func (store *Store) clearEntireUnsortedCache() {
+	// This pattern allows the Go compiler to emit the map clearing idiom for the entire map.
+	for key := range store.unsortedCache {
+		delete(store.unsortedCache, key)
 	}
+}
 
-	if sortState == stateUnsorted {
-		sort.Slice(unsorted, func(i, j int) bool {
-			return bytes.Compare(unsorted[i].Key, unsorted[j].Key) < 0
-		})
-	}
+func (store *Store) updateSortedCache(unsorted []*kv.Pair) {
+	sort.Slice(unsorted, func(i, j int) bool {
+		return bytes.Compare(unsorted[i].Key, unsorted[j].Key) < 0
+	})
 
 	for _, item := range unsorted {
 		if item.Value == nil {
@@ -377,11 +295,11 @@ func (store *Store) setCacheValue(key, value []byte, deleted bool, dirty bool) {
 	}
 	if deleted {
 		store.deleted[keyStr] = struct{}{}
-	} else {
+	} else if dirty {
 		delete(store.deleted, keyStr)
 	}
 	if dirty {
-		store.unsortedCache[conv.UnsafeBytesToStr(key)] = struct{}{}
+		store.unsortedCache[keyStr] = struct{}{}
 	}
 }
 
