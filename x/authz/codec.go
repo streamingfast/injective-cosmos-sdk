@@ -11,8 +11,8 @@ import (
 // RegisterLegacyAminoCodec registers concrete types on LegacyAmino codec
 func RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
 	cdc.RegisterConcrete(&MsgGrant{}, "cosmos-sdk/MsgGrant", nil)
-	cdc.RegisterConcrete(&MsgGrant{}, "cosmos-sdk/MsgRevoke", nil)
-	cdc.RegisterConcrete(&MsgGrant{}, "cosmos-sdk/MsgExec", nil)
+	cdc.RegisterConcrete(&MsgRevoke{}, "cosmos-sdk/MsgRevoke", nil)
+	cdc.RegisterConcrete(&MsgExec{}, "cosmos-sdk/MsgExec", nil)
 
 	cdc.RegisterInterface((*Authorization)(nil), nil)
 	cdc.RegisterConcrete(&GenericAuthorization{}, "cosmos-sdk/GenericAuthorization", nil)
