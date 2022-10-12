@@ -191,6 +191,12 @@ type CommitMultiStore interface {
 
 	// SetIAVLCacheSize sets the cache size of the IAVL tree.
 	SetIAVLCacheSize(size int)
+
+	// SetCommitSync set store commit sync mode
+	SetCommitSync(sync bool)
+
+	// GetCommitSync get store commit sync mode
+	GetCommitSync() bool
 }
 
 //---------subsp-------------------------------
