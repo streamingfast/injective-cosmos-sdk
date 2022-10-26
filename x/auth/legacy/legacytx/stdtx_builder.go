@@ -19,6 +19,9 @@ type StdTxBuilder struct {
 	cdc *codec.LegacyAmino
 }
 
+// SetFeePayer does nothing for stdtx
+func (s *StdTxBuilder) SetFeePayer(_ sdk.AccAddress) {}
+
 // ensure interface implementation
 var _ client.TxBuilder = &StdTxBuilder{}
 
