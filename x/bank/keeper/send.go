@@ -43,11 +43,11 @@ type BaseSendKeeper struct {
 }
 
 func NewBaseSendKeeper(
-	cdc codec.BinaryCodec, storeKey sdk.StoreKey, ak types.AccountKeeper, paramSpace paramtypes.Subspace, blockedAddrs map[string]bool,
+	cdc codec.BinaryCodec, storeKey sdk.StoreKey, tStoreKey sdk.StoreKey, ak types.AccountKeeper, paramSpace paramtypes.Subspace, blockedAddrs map[string]bool,
 ) BaseSendKeeper {
 
 	return BaseSendKeeper{
-		BaseViewKeeper: NewBaseViewKeeper(cdc, storeKey, ak),
+		BaseViewKeeper: NewBaseViewKeeper(cdc, storeKey, tStoreKey, ak),
 		cdc:            cdc,
 		ak:             ak,
 		storeKey:       storeKey,
@@ -164,6 +164,23 @@ func (k BaseSendKeeper) SendCoins(ctx sdk.Context, fromAddr sdk.AccAddress, toAd
 		),
 	})
 
+	// TODO: ALBERT track module addresses we don't care about
+	ignoredModuleAddresses := map[string]struct{}{
+		// add module addresses to ignore
+	}
+
+	_, containsIgnoredModuleAddress := ignoredModuleAddresses[toAddr.String()]
+	if !containsIgnoredModuleAddress {
+		_, containsIgnoredModuleAddress = ignoredModuleAddresses[fromAddr.String()]
+	}
+
+	if !containsIgnoredModuleAddress {
+		ctx.EventManager().EmitTypedEvent(&types.EventTransfer{
+			Sender:   fromAddr.Bytes(),
+			Receiver: toAddr.Bytes(),
+			Amt:      amt.String(),
+		})
+	}
 	return nil
 }
 
@@ -263,6 +280,8 @@ func (k BaseSendKeeper) setBalance(ctx sdk.Context, addr sdk.AccAddress, balance
 		accountStore.Set([]byte(balance.Denom), bz)
 	}
 
+	// set transient balance which will be emitted in the Endblocker
+	k.setTransientBalance(ctx, addr, balance)
 	return nil
 }
 

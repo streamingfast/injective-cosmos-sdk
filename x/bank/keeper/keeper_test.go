@@ -86,7 +86,7 @@ func (suite *IntegrationTestSuite) initKeepersWithmAccPerms(blockedAddrs map[str
 		authtypes.ProtoBaseAccount, maccPerms,
 	)
 	keeper := keeper.NewBaseKeeper(
-		appCodec, app.GetKey(types.StoreKey), authKeeper,
+		appCodec, app.GetKey(types.StoreKey), app.GetKey(types.TStoreKey), authKeeper,
 		app.GetSubspace(types.ModuleName), blockedAddrs,
 	)
 
@@ -1046,7 +1046,7 @@ func (suite *IntegrationTestSuite) TestBalanceTrackingEvents() {
 		authtypes.ProtoBaseAccount, maccPerms,
 	)
 
-	suite.app.BankKeeper = keeper.NewBaseKeeper(suite.app.AppCodec(), suite.app.GetKey(types.StoreKey),
+	suite.app.BankKeeper = keeper.NewBaseKeeper(suite.app.AppCodec(), suite.app.GetKey(types.StoreKey), suite.app.GetTKey(types.TStoreKey),
 		suite.app.AccountKeeper, suite.app.GetSubspace(types.ModuleName), nil)
 
 	// set account with multiple permissions
@@ -1206,7 +1206,7 @@ func (suite *IntegrationTestSuite) TestMintCoinRestrictions() {
 	}
 
 	for _, test := range tests {
-		suite.app.BankKeeper = keeper.NewBaseKeeper(suite.app.AppCodec(), suite.app.GetKey(types.StoreKey),
+		suite.app.BankKeeper = keeper.NewBaseKeeper(suite.app.AppCodec(), suite.app.GetKey(types.StoreKey), suite.app.GetTKey(types.TStoreKey),
 			suite.app.AccountKeeper, suite.app.GetSubspace(types.ModuleName), nil).WithMintCoinsRestriction(keeper.MintingRestrictionFn(test.restrictionFn))
 		for _, testCase := range test.testCases {
 			if testCase.expectPass {
