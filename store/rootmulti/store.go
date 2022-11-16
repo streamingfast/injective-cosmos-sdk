@@ -64,6 +64,8 @@ type Store struct {
 	interBlockCache types.MultiStorePersistentCache
 
 	listeners map[types.StoreKey][]types.WriteListener
+
+	commitSync bool
 }
 
 var (
@@ -88,6 +90,14 @@ func NewStore(db dbm.DB, logger log.Logger) *Store {
 		pruneHeights:        make([]int64, 0),
 		listeners:           make(map[types.StoreKey][]types.WriteListener),
 	}
+}
+
+func (rs *Store) GetCommitSync() bool {
+	return rs.commitSync
+}
+
+func (rs *Store) SetCommitSync(sync bool) {
+	rs.commitSync = sync
 }
 
 // GetPruning fetches the pruning strategy from the root store.
@@ -859,9 +869,9 @@ func (rs *Store) loadCommitStoreFromParams(key types.StoreKey, id types.CommitID
 		var err error
 
 		if params.initialVersion == 0 {
-			store, err = iavl.LoadStore(db, rs.logger, key, id, rs.lazyLoading, rs.iavlCacheSize, rs.iavlDisableFastNode)
+			store, err = iavl.LoadStore(db, rs.logger, key, id, rs.lazyLoading, rs.iavlCacheSize, rs.iavlDisableFastNode, rs.commitSync)
 		} else {
-			store, err = iavl.LoadStoreWithInitialVersion(db, rs.logger, key, id, rs.lazyLoading, params.initialVersion, rs.iavlCacheSize, rs.iavlDisableFastNode)
+			store, err = iavl.LoadStoreWithInitialVersion(db, rs.logger, key, id, rs.lazyLoading, params.initialVersion, rs.iavlCacheSize, rs.iavlDisableFastNode, rs.commitSync)
 		}
 
 		if err != nil {
