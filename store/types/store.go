@@ -196,6 +196,12 @@ type CommitMultiStore interface {
 
 	// RollbackToVersion rollback the db to specific version(height).
 	RollbackToVersion(version int64) error
+
+	// SetCommitSync set store commit sync mode
+	SetCommitSync(sync bool)
+
+	// GetCommitSync get store commit sync mode
+	GetCommitSync() bool
 }
 
 //---------subsp-------------------------------

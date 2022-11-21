@@ -360,6 +360,12 @@ func (app *BaseApp) init() error {
 	return nil
 }
 
+func SetCommitSync(sync bool) func(app *BaseApp) {
+	return func(bapp *BaseApp) {
+		bapp.cms.SetCommitSync(sync)
+	}
+}
+
 func (app *BaseApp) setMinGasPrices(gasPrices sdk.DecCoins) {
 	app.minGasPrices = gasPrices
 }
