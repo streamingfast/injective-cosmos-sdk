@@ -90,6 +90,10 @@
     - [SendEnabled](#cosmos.bank.v1beta1.SendEnabled)
     - [Supply](#cosmos.bank.v1beta1.Supply)
   
+- [cosmos/bank/v1beta1/events.proto](#cosmos/bank/v1beta1/events.proto)
+    - [BalanceUpdate](#cosmos.bank.v1beta1.BalanceUpdate)
+    - [EventSetBalances](#cosmos.bank.v1beta1.EventSetBalances)
+  
 - [cosmos/bank/v1beta1/genesis.proto](#cosmos/bank/v1beta1/genesis.proto)
     - [Balance](#cosmos.bank.v1beta1.Balance)
     - [GenesisState](#cosmos.bank.v1beta1.GenesisState)
@@ -1769,6 +1773,54 @@ This message is deprecated now that supply is indexed by denom.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | `total` | [cosmos.base.v1beta1.Coin](#cosmos.base.v1beta1.Coin) | repeated |  |
+
+
+
+
+
+ <!-- end messages -->
+
+ <!-- end enums -->
+
+ <!-- end HasExtensions -->
+
+ <!-- end services -->
+
+
+
+<a name="cosmos/bank/v1beta1/events.proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## cosmos/bank/v1beta1/events.proto
+
+
+
+<a name="cosmos.bank.v1beta1.BalanceUpdate"></a>
+
+### BalanceUpdate
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `addr` | [bytes](#bytes) |  |  |
+| `denom` | [bytes](#bytes) |  |  |
+| `amt` | [string](#string) |  | the latest amount |
+
+
+
+
+
+
+<a name="cosmos.bank.v1beta1.EventSetBalances"></a>
+
+### EventSetBalances
+EventSetBalance is an event that tracks the latest bank balance.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `balance_updates` | [BalanceUpdate](#cosmos.bank.v1beta1.BalanceUpdate) | repeated |  |
 
 
 
