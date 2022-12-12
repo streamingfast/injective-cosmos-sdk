@@ -69,7 +69,7 @@ func TestSendToModuleAccount(t *testing.T) {
 	ctx := app.BaseApp.NewContext(false, tmproto.Header{})
 
 	app.BankKeeper = bankkeeper.NewBaseKeeper(
-		app.AppCodec(), app.GetKey(types.StoreKey), app.AccountKeeper, app.GetSubspace(types.ModuleName), map[string]bool{
+		app.AppCodec(), app.GetKey(types.StoreKey), app.GetTKey(types.TStoreKey), app.AccountKeeper, app.GetSubspace(types.ModuleName), map[string]bool{
 			moduleAccAddr.String(): true,
 		},
 	)
