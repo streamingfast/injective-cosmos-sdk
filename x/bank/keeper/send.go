@@ -36,6 +36,7 @@ type BaseSendKeeper struct {
 	cdc        codec.BinaryCodec
 	ak         types.AccountKeeper
 	storeKey   sdk.StoreKey
+	tStoreKey  sdk.StoreKey
 	paramSpace paramtypes.Subspace
 
 	// list of addresses that are restricted from receiving transactions
@@ -43,13 +44,14 @@ type BaseSendKeeper struct {
 }
 
 func NewBaseSendKeeper(
-	cdc codec.BinaryCodec, storeKey sdk.StoreKey, ak types.AccountKeeper, paramSpace paramtypes.Subspace, blockedAddrs map[string]bool,
+	cdc codec.BinaryCodec, storeKey, tStoreKey sdk.StoreKey, ak types.AccountKeeper, paramSpace paramtypes.Subspace, blockedAddrs map[string]bool,
 ) BaseSendKeeper {
 	return BaseSendKeeper{
-		BaseViewKeeper: NewBaseViewKeeper(cdc, storeKey, ak),
+		BaseViewKeeper: NewBaseViewKeeper(cdc, storeKey, tStoreKey, ak),
 		cdc:            cdc,
 		ak:             ak,
 		storeKey:       storeKey,
+		tStoreKey:      tStoreKey,
 		paramSpace:     paramSpace,
 		blockedAddrs:   blockedAddrs,
 	}
@@ -262,6 +264,8 @@ func (k BaseSendKeeper) setBalance(ctx sdk.Context, addr sdk.AccAddress, balance
 		accountStore.Set([]byte(balance.Denom), bz)
 	}
 
+	// set transient balance which will be emitted in the Endblocker
+	k.setTransientBalance(ctx, addr, balance)
 	return nil
 }
 
