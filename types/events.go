@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"reflect"
 	"sort"
 	"strings"
@@ -24,25 +25,51 @@ import (
 // EventManager implements a simple wrapper around a slice of Event objects that
 // can be emitted from.
 type EventManager struct {
-	events Events
+	events      Events
+	protoEvents []codectypes.Any
 }
 
 func NewEventManager() *EventManager {
-	return &EventManager{EmptyEvents()}
+	return &EventManager{events: EmptyEvents(), protoEvents: []codectypes.Any{}}
 }
 
-func (em *EventManager) Events() Events { return em.events }
+func (em *EventManager) Events() Events {
+	return em.events
+}
+func (em *EventManager) ProtoEvents() []codectypes.Any {
+	return em.protoEvents
+}
 
 // EmitEvent stores a single Event object.
 // Deprecated: Use EmitTypedEvent
 func (em *EventManager) EmitEvent(event Event) {
 	em.events = em.events.AppendEvent(event)
 }
+func (em *EventManager) EmitProtoEvent(tev proto.Message) {
+	et := proto.MessageName(tev)
+	ev, _ := proto.Marshal(tev)
+	anyEvent := codectypes.Any{
+		TypeUrl: et,
+		Value:   ev,
+	}
+	em.protoEvents = append(em.protoEvents, anyEvent)
+}
 
 // EmitEvents stores a series of Event objects.
 // Deprecated: Use EmitTypedEvents
 func (em *EventManager) EmitEvents(events Events) {
 	em.events = em.events.AppendEvents(events)
+}
+func (em *EventManager) EmitProtoEvents(tevs []proto.Message) {
+	for _, tev := range tevs {
+		et := proto.MessageName(tev)
+		ev, _ := proto.Marshal(tev)
+		anyEvent := codectypes.Any{
+			TypeUrl: et,
+			Value:   ev,
+		}
+		em.protoEvents = append(em.protoEvents, anyEvent)
+	}
 }
 
 // ABCIEvents returns all stored Event objects as abci.Event objects.
@@ -58,11 +85,12 @@ func (em *EventManager) EmitTypedEvent(tev proto.Message) error {
 	}
 
 	em.EmitEvent(event)
+	em.EmitProtoEvent(tev)
 	return nil
 }
 
 // EmitTypedEvents takes series of typed events and emit
-func (em *EventManager) EmitTypedEvents(tevs ...proto.Message) error {
+func (em *EventManager) EmitTypedEvents(tevs []proto.Message) error {
 	events := make(Events, len(tevs))
 	for i, tev := range tevs {
 		res, err := TypedEventToEvent(tev)
@@ -73,6 +101,7 @@ func (em *EventManager) EmitTypedEvents(tevs ...proto.Message) error {
 	}
 
 	em.EmitEvents(events)
+	em.EmitProtoEvents(tevs)
 	return nil
 }
 

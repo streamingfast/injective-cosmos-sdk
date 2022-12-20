@@ -187,6 +187,13 @@ func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeg
 		}
 	}
 
+	// collect events and clear event manager
+	app.eventProviderStore.SetBeginBlockerEvents(
+		req.Header.Height,
+		app.deliverState.ctx.EventManager().ProtoEvents(),
+	)
+	app.deliverState.ctx = app.deliverState.ctx.WithEventManager(sdk.NewEventManager())
+
 	return res
 }
 
@@ -213,6 +220,9 @@ func (app *BaseApp) EndBlock(req abci.RequestEndBlock) (res abci.ResponseEndBloc
 			app.logger.Error("EndBlock listening hook failed", "height", req.Height, "err", err)
 		}
 	}
+
+	app.eventProviderStore.SetEndBlockerEvents(app.deliverState.ctx.EventManager().ProtoEvents())
+	app.deliverState.ctx = app.deliverState.ctx.WithEventManager(sdk.NewEventManager())
 
 	return res
 }
@@ -344,6 +354,8 @@ func (app *BaseApp) Commit() (res abci.ResponseCommit) {
 	if app.snapshotInterval > 0 && uint64(header.Height)%app.snapshotInterval == 0 {
 		go app.snapshot(header.Height)
 	}
+
+	app.eventProviderStore.Commit()
 
 	return abci.ResponseCommit{
 		Data:         commitID.Hash,

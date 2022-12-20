@@ -3,6 +3,7 @@ package baseapp
 import (
 	"errors"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/eventprovider"
 	"reflect"
 	"strings"
 
@@ -111,6 +112,9 @@ type BaseApp struct { //nolint: maligned
 	// abciListeners for hooking into the ABCI message processing of the BaseApp
 	// and exposing the requests and responses to external consumers
 	abciListeners []ABCIListener
+
+	// event provider db
+	eventProviderStore *eventprovider.EventProviderStore
 }
 
 type appStore struct {
@@ -193,6 +197,9 @@ func NewBaseApp(
 	}
 
 	app.runTxRecoveryMiddleware = newDefaultRecoveryMiddleware()
+
+	// init event provider kvstore at different path
+	app.eventProviderStore = eventprovider.NewEventProviderStore("")
 
 	return app
 }
@@ -727,6 +734,11 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte) (gInfo sdk.GasInfo, re
 		}
 	}
 
+	if mode == runTxModeDeliver {
+		app.eventProviderStore.SetTxEvents(runMsgCtx.EventManager().ProtoEvents())
+		ctx.WithEventManager(sdk.NewEventManager())
+	}
+
 	return gInfo, result, anteEvents, err
 }
 
@@ -758,6 +770,7 @@ func (app *BaseApp) runMsgs(ctx sdk.Context, msgs []sdk.Msg, mode runTxMode) (*s
 		if handler := app.msgServiceRouter.Handler(msg); handler != nil {
 			// ADR 031 request type routing
 			msgResult, err = handler(ctx, msg)
+			ctx.EventManager().ProtoEvents()
 			eventMsgName = sdk.MsgTypeURL(msg)
 		} else if legacyMsg, ok := msg.(legacytx.LegacyMsg); ok {
 			// legacy sdk.Msg routing
@@ -785,7 +798,6 @@ func (app *BaseApp) runMsgs(ctx sdk.Context, msgs []sdk.Msg, mode runTxMode) (*s
 			sdk.NewEvent(sdk.EventTypeMessage, sdk.NewAttribute(sdk.AttributeKeyAction, eventMsgName)),
 		}
 		msgEvents = msgEvents.AppendEvents(msgResult.GetEvents())
-
 		// append message events, data and logs
 		//
 		// Note: Each message result's data must be length-prefixed in order to
@@ -806,4 +818,8 @@ func (app *BaseApp) runMsgs(ctx sdk.Context, msgs []sdk.Msg, mode runTxMode) (*s
 		Log:    strings.TrimSpace(msgLogs.String()),
 		Events: events.ToABCIEvents(),
 	}, nil
+}
+
+func (app *BaseApp) GetEventProviderStore() *eventprovider.EventProviderStore {
+	return app.eventProviderStore
 }
