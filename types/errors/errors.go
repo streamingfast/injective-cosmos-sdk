@@ -2,6 +2,9 @@ package errors
 
 import (
 	"fmt"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -393,4 +396,37 @@ type causer interface {
 
 type unpacker interface {
 	Unpack() []error
+}
+
+func GRPCWrap(err error, c codes.Code, msg string) error {
+	if err != nil {
+		st := status.New(c, msg)
+		var sdkErr *Error
+		if errors.As(err, &sdkErr) {
+			errorInfo := &errdetails.ErrorInfo{
+				Reason:   sdkErr.Error(),
+				Metadata: map[string]string{"Codespace": sdkErr.Codespace(), "ABCICode": fmt.Sprintf("%d", sdkErr.ABCICode())},
+			}
+			st, err = st.WithDetails(errorInfo)
+			if err != nil {
+				return err
+			}
+		}
+
+		stack := stackTrace(err)
+		var stackEntries []string
+		stackEntries = make([]string, len(stack))
+		for i, f := range stack {
+			stackEntries[i] = fmt.Sprintf("%+v", f)
+		}
+		dbgInfo := &errdetails.DebugInfo{
+			StackEntries: stackEntries,
+		}
+		st, err = st.WithDetails(dbgInfo)
+		if err != nil {
+			return err
+		}
+		return st.Err()
+	}
+	return nil
 }
