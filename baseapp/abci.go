@@ -620,7 +620,7 @@ func gRPCErrorToSDKError(err error) error {
 	case codes.Unauthenticated:
 		return sdkerrors.Wrap(sdkerrors.ErrUnauthorized, err.Error())
 	default:
-		return sdkerrors.Wrap(sdkerrors.ErrUnknownRequest, err.Error())
+		return sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "%v: %v", err.Error(), status.Details())
 	}
 }
 
