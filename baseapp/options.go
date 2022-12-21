@@ -2,6 +2,7 @@ package baseapp
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/eventstore"
 	"io"
 
 	dbm "github.com/tendermint/tm-db"
@@ -92,6 +93,10 @@ func SetSnapshotKeepRecent(keepRecent uint32) func(*BaseApp) {
 // SetSnapshotStore sets the snapshot store.
 func SetSnapshotStore(snapshotStore *snapshots.Store) func(*BaseApp) {
 	return func(app *BaseApp) { app.SetSnapshotStore(snapshotStore) }
+}
+
+func SetEventProvider(path string) func(*BaseApp) {
+	return func(bapp *BaseApp) { bapp.eventStore = eventstore.NewEventStore(path) }
 }
 
 func (app *BaseApp) SetName(name string) {

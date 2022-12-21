@@ -188,8 +188,9 @@ func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeg
 	}
 
 	// collect events and clear event manager
-	app.eventProviderStore.SetBeginBlockerEvents(
+	app.eventStore.SetBeginBlockerEvents(
 		req.Header.Height,
+		app.deliverState.ctx.EventManager().Events(),
 		app.deliverState.ctx.EventManager().ProtoEvents(),
 	)
 	app.deliverState.ctx = app.deliverState.ctx.WithEventManager(sdk.NewEventManager())
@@ -221,7 +222,10 @@ func (app *BaseApp) EndBlock(req abci.RequestEndBlock) (res abci.ResponseEndBloc
 		}
 	}
 
-	app.eventProviderStore.SetEndBlockerEvents(app.deliverState.ctx.EventManager().ProtoEvents())
+	app.eventStore.SetEndBlockerEvents(
+		app.deliverState.ctx.EventManager().Events(),
+		app.deliverState.ctx.EventManager().ProtoEvents(),
+	)
 	app.deliverState.ctx = app.deliverState.ctx.WithEventManager(sdk.NewEventManager())
 
 	return res
@@ -355,7 +359,7 @@ func (app *BaseApp) Commit() (res abci.ResponseCommit) {
 		go app.snapshot(header.Height)
 	}
 
-	app.eventProviderStore.Commit()
+	app.eventStore.Commit()
 
 	return abci.ResponseCommit{
 		Data:         commitID.Hash,

@@ -3,7 +3,7 @@ package baseapp
 import (
 	"errors"
 	"fmt"
-	"github.com/cosmos/cosmos-sdk/eventprovider"
+	"github.com/cosmos/cosmos-sdk/eventstore"
 	"reflect"
 	"strings"
 
@@ -114,7 +114,7 @@ type BaseApp struct { //nolint: maligned
 	abciListeners []ABCIListener
 
 	// event provider db
-	eventProviderStore *eventprovider.EventProviderStore
+	eventStore *eventstore.EventStore
 }
 
 type appStore struct {
@@ -197,9 +197,6 @@ func NewBaseApp(
 	}
 
 	app.runTxRecoveryMiddleware = newDefaultRecoveryMiddleware()
-
-	// init event provider kvstore at different path
-	app.eventProviderStore = eventprovider.NewEventProviderStore("")
 
 	return app
 }
@@ -735,7 +732,10 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte) (gInfo sdk.GasInfo, re
 	}
 
 	if mode == runTxModeDeliver {
-		app.eventProviderStore.SetTxEvents(runMsgCtx.EventManager().ProtoEvents())
+		app.eventStore.SetTxEvents(
+			runMsgCtx.EventManager().Events(),
+			runMsgCtx.EventManager().ProtoEvents(),
+		)
 		ctx.WithEventManager(sdk.NewEventManager())
 	}
 
@@ -820,6 +820,6 @@ func (app *BaseApp) runMsgs(ctx sdk.Context, msgs []sdk.Msg, mode runTxMode) (*s
 	}, nil
 }
 
-func (app *BaseApp) GetEventProviderStore() *eventprovider.EventProviderStore {
-	return app.eventProviderStore
+func (app *BaseApp) GetEventStore() *eventstore.EventStore {
+	return app.eventStore
 }
