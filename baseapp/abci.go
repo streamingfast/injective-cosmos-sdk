@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/eventstore"
 	"os"
 	"sort"
 	"strings"
@@ -188,7 +189,8 @@ func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeg
 	}
 
 	// collect events and clear event manager
-	app.eventStore.SetBeginBlockerEvents(
+	app.eventStore.SetBlockEvents(
+		eventstore.AppBeginBlocker,
 		req.Header.Height,
 		app.deliverState.ctx.EventManager().Events(),
 		app.deliverState.ctx.EventManager().ProtoEvents(),
@@ -222,10 +224,13 @@ func (app *BaseApp) EndBlock(req abci.RequestEndBlock) (res abci.ResponseEndBloc
 		}
 	}
 
-	app.eventStore.SetEndBlockerEvents(
+	app.eventStore.SetBlockEvents(
+		eventstore.AppEndBlocker,
+		0,
 		app.deliverState.ctx.EventManager().Events(),
 		app.deliverState.ctx.EventManager().ProtoEvents(),
 	)
+
 	app.deliverState.ctx = app.deliverState.ctx.WithEventManager(sdk.NewEventManager())
 
 	return res
