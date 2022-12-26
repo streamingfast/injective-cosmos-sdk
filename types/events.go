@@ -62,13 +62,7 @@ func (em *EventManager) EmitEvents(events Events) {
 }
 func (em *EventManager) EmitProtoEvents(tevs []proto.Message) {
 	for _, tev := range tevs {
-		et := proto.MessageName(tev)
-		ev, _ := proto.Marshal(tev)
-		anyEvent := codectypes.Any{
-			TypeUrl: et,
-			Value:   ev,
-		}
-		em.protoEvents = append(em.protoEvents, anyEvent)
+		em.EmitProtoEvent(tev)
 	}
 }
 
@@ -79,28 +73,12 @@ func (em EventManager) ABCIEvents() []abci.Event {
 
 // EmitTypedEvent takes typed event and emits converting it into Event
 func (em *EventManager) EmitTypedEvent(tev proto.Message) error {
-	event, err := TypedEventToEvent(tev)
-	if err != nil {
-		return err
-	}
-
-	em.EmitEvent(event)
 	em.EmitProtoEvent(tev)
 	return nil
 }
 
 // EmitTypedEvents takes series of typed events and emit
 func (em *EventManager) EmitTypedEvents(tevs []proto.Message) error {
-	events := make(Events, len(tevs))
-	for i, tev := range tevs {
-		res, err := TypedEventToEvent(tev)
-		if err != nil {
-			return err
-		}
-		events[i] = res
-	}
-
-	em.EmitEvents(events)
 	em.EmitProtoEvents(tevs)
 	return nil
 }
