@@ -189,12 +189,14 @@ func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeg
 	}
 
 	// collect events and clear event manager
-	app.eventStore.SetBlockEvents(
-		eventstore.AppBeginBlocker,
-		req.Header.Height,
-		app.deliverState.ctx.EventManager().Events(),
-		app.deliverState.ctx.EventManager().ProtoEvents(),
-	)
+	if app.eventStore != nil {
+		app.eventStore.SetBlockEvents(
+			eventstore.AppBeginBlocker,
+			req.Header.Height,
+			app.deliverState.ctx.EventManager().Events(),
+			app.deliverState.ctx.EventManager().ProtoEvents(),
+		)
+	}
 	app.deliverState.ctx = app.deliverState.ctx.WithEventManager(sdk.NewEventManager())
 
 	return res
@@ -224,13 +226,14 @@ func (app *BaseApp) EndBlock(req abci.RequestEndBlock) (res abci.ResponseEndBloc
 		}
 	}
 
-	app.eventStore.SetBlockEvents(
-		eventstore.AppEndBlocker,
-		0,
-		app.deliverState.ctx.EventManager().Events(),
-		app.deliverState.ctx.EventManager().ProtoEvents(),
-	)
-
+	if app.eventStore != nil {
+		app.eventStore.SetBlockEvents(
+			eventstore.AppEndBlocker,
+			0,
+			app.deliverState.ctx.EventManager().Events(),
+			app.deliverState.ctx.EventManager().ProtoEvents(),
+		)
+	}
 	app.deliverState.ctx = app.deliverState.ctx.WithEventManager(sdk.NewEventManager())
 
 	return res
@@ -364,7 +367,9 @@ func (app *BaseApp) Commit() (res abci.ResponseCommit) {
 		go app.snapshot(header.Height)
 	}
 
-	app.eventStore.Commit()
+	if app.eventStore != nil {
+		app.eventStore.Commit()
+	}
 
 	return abci.ResponseCommit{
 		Data:         commitID.Hash,

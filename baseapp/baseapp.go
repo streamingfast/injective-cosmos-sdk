@@ -731,14 +731,13 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte) (gInfo sdk.GasInfo, re
 		}
 	}
 
-	if mode == runTxModeDeliver {
+	if mode == runTxModeDeliver && app.eventStore != nil {
 		app.eventStore.SetBlockEvents(
 			eventstore.AppTx,
 			0,
 			runMsgCtx.EventManager().Events(),
 			runMsgCtx.EventManager().ProtoEvents(),
 		)
-
 		ctx.WithEventManager(sdk.NewEventManager())
 	}
 
