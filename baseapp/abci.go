@@ -609,7 +609,9 @@ func gRPCErrorToSDKError(err error) error {
 	if !ok {
 		return sdkerrors.Wrap(sdkerrors.ErrInvalidRequest, err.Error())
 	}
-
+	if len(status.Details()) > 0 {
+		err = sdkerrors.Wrapf(err, "%v", status.Details())
+	}
 	switch status.Code() {
 	case codes.NotFound:
 		return sdkerrors.Wrap(sdkerrors.ErrKeyNotFound, err.Error())
@@ -620,7 +622,7 @@ func gRPCErrorToSDKError(err error) error {
 	case codes.Unauthenticated:
 		return sdkerrors.Wrap(sdkerrors.ErrUnauthorized, err.Error())
 	default:
-		return sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "%v: %v", err.Error(), status.Details())
+		return sdkerrors.Wrap(sdkerrors.ErrUnknownRequest, err.Error())
 	}
 }
 
