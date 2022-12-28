@@ -413,7 +413,7 @@ func GRPCWrap(err error, c codes.Code, msg string) error {
 		var withDetailsErr error
 		st, withDetailsErr = st.WithDetails(errorInfo)
 		if withDetailsErr != nil {
-			return withDetailsErr
+			return status.Errorf(c, "%v (failed to add error details: %v)", msg, withDetailsErr)
 		}
 	}
 
