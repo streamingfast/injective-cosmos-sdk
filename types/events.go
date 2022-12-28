@@ -33,18 +33,13 @@ func (em *EventManager) Events() Events {
 // EmitEvent stores a single Event object.
 // Deprecated: Use EmitTypedEvent
 func (em *EventManager) EmitEvent(event Event) {
-	ev := ParseAbciEvent(event)
-	em.events = em.events.AppendEvent(ev)
+	em.events = em.events.AppendEvent(event)
 }
 
 // EmitEvents stores a series of Event objects.
 // Deprecated: Use EmitTypedEvents
 func (em *EventManager) EmitEvents(events Events) {
-	evs := make(Events, len(events))
-	for i, event := range events {
-		evs[i] = ParseAbciEvent(event)
-		em.events = em.events.AppendEvents(evs)
-	}
+	em.events = em.events.AppendEvents(events)
 }
 
 // ABCIEvents returns all stored Event objects as abci.Event objects.
@@ -55,7 +50,7 @@ func (em EventManager) ABCIEvents() []abci.Event {
 // EmitTypedEvent takes typed event and emits converting it into Event
 func (em *EventManager) EmitTypedEvent(tev proto.Message) error {
 	ev := ParseTypedEvents(tev)
-	em.events = em.events.AppendEvent(ev)
+	em.events = append(em.events, ev)
 	return nil
 }
 
@@ -65,7 +60,7 @@ func (em *EventManager) EmitTypedEvents(tevs []proto.Message) error {
 	for i, tev := range tevs {
 		evs[i] = ParseTypedEvents(tev)
 	}
-	em.events = em.events.AppendEvents(evs)
+	em.events = append(em.events, evs...)
 	return nil
 }
 
@@ -152,12 +147,17 @@ func (e Event) AppendAttributes(attrs ...Attribute) Event {
 
 // AppendEvent adds an Event to a slice of events.
 func (e Events) AppendEvent(event Event) Events {
-	return append(e, event)
+	pev := ParseAbciEvent(event)
+	return append(e, pev)
 }
 
 // AppendEvents adds a slice of Event objects to an exist slice of Event objects.
 func (e Events) AppendEvents(events Events) Events {
-	return append(e, events...)
+	for _, ev := range events {
+		pev := ParseAbciEvent(ev)
+		e = append(e, pev)
+	}
+	return e
 }
 
 // ToABCIEvents converts a slice of Event objects to a slice of abci.Event
