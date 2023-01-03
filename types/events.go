@@ -49,7 +49,7 @@ func (em EventManager) ABCIEvents() []abci.Event {
 
 // EmitTypedEvent takes typed event and emits converting it into Event
 func (em *EventManager) EmitTypedEvent(tev proto.Message) error {
-	ev := ParseTypedEvents(tev)
+	ev := ParseTypedEvent(tev)
 	em.events = append(em.events, ev)
 	return nil
 }
@@ -58,7 +58,7 @@ func (em *EventManager) EmitTypedEvent(tev proto.Message) error {
 func (em *EventManager) EmitTypedEvents(tevs []proto.Message) error {
 	evs := make(Events, len(tevs))
 	for i, tev := range tevs {
-		evs[i] = ParseTypedEvents(tev)
+		evs[i] = ParseTypedEvent(tev)
 	}
 	em.events = append(em.events, evs...)
 	return nil
@@ -67,6 +67,10 @@ func (em *EventManager) EmitTypedEvents(tevs []proto.Message) error {
 func ParseAbciEvent(event Event) Event {
 	m := map[string]interface{}{}
 	for _, a := range event.Attributes {
+		// trick to skip parsed events
+		if strings.Contains(string(a.Key), ABCI_PREFIX) || len(a.Key) == 0 {
+			return event
+		}
 		m[string(a.Key)] = string(a.Value)
 	}
 	bz, _ := json.Marshal(m)
@@ -81,7 +85,7 @@ func ParseAbciEvent(event Event) Event {
 
 }
 
-func ParseTypedEvents(event proto.Message) Event {
+func ParseTypedEvent(event proto.Message) Event {
 	k := proto.MessageName(event)
 	v, _ := proto.Marshal(event)
 	e := Event{
