@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"fmt"
 
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
@@ -202,6 +203,12 @@ func (msg MsgEditValidator) ValidateBasic() error {
 	if msg.CommissionRate != nil {
 		if msg.CommissionRate.GT(sdk.OneDec()) || msg.CommissionRate.IsNegative() {
 			return sdkerrors.Wrap(sdkerrors.ErrInvalidRequest, "commission rate must be between 0 and 1 (inclusive)")
+		}
+		if msg.CommissionRate.LT(MinCommissionRate) {
+			return sdkerrors.Wrap(
+				ErrCommissionTooSmall,
+				fmt.Sprintf("minimum commission rate is %s", MinCommissionRate.String()),
+			)
 		}
 	}
 
