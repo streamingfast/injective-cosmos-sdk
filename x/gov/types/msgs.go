@@ -3,7 +3,7 @@ package types
 import (
 	"fmt"
 
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 
 	"github.com/gogo/protobuf/proto"
 
@@ -92,6 +92,18 @@ func (m MsgSubmitProposal) ValidateBasic() error {
 	}
 	if m.InitialDeposit.IsAnyNegative() {
 		return sdkerrors.Wrap(sdkerrors.ErrInvalidCoins, m.InitialDeposit.String())
+	}
+
+	depositAmount := m.InitialDeposit.AmountOf("inj")
+
+	minDepositAmount, ok := sdk.NewIntFromString("50000000000000000000") // 50 INJ
+	if !ok {
+		// should never happen, just defensive programming
+		return sdkerrors.Wrapf(sdkerrors.ErrInvalidCoins, "invalid minDepositAmount amount: %s", minDepositAmount.String())
+	}
+
+	if depositAmount.LT(minDepositAmount) {
+		return sdkerrors.Wrapf(sdkerrors.ErrInsufficientFunds, "proposals require a minDepositAmount of at least: %s", minDepositAmount.String())
 	}
 
 	content := m.GetContent()
