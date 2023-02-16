@@ -91,7 +91,6 @@ func (op *LeafOp) CheckAgainstSpec(spec *ProofSpec) error {
 	lspec := spec.LeafSpec
 
 	if g(spec) {
-		fmt.Println("Dragonberry Active")
 		err := z(op, 0)
 		if err != nil {
 			return err
