@@ -95,6 +95,9 @@ func (m MsgSubmitProposal) ValidateBasic() error {
 	}
 
 	for _, coin := range m.InitialDeposit {
+		if coin.Denom != "inj" {
+			continue
+		}
 		minDepositAmount, ok := sdk.NewIntFromString("50000000000000000000") // 50 INJ
 		if !ok {
 			// should never happen, just defensive programming
