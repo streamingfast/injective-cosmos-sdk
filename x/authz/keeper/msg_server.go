@@ -23,6 +23,13 @@ func (k Keeper) Grant(goCtx context.Context, msg *authz.MsgGrant) (*authz.MsgGra
 		return nil, err
 	}
 
+	// create the account if it is not in account state
+	granteeAcc := k.authKeeper.GetAccount(ctx, grantee)
+	if granteeAcc == nil {
+		granteeAcc = k.authKeeper.NewAccountWithAddress(ctx, grantee)
+		k.authKeeper.SetAccount(ctx, granteeAcc)
+	}
+
 	authorization := msg.GetAuthorization()
 	if authorization == nil {
 		return nil, sdkerrors.ErrUnpackAny.Wrap("Authorization is not present in the msg")

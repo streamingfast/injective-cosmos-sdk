@@ -14,21 +14,24 @@ import (
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 )
 
 type Keeper struct {
-	storeKey sdk.StoreKey
-	cdc      codec.BinaryCodec
-	router   *baseapp.MsgServiceRouter
+	storeKey   sdk.StoreKey
+	cdc        codec.BinaryCodec
+	router     *baseapp.MsgServiceRouter
+	authKeeper authkeeper.AccountKeeper
 }
 
 // NewKeeper constructs a message authorization Keeper
-func NewKeeper(storeKey sdk.StoreKey, cdc codec.BinaryCodec, router *baseapp.MsgServiceRouter) Keeper {
+func NewKeeper(storeKey sdk.StoreKey, cdc codec.BinaryCodec, router *baseapp.MsgServiceRouter, ak authkeeper.AccountKeeper) Keeper {
 	return Keeper{
-		storeKey: storeKey,
-		cdc:      cdc,
-		router:   router,
+		storeKey:   storeKey,
+		cdc:        cdc,
+		router:     router,
+		authKeeper: ak,
 	}
 }
 
