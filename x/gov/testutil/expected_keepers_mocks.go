@@ -543,7 +543,7 @@ func (mr *MockBankKeeperMockRecorder) InitGenesis(arg0, arg1 interface{}) *gomoc
 }
 
 // InputOutputCoins mocks base method.
-func (m *MockBankKeeper) InputOutputCoins(ctx context.Context, input types1.Input, outputs []types1.Output) error {
+func (m *MockBankKeeper) InputOutputCoins(ctx types.Context, input types1.Input, outputs []types1.Output) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InputOutputCoins", ctx, input, outputs)
 	ret0, _ := ret[0].(error)
