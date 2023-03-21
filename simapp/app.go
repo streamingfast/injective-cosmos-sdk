@@ -55,7 +55,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/capability"
 	capabilitykeeper "github.com/cosmos/cosmos-sdk/x/capability/keeper"
 	capabilitytypes "github.com/cosmos/cosmos-sdk/x/capability/types"
-	consensus "github.com/cosmos/cosmos-sdk/x/consensus"
+	"github.com/cosmos/cosmos-sdk/x/consensus"
 	consensusparamkeeper "github.com/cosmos/cosmos-sdk/x/consensus/keeper"
 	consensusparamtypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
 	"github.com/cosmos/cosmos-sdk/x/crisis"
@@ -266,7 +266,7 @@ func NewSimApp(
 		authzkeeper.StoreKey, nftkeeper.StoreKey, group.StoreKey,
 	)
 
-	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey)
+	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey, banktypes.TStoreKey)
 	// NOTE: The testingkey is just mounted for testing purposes. Actual applications should
 	// not include this key.
 	memKeys := sdk.NewMemoryStoreKeys(capabilitytypes.MemStoreKey, "testingkey")
@@ -305,6 +305,7 @@ func NewSimApp(
 	app.BankKeeper = bankkeeper.NewBaseKeeper(
 		appCodec,
 		keys[banktypes.StoreKey],
+		tkeys[banktypes.TStoreKey],
 		app.AccountKeeper,
 		BlockedAddresses(),
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
