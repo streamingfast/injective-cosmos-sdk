@@ -65,6 +65,7 @@ type BaseSendKeeper struct {
 func NewBaseSendKeeper(
 	cdc codec.BinaryCodec,
 	storeKey storetypes.StoreKey,
+	tStoreKey storetypes.StoreKey,
 	ak types.AccountKeeper,
 	blockedAddrs map[string]bool,
 	authority string,
@@ -74,7 +75,7 @@ func NewBaseSendKeeper(
 	}
 
 	return BaseSendKeeper{
-		BaseViewKeeper: NewBaseViewKeeper(cdc, storeKey, ak),
+		BaseViewKeeper: NewBaseViewKeeper(cdc, storeKey, tStoreKey, ak),
 		cdc:            cdc,
 		ak:             ak,
 		storeKey:       storeKey,
