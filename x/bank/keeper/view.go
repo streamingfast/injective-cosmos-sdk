@@ -35,17 +35,19 @@ type ViewKeeper interface {
 
 // BaseViewKeeper implements a read only keeper implementation of ViewKeeper.
 type BaseViewKeeper struct {
-	cdc      codec.BinaryCodec
-	storeKey storetypes.StoreKey
-	ak       types.AccountKeeper
+	cdc       codec.BinaryCodec
+	storeKey  storetypes.StoreKey
+	tStoreKey storetypes.StoreKey
+	ak        types.AccountKeeper
 }
 
 // NewBaseViewKeeper returns a new BaseViewKeeper.
-func NewBaseViewKeeper(cdc codec.BinaryCodec, storeKey storetypes.StoreKey, ak types.AccountKeeper) BaseViewKeeper {
+func NewBaseViewKeeper(cdc codec.BinaryCodec, storeKey storetypes.StoreKey, tStoreKey storetypes.StoreKey, ak types.AccountKeeper) BaseViewKeeper {
 	return BaseViewKeeper{
-		cdc:      cdc,
-		storeKey: storeKey,
-		ak:       ak,
+		cdc:       cdc,
+		storeKey:  storeKey,
+		tStoreKey: tStoreKey,
+		ak:        ak,
 	}
 }
 
