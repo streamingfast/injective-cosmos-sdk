@@ -200,6 +200,12 @@ type CommitMultiStore interface {
 	// AddListeners adds WriteListeners for the KVStore belonging to the provided StoreKey
 	// It appends the listeners to a current set, if one already exists
 	AddListeners(key StoreKey, listeners []WriteListener)
+
+	// SetCommitSync set store commit sync mode
+	SetCommitSync(sync bool)
+
+	// GetCommitSync get store commit sync mode
+	GetCommitSync() bool
 }
 
 //---------subsp-------------------------------
