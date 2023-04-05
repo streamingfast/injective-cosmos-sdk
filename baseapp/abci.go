@@ -180,6 +180,9 @@ func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeg
 	// set the signed validators for addition to context in deliverTx
 	app.voteInfos = req.LastCommitInfo.GetVotes()
 
+	// mark tendermint event version by 1st event
+	res.Events = append([]abci.Event{{Type: "use_proto_abci"}}, res.Events...)
+
 	// call the hooks with the BeginBlock messages
 	for _, streamingListener := range app.abciListeners {
 		if err := streamingListener.ListenBeginBlock(app.deliverState.ctx, req, res); err != nil {
