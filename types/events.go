@@ -1,7 +1,6 @@
 package types
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -12,8 +11,6 @@ import (
 // ----------------------------------------------------------------------------
 // Event Manager
 // ----------------------------------------------------------------------------
-
-const ABCI_PREFIX = "abci_"
 
 // EventManager implements a simple wrapper around a slice of Event objects that
 // can be emitted from.
@@ -32,18 +29,13 @@ func (em *EventManager) Events() Events {
 // EmitEvent stores a single Event object.
 // Deprecated: Use EmitTypedEvent
 func (em *EventManager) EmitEvent(event Event) {
-	ev := ParseAbciEvent(event)
-	em.events = em.events.AppendEvent(ev)
+	em.events = em.events.AppendEvent(event)
 }
 
 // EmitEvents stores a series of Event objects.
 // Deprecated: Use EmitTypedEvents
 func (em *EventManager) EmitEvents(events Events) {
-	evs := make(Events, len(events))
-	for i, event := range events {
-		evs[i] = ParseAbciEvent(event)
-		em.events = em.events.AppendEvents(evs)
-	}
+	em.events = em.events.AppendEvents(events)
 }
 
 // ABCIEvents returns all stored Event objects as abci.Event objects.
@@ -66,27 +58,6 @@ func (em *EventManager) EmitTypedEvents(tevs []proto.Message) error {
 	}
 	em.events = em.events.AppendEvents(evs)
 	return nil
-}
-
-func ParseAbciEvent(event Event) Event {
-	m := map[string]interface{}{}
-	for _, a := range event.Attributes {
-		// trick to skip parsed events
-		if strings.Contains(string(a.Key), ABCI_PREFIX) || len(a.Key) == 0 {
-			return event
-		}
-		m[string(a.Key)] = string(a.Value)
-	}
-	bz, _ := json.Marshal(m)
-	e := Event{
-		Type: event.Type,
-		Attributes: []abci.EventAttribute{
-			{Key: ABCI_PREFIX + event.Type, Value: string(bz)},
-		},
-	}
-
-	return e
-
 }
 
 func ParseTypedEvent(event proto.Message) Event {
