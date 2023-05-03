@@ -1,7 +1,6 @@
 package types
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -13,8 +12,6 @@ import (
 // ----------------------------------------------------------------------------
 // Event Manager
 // ----------------------------------------------------------------------------
-
-const ABCI_PREFIX = "abci_"
 
 // EventManager implements a simple wrapper around a slice of Event objects that
 // can be emitted from.
@@ -62,27 +59,6 @@ func (em *EventManager) EmitTypedEvents(tevs []proto.Message) error {
 	}
 	em.events = append(em.events, evs...)
 	return nil
-}
-
-func ParseAbciEvent(event Event) Event {
-	m := map[string]interface{}{}
-	for _, a := range event.Attributes {
-		// trick to skip parsed events
-		if strings.Contains(string(a.Key), ABCI_PREFIX) || len(a.Key) == 0 {
-			return event
-		}
-		m[string(a.Key)] = string(a.Value)
-	}
-	bz, _ := json.Marshal(m)
-	e := Event{
-		Type: event.Type,
-		Attributes: []abci.EventAttribute{
-			{Key: []byte(ABCI_PREFIX + event.Type), Value: bz},
-		},
-	}
-
-	return e
-
 }
 
 func ParseTypedEvent(event proto.Message) Event {
@@ -151,17 +127,12 @@ func (e Event) AppendAttributes(attrs ...Attribute) Event {
 
 // AppendEvent adds an Event to a slice of events.
 func (e Events) AppendEvent(event Event) Events {
-	pev := ParseAbciEvent(event)
-	return append(e, pev)
+	return append(e, event)
 }
 
 // AppendEvents adds a slice of Event objects to an exist slice of Event objects.
 func (e Events) AppendEvents(events Events) Events {
-	for _, ev := range events {
-		pev := ParseAbciEvent(ev)
-		e = append(e, pev)
-	}
-	return e
+	return append(e, events...)
 }
 
 // ToABCIEvents converts a slice of Event objects to a slice of abci.Event
