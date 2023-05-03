@@ -730,6 +730,7 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte) (gInfo sdk.GasInfo, re
 	// in case message processing fails. At this point, the MultiStore
 	// is a branch of a branch.
 	runMsgCtx, msCache := app.cacheTxContext(ctx, txBytes)
+	runMsgCtx = runMsgCtx.WithValue("txHash", tmhash.Sum(txBytes))
 
 	// Attempt to execute all messages and only update state if all messages pass
 	// and we're in DeliverTx. Note, runMsgs will never return a reference to a
