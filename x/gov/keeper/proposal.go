@@ -19,7 +19,7 @@ func (keeper Keeper) SubmitProposal(ctx sdk.Context, messages []sdk.Msg, metadat
 	}
 
 	// assert summary is no longer than predefined max length of metadata
-	err = keeper.assertMetadataLength(summary)
+	err = keeper.assertSummaryLength(summary)
 	if err != nil {
 		return v1.Proposal{}, err
 	}
