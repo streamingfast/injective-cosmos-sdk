@@ -1005,7 +1005,8 @@ func (rs *Store) buildCommitInfo(version int64) *types.CommitInfo {
 	storeInfos := []types.StoreInfo{}
 	for _, key := range keys {
 		store := rs.stores[key]
-		if store.GetStoreType() == types.StoreTypeTransient {
+		storeType := store.GetStoreType()
+		if storeType == types.StoreTypeTransient || storeType == types.StoreTypeMemory {
 			continue
 		}
 		storeInfos = append(storeInfos, types.StoreInfo{
