@@ -194,6 +194,7 @@ func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeg
 
 	if app.beginBlocker != nil {
 		res = app.beginBlocker(app.deliverState.ctx, req)
+		app.AddStreamEvents(req.Header.Height, res.Events, false)
 		res.Events = sdk.MarkEventsToIndex(res.Events, app.indexEvents)
 	}
 	// set the signed validators for addition to context in deliverTx
@@ -217,6 +218,7 @@ func (app *BaseApp) EndBlock(req abci.RequestEndBlock) (res abci.ResponseEndBloc
 
 	if app.endBlocker != nil {
 		res = app.endBlocker(app.deliverState.ctx, req)
+		app.AddStreamEvents(req.Height, res.Events, true)
 		res.Events = sdk.MarkEventsToIndex(res.Events, app.indexEvents)
 	}
 
