@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/InjectiveLabs/injective-core/memstore"
 	dbm "github.com/cometbft/cometbft-db"
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/crypto/tmhash"
@@ -76,6 +77,8 @@ type BaseApp struct { //nolint: maligned
 
 	// manages snapshots, i.e. dumps of app state at certain intervals
 	snapshotManager *snapshots.Manager
+	// manages memory stores and memCtxs
+	memStoreMgr *memstore.MemStoreMgr
 
 	// volatile states:
 	//
@@ -191,6 +194,7 @@ func NewBaseApp(
 	}
 
 	app.runTxRecoveryMiddleware = newDefaultRecoveryMiddleware()
+	app.memStoreMgr = &memstore.MemStoreMgr{}
 
 	return app
 }
@@ -411,7 +415,7 @@ func (app *BaseApp) setState(mode runTxMode, header tmproto.Header) {
 	ms := app.cms.CacheMultiStore()
 	baseState := &state{
 		ms:  ms,
-		ctx: sdk.NewContext(ms, header, false, app.logger),
+		ctx: sdk.NewContext(ms, header, false, app.logger).WithMemStoreCtx(app.memStoreMgr.NewMemContext()),
 	}
 
 	switch mode {
@@ -604,7 +608,7 @@ func (app *BaseApp) cacheTxContext(ctx sdk.Context, txBytes []byte) (sdk.Context
 		).(sdk.CacheMultiStore)
 	}
 
-	return ctx.WithMultiStore(msCache), msCache
+	return ctx.WithMultiStore(msCache).WithMemStoreCtx(ctx.MemStoreCtx().Branch()), msCache
 }
 
 // runTx processes a transaction within a given execution mode, encoded transaction
@@ -709,6 +713,7 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte) (gInfo sdk.GasInfo, re
 
 		priority = ctx.Priority()
 		msCache.Write()
+		anteCtx.MemStoreCtx().Commit()
 		anteEvents = events.ToABCIEvents()
 	}
 
@@ -756,6 +761,7 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte) (gInfo sdk.GasInfo, re
 			// When block gas exceeds, it'll panic and won't commit the cached store.
 			consumeBlockGas()
 
+			runMsgCtx.MemStoreCtx().Commit()
 			msCache.Write()
 		}
 
