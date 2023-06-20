@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/InjectiveLabs/injective-core/memstore"
 	abci "github.com/cometbft/cometbft/abci/types"
 	tmbytes "github.com/cometbft/cometbft/libs/bytes"
 	"github.com/cometbft/cometbft/libs/log"
@@ -41,6 +42,7 @@ type Context struct {
 	priority             int64 // The tx priority, only relevant in CheckTx
 	kvGasConfig          storetypes.GasConfig
 	transientKVGasConfig storetypes.GasConfig
+	memStoreCtx          *memstore.MemContext
 }
 
 // Proposed rename, not done to avoid API breakage
@@ -64,6 +66,7 @@ func (c Context) EventManager() *EventManager                { return c.eventMan
 func (c Context) Priority() int64                            { return c.priority }
 func (c Context) KVGasConfig() storetypes.GasConfig          { return c.kvGasConfig }
 func (c Context) TransientKVGasConfig() storetypes.GasConfig { return c.transientKVGasConfig }
+func (c Context) MemStoreCtx() *memstore.MemContext          { return c.memStoreCtx }
 
 // clone the header before returning
 func (c Context) BlockHeader() tmproto.Header {
@@ -255,6 +258,12 @@ func (c Context) WithPriority(p int64) Context {
 	return c
 }
 
+// WithMemStoreCtx returns a Context with an updated memStoreCtx
+func (c Context) WithMemStoreCtx(memCtx *memstore.MemContext) Context {
+	c.memStoreCtx = memCtx
+	return c
+}
+
 // TODO: remove???
 func (c Context) IsZero() bool {
 	return c.ms == nil
@@ -293,11 +302,12 @@ func (c Context) TransientStore(key storetypes.StoreKey) KVStore {
 // EventManager when the caller executes the write.
 func (c Context) CacheContext() (cc Context, writeCache func()) {
 	cms := c.MultiStore().CacheMultiStore()
-	cc = c.WithMultiStore(cms).WithEventManager(NewEventManager())
+	cc = c.WithMultiStore(cms).WithEventManager(NewEventManager()).WithMemStoreCtx(c.MemStoreCtx().Branch())
 
 	writeCache = func() {
 		c.EventManager().EmitEvents(cc.EventManager().Events())
 		cms.Write()
+		cc.MemStoreCtx().Commit()
 	}
 
 	return cc, writeCache
