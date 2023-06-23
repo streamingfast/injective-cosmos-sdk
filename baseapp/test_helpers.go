@@ -38,12 +38,14 @@ func (app *BaseApp) SimDeliver(txEncoder sdk.TxEncoder, tx sdk.Tx) (sdk.GasInfo,
 
 // Context with current {check, deliver}State of the app used by tests.
 func (app *BaseApp) NewContext(isCheckTx bool, header tmproto.Header) sdk.Context {
+	var ctx sdk.Context
 	if isCheckTx {
-		return sdk.NewContext(app.checkState.ms, header, true, app.logger).
+		ctx = sdk.NewContext(app.checkState.ms, header, true, app.logger).
 			WithMinGasPrices(app.minGasPrices)
+	} else {
+		ctx = sdk.NewContext(app.deliverState.ms, header, false, app.logger)
 	}
-
-	return sdk.NewContext(app.deliverState.ms, header, false, app.logger)
+	return ctx.WithMemStoreCtx(app.memStoreMgr.NewMemContext())
 }
 
 func (app *BaseApp) NewUncachedContext(isCheckTx bool, header tmproto.Header) sdk.Context {
