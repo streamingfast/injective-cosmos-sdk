@@ -337,3 +337,23 @@ func (k Keeper) RemoveExpiredAllowances(ctx sdk.Context) {
 		store.Delete(feegrant.FeeAllowanceKey(granter, grantee))
 	}
 }
+
+// CheckGrantedFee is the check part of UseGrantedFees. It's used to assert whether a grant covers the fees.
+// No state is persisted.
+func (k Keeper) CheckGrantedFee(ctx sdk.Context, granter, grantee sdk.AccAddress, fee sdk.Coins, msgs []sdk.Msg) error {
+	f, err := k.getGrant(ctx, granter, grantee)
+	if err != nil {
+		return err
+	}
+
+	grant, err := f.GetGrant()
+	if err != nil {
+		return err
+	}
+
+	if _, err := grant.Accept(ctx, fee, msgs); err != nil {
+		return err
+	}
+
+	return nil
+}

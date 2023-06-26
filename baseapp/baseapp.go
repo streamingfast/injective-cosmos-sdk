@@ -1,8 +1,10 @@
 package baseapp
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"sort"
 	"strings"
 
@@ -885,11 +887,13 @@ func (app *BaseApp) PrepareProposalVerifyTx(tx sdk.Tx) ([]byte, error) {
 func (app *BaseApp) ProcessProposalVerifyTx(txBz []byte) (sdk.Tx, error) {
 	tx, err := app.txDecoder(txBz)
 	if err != nil {
+		println("🦀 ProcessProposalVerifyTx txDecoder fail", err.Error())
 		return nil, err
 	}
 
 	_, _, _, _, err = app.runTx(runTxProcessProposal, txBz) //nolint:dogsled
 	if err != nil {
+		println("🦀 ProcessProposalVerifyTx runTx fail", err.Error())
 		return nil, err
 	}
 
@@ -1003,6 +1007,12 @@ func (h DefaultProposalHandler) ProcessProposalHandler() sdk.ProcessProposalHand
 		for _, txBytes := range req.Txs {
 			_, err := h.txVerifier.ProcessProposalVerifyTx(txBytes)
 			if err != nil {
+				println("🚨ProcessProposalHandler error", err.Error())
+				println("🚨tx bytes", base64.StdEncoding.EncodeToString(txBytes))
+				println("🚨request", req.String())
+				println("👉👉👉👉👉👉👉👉👉👉👉👉👉👉👉👉👉")
+				debug.PrintStack()
+				println("🐛🐛🐛🐛🐛🐛🐛🐛🐛🐛🐛🐛🐛🐛🐛🐛🐛🐛")
 				return abci.ResponseProcessProposal{Status: abci.ResponseProcessProposal_REJECT}
 			}
 		}
