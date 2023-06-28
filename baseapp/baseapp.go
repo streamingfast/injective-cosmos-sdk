@@ -708,7 +708,7 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte) (gInfo sdk.GasInfo, re
 			// Also, in the case of the tx aborting, we need to track gas consumed via
 			// the instantiated gas meter in the AnteHandler, so we update the context
 			// prior to returning.
-			ctx = newCtx.WithMultiStore(ms)
+			ctx = newCtx.WithMultiStore(ms).WithMemStoreCtx(ctx.MemStoreCtx())
 		}
 
 		events := ctx.EventManager().Events()
