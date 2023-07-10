@@ -45,7 +45,7 @@ func (app *BaseApp) NewContext(isCheckTx bool, header tmproto.Header) sdk.Contex
 	} else {
 		ctx = sdk.NewContext(app.deliverState.ms, header, false, app.logger)
 	}
-	return ctx.WithMemStoreCtx(app.memStoreMgr.NewMemContext())
+	return ctx.WithMemStoreCtx(app.memStoreManager.NewMemContext())
 }
 
 func (app *BaseApp) NewUncachedContext(isCheckTx bool, header tmproto.Header) sdk.Context {

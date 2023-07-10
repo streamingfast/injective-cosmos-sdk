@@ -78,7 +78,7 @@ type BaseApp struct { //nolint: maligned
 	// manages snapshots, i.e. dumps of app state at certain intervals
 	snapshotManager *snapshots.Manager
 	// manages memory stores and memCtxs
-	memStoreMgr *memstore.MemStoreMgr
+	memStoreManager *memstore.MemStoreManager
 
 	// volatile states:
 	//
@@ -194,7 +194,7 @@ func NewBaseApp(
 	}
 
 	app.runTxRecoveryMiddleware = newDefaultRecoveryMiddleware()
-	app.memStoreMgr = &memstore.MemStoreMgr{}
+	app.memStoreManager = &memstore.MemStoreManager{}
 
 	return app
 }
@@ -424,7 +424,7 @@ func (app *BaseApp) setState(mode runTxMode, header tmproto.Header) {
 	ms := app.cms.CacheMultiStore()
 	baseState := &state{
 		ms:  ms,
-		ctx: sdk.NewContext(ms, header, false, app.logger).WithMemStoreCtx(app.memStoreMgr.NewMemContext()),
+		ctx: sdk.NewContext(ms, header, false, app.logger).WithMemStoreCtx(app.memStoreManager.NewMemContext()),
 	}
 
 	switch mode {
