@@ -1,10 +1,12 @@
 package baseapp
 
 import (
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
+	"runtime/trace"
 	"sort"
 	"strings"
 	"syscall"
@@ -429,6 +431,8 @@ func (app *BaseApp) DeliverTx(req abci.RequestDeliverTx) (res abci.ResponseDeliv
 // against that height and gracefully halt if it matches the latest committed
 // height.
 func (app *BaseApp) Commit() abci.ResponseCommit {
+	ctx, task := trace.NewTask(context.Background(), "baseapp commit")
+	defer task.End()
 	header := app.deliverState.ctx.BlockHeader()
 	retainHeight := app.GetBlockRetentionHeight(header.Height)
 
@@ -440,8 +444,12 @@ func (app *BaseApp) Commit() abci.ResponseCommit {
 	// Write the DeliverTx state into branched storage and commit the MultiStore.
 	// The write to the DeliverTx state writes all state transitions to the root
 	// MultiStore (app.cms) so when Commit() is called is persists those values.
+	r := trace.StartRegion(ctx, "deliverState write")
 	app.deliverState.ms.Write()
+	r.End()
+	r = trace.StartRegion(ctx, "cms commit")
 	commitID := app.cms.Commit()
+	r.End()
 
 	res := abci.ResponseCommit{
 		Data:         commitID.Hash,
