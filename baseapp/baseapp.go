@@ -661,6 +661,9 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte) (gInfo sdk.GasInfo, re
 		defer consumeBlockGas()
 	}
 
+	noOpEventManager := mode == runTxModeCheck
+	ctx.EventManager().WithNoOpOption(noOpEventManager)
+
 	tx, err := app.txDecoder(txBytes)
 	if err != nil {
 		return sdk.GasInfo{}, nil, nil, 0, err
@@ -686,6 +689,8 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte) (gInfo sdk.GasInfo, re
 		// performance benefits, but it'll be more difficult to get right.
 		anteCtx, msCache = app.cacheTxContext(ctx, txBytes)
 		anteCtx = anteCtx.WithEventManager(sdk.NewEventManager())
+		anteCtx.EventManager().WithNoOpOption(noOpEventManager)
+
 		newCtx, err := app.anteHandler(anteCtx, tx, mode == runTxModeSimulate)
 
 		if !newCtx.IsZero() {
@@ -729,6 +734,7 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte) (gInfo sdk.GasInfo, re
 	// in case message processing fails. At this point, the MultiStore
 	// is a branch of a branch.
 	runMsgCtx, msCache := app.cacheTxContext(ctx, txBytes)
+	runMsgCtx.EventManager().WithNoOpOption(noOpEventManager)
 
 	// Attempt to execute all messages and only update state if all messages pass
 	// and we're in DeliverTx. Note, runMsgs will never return a reference to a
@@ -742,7 +748,7 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte) (gInfo sdk.GasInfo, re
 			// The runMsgCtx context currently contains events emitted by the ante handler.
 			// We clear this to correctly order events without duplicates.
 			// Note that the state is still preserved.
-			postCtx := runMsgCtx.WithEventManager(sdk.NewEventManager())
+			postCtx := runMsgCtx.WithEventManager(sdk.NewEventManager().WithNoOpOption(noOpEventManager))
 
 			newCtx, err := app.postHandler(postCtx, tx, mode == runTxModeSimulate, err == nil)
 			if err != nil {

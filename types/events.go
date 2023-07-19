@@ -16,10 +16,18 @@ import (
 // can be emitted from.
 type EventManager struct {
 	events Events
+	isNoOp bool
 }
 
-func NewEventManager() *EventManager {
-	return &EventManager{events: EmptyEvents()}
+type EventManagerOpt func(*EventManager)
+
+func (em *EventManager) WithNoOpOption(isNoOp bool) *EventManager {
+	em.isNoOp = isNoOp
+	return em
+}
+
+func NewEventManager(opts ...EventManagerOpt) *EventManager {
+	return &EventManager{events: EmptyEvents(), isNoOp: false}
 }
 
 func (em *EventManager) Events() Events {
@@ -29,12 +37,19 @@ func (em *EventManager) Events() Events {
 // EmitEvent stores a single Event object.
 // Deprecated: Use EmitTypedEvent
 func (em *EventManager) EmitEvent(event Event) {
+	if em.isNoOp {
+		return
+	}
 	em.events = em.events.AppendEvent(event)
 }
 
 // EmitEvents stores a series of Event objects.
 // Deprecated: Use EmitTypedEvents
 func (em *EventManager) EmitEvents(events Events) {
+	if em.isNoOp {
+		return
+	}
+
 	em.events = em.events.AppendEvents(events)
 }
 
@@ -45,6 +60,10 @@ func (em EventManager) ABCIEvents() []abci.Event {
 
 // EmitTypedEvent takes typed event and emits converting it into Event
 func (em *EventManager) EmitTypedEvent(tev proto.Message) error {
+	if em.isNoOp {
+		return nil
+	}
+
 	ev := ParseTypedEvent(tev)
 	em.events = append(em.events, ev)
 	return nil
@@ -52,6 +71,10 @@ func (em *EventManager) EmitTypedEvent(tev proto.Message) error {
 
 // EmitTypedEvents takes series of typed events and emit
 func (em *EventManager) EmitTypedEvents(tevs []proto.Message) error {
+	if em.isNoOp {
+		return nil
+	}
+
 	evs := make(Events, len(tevs))
 	for i, tev := range tevs {
 		evs[i] = ParseTypedEvent(tev)
