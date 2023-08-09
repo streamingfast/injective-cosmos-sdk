@@ -78,7 +78,7 @@ type BaseApp struct { //nolint: maligned
 	// manages snapshots, i.e. dumps of app state at certain intervals
 	snapshotManager *snapshots.Manager
 	// manages memory stores and memCtxs
-	memStoreMgr *memstore.MemStoreMgr
+	memStoreMgr *memstore.MemStoreManager
 
 	// volatile states:
 	//
@@ -194,7 +194,7 @@ func NewBaseApp(
 	}
 
 	app.runTxRecoveryMiddleware = newDefaultRecoveryMiddleware()
-	app.memStoreMgr = &memstore.MemStoreMgr{}
+	app.memStoreMgr = &memstore.MemStoreManager{}
 
 	return app
 }
