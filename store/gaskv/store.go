@@ -40,6 +40,8 @@ func (gs *Store) Get(key []byte) (value []byte) {
 	gs.gasMeter.ConsumeGas(gs.gasConfig.ReadCostPerByte*types.Gas(len(key)), types.GasReadPerByteDesc)
 	gs.gasMeter.ConsumeGas(gs.gasConfig.ReadCostPerByte*types.Gas(len(value)), types.GasReadPerByteDesc)
 
+	// fmt.Printf("get: %v(%d) = %v (%d)\n", key, len(key), value, len(value))
+
 	return value
 }
 
@@ -52,6 +54,8 @@ func (gs *Store) Set(key []byte, value []byte) {
 	gs.gasMeter.ConsumeGas(gs.gasConfig.WriteCostPerByte*types.Gas(len(key)), types.GasWritePerByteDesc)
 	gs.gasMeter.ConsumeGas(gs.gasConfig.WriteCostPerByte*types.Gas(len(value)), types.GasWritePerByteDesc)
 	gs.parent.Set(key, value)
+
+	// fmt.Printf("set: %v(%d) = %v (%d)\n", key, len(key), value, len(value))
 }
 
 // Implements KVStore.
