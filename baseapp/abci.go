@@ -441,9 +441,9 @@ func (app *BaseApp) Commit() abci.ResponseCommit {
 	if err := app.deliverState.ctx.MemStoreCtx().Commit(); err != nil {
 		panic(fmt.Errorf("commit deliver state MemStoreCtx failed, height: %d, err: %w", header.Height, err))
 	}
-	if err := app.memStoreMgr.Flush(app.cms); err != nil {
+	/*if err := app.memStoreMgr.Flush(app.cms); err != nil {
 		panic(fmt.Errorf("flush mem store to KVStore failed, height: %d, err: %w", header.Height, err))
-	}
+	}*/
 
 	// Write the DeliverTx state into branched storage and commit the MultiStore.
 	// The write to the DeliverTx state writes all state transitions to the root
