@@ -194,7 +194,7 @@ func NewBaseApp(
 	}
 
 	app.runTxRecoveryMiddleware = newDefaultRecoveryMiddleware()
-	app.memStoreMgr = &memstore.MemStoreManager{}
+	app.memStoreMgr = memstore.NewMemStoreManager()
 
 	return app
 }
