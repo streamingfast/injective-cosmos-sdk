@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"runtime/debug"
+	"strconv"
 
 	"github.com/cosmos/gogoproto/jsonpb"
 	"github.com/cosmos/gogoproto/proto"
@@ -137,7 +138,13 @@ func (a AminoJSONUnpacker) UnpackAny(any *Any, iface interface{}) error {
 	if ac == nil {
 		return anyCompatError("JSON unmarshal", reflect.TypeOf(iface))
 	}
-	err := a.Cdc.UnmarshalJSON(ac.jsonBz, iface)
+
+	actualBz, err := strconv.Unquote(string(ac.jsonBz))
+	if err != nil {
+		return fmt.Errorf("cannot unquote json bz: %w", err)
+	}
+
+	err = a.Cdc.UnmarshalJSON([]byte(actualBz), iface)
 	if err != nil {
 		return err
 	}
@@ -176,7 +183,7 @@ func (a AminoJSONPacker) UnpackAny(any *Any, _ interface{}) error {
 	}
 	bz, err := a.Cdc.MarshalJSON(any.cachedValue)
 	any.compat = &anyCompat{
-		jsonBz: bz,
+		jsonBz: []byte(strconv.Quote(string(bz))),
 		err:    err,
 	}
 	return err
