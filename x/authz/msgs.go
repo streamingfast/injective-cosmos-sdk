@@ -249,3 +249,54 @@ func (msg MsgExec) Route() string {
 func (msg MsgExec) GetSignBytes() []byte {
 	return sdk.MustSortJSON(authzcodec.ModuleCdc.MustMarshalJSON(&msg))
 }
+
+// func NewMsgExecCompat(grantee sdk.AccAddress, msgs []sdk.Msg) MsgExecCompat {
+// 	msgsAny := make([]*cdctypes.Any, len(msgs))
+// 	for i, msg := range msgs {
+// 		any, err := cdctypes.NewAnyWithValue(msg)
+// 		if err != nil {
+// 			panic(err)
+// 		}
+
+// 		msgsAny[i] = any.MarshalJSON()
+// 	}
+
+// 	return MsgExec{
+// 		Grantee: grantee.String(),
+// 		Msgs:    msgsAny,
+// 	}
+// }
+
+// GetSigners implements Msg
+func (msg MsgExecCompat) GetSigners() []sdk.AccAddress {
+	grantee, _ := sdk.AccAddressFromBech32(msg.Grantee)
+	return []sdk.AccAddress{grantee}
+}
+
+// ValidateBasic implements Msg
+func (msg MsgExecCompat) ValidateBasic() error {
+	if _, err := sdk.AccAddressFromBech32(msg.Grantee); err != nil {
+		return sdkerrors.ErrInvalidAddress.Wrapf("invalid grantee address: %s", err)
+	}
+
+	if len(msg.Msgs) == 0 {
+		return sdkerrors.ErrInvalidRequest.Wrapf("messages cannot be empty")
+	}
+
+	return nil
+}
+
+// Type implements the LegacyMsg.Type method.
+func (msg MsgExecCompat) Type() string {
+	return sdk.MsgTypeURL(&msg)
+}
+
+// Route implements the LegacyMsg.Route method.
+func (msg MsgExecCompat) Route() string {
+	return sdk.MsgTypeURL(&msg)
+}
+
+// GetSignBytes implements the LegacyMsg.GetSignBytes method.
+func (msg MsgExecCompat) GetSignBytes() []byte {
+	return sdk.MustSortJSON(authzcodec.ModuleCdc.MustMarshalJSON(&msg))
+}
