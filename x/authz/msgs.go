@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/x/auth/migrations/legacytx"
+	"github.com/cosmos/cosmos-sdk/x/authz/codec"
 	authzcodec "github.com/cosmos/cosmos-sdk/x/authz/codec"
 
 	"github.com/cosmos/gogoproto/proto"
@@ -250,23 +251,6 @@ func (msg MsgExec) GetSignBytes() []byte {
 	return sdk.MustSortJSON(authzcodec.ModuleCdc.MustMarshalJSON(&msg))
 }
 
-// func NewMsgExecCompat(grantee sdk.AccAddress, msgs []sdk.Msg) MsgExecCompat {
-// 	msgsAny := make([]*cdctypes.Any, len(msgs))
-// 	for i, msg := range msgs {
-// 		any, err := cdctypes.NewAnyWithValue(msg)
-// 		if err != nil {
-// 			panic(err)
-// 		}
-
-// 		msgsAny[i] = any.MarshalJSON()
-// 	}
-
-// 	return MsgExec{
-// 		Grantee: grantee.String(),
-// 		Msgs:    msgsAny,
-// 	}
-// }
-
 // GetSigners implements Msg
 func (msg MsgExecCompat) GetSigners() []sdk.AccAddress {
 	grantee, _ := sdk.AccAddressFromBech32(msg.Grantee)
@@ -281,6 +265,19 @@ func (msg MsgExecCompat) ValidateBasic() error {
 
 	if len(msg.Msgs) == 0 {
 		return sdkerrors.ErrInvalidRequest.Wrapf("messages cannot be empty")
+	}
+
+	for _, m := range msg.Msgs {
+		var iMsg sdk.Msg
+		err := codec.GlobalCdc.UnmarshalInterfaceJSON([]byte(m), &iMsg)
+		if err != nil {
+			return err
+		}
+
+		err = iMsg.ValidateBasic()
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

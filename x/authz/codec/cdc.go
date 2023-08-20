@@ -9,6 +9,7 @@ import (
 var (
 	Amino     = codec.NewLegacyAmino()
 	ModuleCdc = codec.NewAminoCodec(Amino)
+	GlobalCdc *codec.ProtoCodec
 )
 
 func init() {
