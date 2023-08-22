@@ -146,7 +146,8 @@ type BaseApp struct { //nolint: maligned
 	chainID string
 
 	// StreamEvents
-	StreamEvents chan StreamEvents
+	EnableStreamer bool
+	StreamEvents   chan StreamEvents
 }
 
 // NewBaseApp returns a reference to an initialized BaseApp. It accepts a
