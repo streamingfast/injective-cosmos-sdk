@@ -1,6 +1,7 @@
 package authz
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/x/auth/migrations/legacytx"
@@ -267,16 +268,16 @@ func (msg MsgExecCompat) ValidateBasic() error {
 		return sdkerrors.ErrInvalidRequest.Wrapf("messages cannot be empty")
 	}
 
-	for _, m := range msg.Msgs {
+	for idx, m := range msg.Msgs {
 		var iMsg sdk.Msg
 		err := codec.GlobalCdc.UnmarshalInterfaceJSON([]byte(m), &iMsg)
 		if err != nil {
-			return err
+			return fmt.Errorf("parse message at index %d error: %w", idx, err)
 		}
 
 		err = iMsg.ValidateBasic()
 		if err != nil {
-			return err
+			return fmt.Errorf("validate message at index %d error: %w", idx, err)
 		}
 	}
 
