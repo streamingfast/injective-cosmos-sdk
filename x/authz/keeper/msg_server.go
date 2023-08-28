@@ -2,10 +2,12 @@ package keeper
 
 import (
 	"context"
+	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/authz"
+	"github.com/cosmos/cosmos-sdk/x/authz/codec"
 )
 
 var _ authz.MsgServer = Keeper{}
@@ -87,4 +89,30 @@ func (k Keeper) Exec(goCtx context.Context, msg *authz.MsgExec) (*authz.MsgExecR
 	}
 
 	return &authz.MsgExecResponse{Results: results}, nil
+}
+
+// Exec implements the MsgServer.ExecCompat method.
+func (k Keeper) ExecCompat(goCtx context.Context, msg *authz.MsgExecCompat) (*authz.MsgExecCompatResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	grantee, err := sdk.AccAddressFromBech32(msg.Grantee)
+	if err != nil {
+		return nil, err
+	}
+
+	subMsgs := make([]sdk.Msg, len(msg.Msgs))
+	for idx, m := range msg.Msgs {
+		var iMsg sdk.Msg
+		err := codec.GlobalCdc.UnmarshalInterfaceJSON([]byte(m), &iMsg)
+		if err != nil {
+			return nil, err
+		}
+		subMsgs[idx] = iMsg
+	}
+
+	results, err := k.DispatchActions(ctx, grantee, subMsgs)
+	if err != nil {
+		return nil, fmt.Errorf("dispatch err: %w", err)
+	}
+
+	return &authz.MsgExecCompatResponse{Results: results}, nil
 }

@@ -144,6 +144,9 @@ type BaseApp struct { //nolint: maligned
 	abciListeners []ABCIListener
 
 	chainID string
+
+	// StreamEvents
+	StreamEvents chan StreamEvents
 }
 
 // NewBaseApp returns a reference to an initialized BaseApp. It accepts a
@@ -164,6 +167,7 @@ func NewBaseApp(
 		msgServiceRouter: NewMsgServiceRouter(),
 		txDecoder:        txDecoder,
 		fauxMerkleMode:   false,
+		StreamEvents:     make(chan StreamEvents),
 	}
 
 	for _, option := range options {
