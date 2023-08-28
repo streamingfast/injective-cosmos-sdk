@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/x/auth/migrations/legacytx"
-	"github.com/cosmos/cosmos-sdk/x/authz/codec"
 	authzcodec "github.com/cosmos/cosmos-sdk/x/authz/codec"
 
 	"github.com/cosmos/gogoproto/proto"
@@ -270,7 +269,7 @@ func (msg MsgExecCompat) ValidateBasic() error {
 
 	for idx, m := range msg.Msgs {
 		var iMsg sdk.Msg
-		err := codec.GlobalCdc.UnmarshalInterfaceJSON([]byte(m), &iMsg)
+		err := authzcodec.GlobalCdc.UnmarshalInterfaceJSON([]byte(m), &iMsg)
 		if err != nil {
 			return fmt.Errorf("parse message at index %d error: %w", idx, err)
 		}
