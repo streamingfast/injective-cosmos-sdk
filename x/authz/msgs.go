@@ -1,6 +1,7 @@
 package authz
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/x/auth/migrations/legacytx"
@@ -247,5 +248,52 @@ func (msg MsgExec) Route() string {
 
 // GetSignBytes implements the LegacyMsg.GetSignBytes method.
 func (msg MsgExec) GetSignBytes() []byte {
+	return sdk.MustSortJSON(authzcodec.ModuleCdc.MustMarshalJSON(&msg))
+}
+
+// GetSigners implements Msg
+func (msg MsgExecCompat) GetSigners() []sdk.AccAddress {
+	grantee, _ := sdk.AccAddressFromBech32(msg.Grantee)
+	return []sdk.AccAddress{grantee}
+}
+
+// ValidateBasic implements Msg
+func (msg MsgExecCompat) ValidateBasic() error {
+	if _, err := sdk.AccAddressFromBech32(msg.Grantee); err != nil {
+		return sdkerrors.ErrInvalidAddress.Wrapf("invalid grantee address: %s", err)
+	}
+
+	if len(msg.Msgs) == 0 {
+		return sdkerrors.ErrInvalidRequest.Wrapf("messages cannot be empty")
+	}
+
+	for idx, m := range msg.Msgs {
+		var iMsg sdk.Msg
+		err := authzcodec.GlobalCdc.UnmarshalInterfaceJSON([]byte(m), &iMsg)
+		if err != nil {
+			return fmt.Errorf("parse message at index %d error: %w", idx, err)
+		}
+
+		err = iMsg.ValidateBasic()
+		if err != nil {
+			return fmt.Errorf("validate message at index %d error: %w", idx, err)
+		}
+	}
+
+	return nil
+}
+
+// Type implements the LegacyMsg.Type method.
+func (msg MsgExecCompat) Type() string {
+	return sdk.MsgTypeURL(&msg)
+}
+
+// Route implements the LegacyMsg.Route method.
+func (msg MsgExecCompat) Route() string {
+	return sdk.MsgTypeURL(&msg)
+}
+
+// GetSignBytes implements the LegacyMsg.GetSignBytes method.
+func (msg MsgExecCompat) GetSignBytes() []byte {
 	return sdk.MustSortJSON(authzcodec.ModuleCdc.MustMarshalJSON(&msg))
 }
