@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"context"
 	"fmt"
 
 	"cosmossdk.io/math"
@@ -112,7 +111,7 @@ func NewBaseKeeper(
 		ak:                     ak,
 		cdc:                    cdc,
 		storeKey:               storeKey,
-		mintCoinsRestrictionFn: func(ctx context.Context, coins sdk.Coins) error { return nil },
+		mintCoinsRestrictionFn: types.NoOpMintingRestrictionFn,
 	}
 }
 
