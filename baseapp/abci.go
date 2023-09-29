@@ -194,7 +194,7 @@ func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeg
 
 	if app.beginBlocker != nil {
 		res = app.beginBlocker(app.deliverState.ctx, req)
-		app.AddStreamEvents(req.Header.Height, res.Events, false)
+		app.AddStreamEvents(req.Header.Height, req.Header.Time, res.Events, false)
 		res.Events = sdk.MarkEventsToIndex(res.Events, app.indexEvents)
 	}
 	// set the signed validators for addition to context in deliverTx
@@ -218,7 +218,7 @@ func (app *BaseApp) EndBlock(req abci.RequestEndBlock) (res abci.ResponseEndBloc
 
 	if app.endBlocker != nil {
 		res = app.endBlocker(app.deliverState.ctx, req)
-		app.AddStreamEvents(req.Height, res.Events, true)
+		app.AddStreamEvents(req.Height, app.deliverState.ctx.BlockTime(), res.Events, true)
 		res.Events = sdk.MarkEventsToIndex(res.Events, app.indexEvents)
 	}
 
@@ -414,7 +414,7 @@ func (app *BaseApp) DeliverTx(req abci.RequestDeliverTx) (res abci.ResponseDeliv
 		return sdkerrors.ResponseDeliverTxWithEvents(err, gInfo.GasWanted, gInfo.GasUsed, sdk.MarkEventsToIndex(anteEvents, app.indexEvents), app.trace)
 	}
 
-	app.AddStreamEvents(app.checkState.Context().BlockHeight(), result.Events, false)
+	app.AddStreamEvents(app.checkState.Context().BlockHeight(), app.checkState.Context().BlockTime(), result.Events, false)
 
 	return abci.ResponseDeliverTx{
 		GasWanted: int64(gInfo.GasWanted), // TODO: Should type accept unsigned ints?
