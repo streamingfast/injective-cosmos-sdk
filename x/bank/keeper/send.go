@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"context"
 	"fmt"
 
 	gogotypes "github.com/cosmos/gogoproto/types"
@@ -21,11 +20,7 @@ import (
 type SendKeeper interface {
 	ViewKeeper
 
-	AppendSendRestriction(restriction types.SendRestrictionFn)
-	PrependSendRestriction(restriction types.SendRestrictionFn)
-	ClearSendRestriction()
-
-	InputOutputCoins(ctx sdk.Context, input types.Input, outputs []types.Output) error
+	InputOutputCoins(ctx sdk.Context, inputs []types.Input, outputs []types.Output) error
 	SendCoins(ctx sdk.Context, fromAddr sdk.AccAddress, toAddr sdk.AccAddress, amt sdk.Coins) error
 
 	GetParams(ctx sdk.Context) types.Params
@@ -65,8 +60,6 @@ type BaseSendKeeper struct {
 	// the address capable of executing a MsgUpdateParams message. Typically, this
 	// should be the x/gov module account.
 	authority string
-
-	sendRestriction *sendRestriction
 }
 
 func NewBaseSendKeeper(
@@ -82,29 +75,13 @@ func NewBaseSendKeeper(
 	}
 
 	return BaseSendKeeper{
-		BaseViewKeeper:  NewBaseViewKeeper(cdc, storeKey, tStoreKey, ak),
-		cdc:             cdc,
-		ak:              ak,
-		storeKey:        storeKey,
-		blockedAddrs:    blockedAddrs,
-		authority:       authority,
-		sendRestriction: newSendRestriction(),
+		BaseViewKeeper: NewBaseViewKeeper(cdc, storeKey, tStoreKey, ak),
+		cdc:            cdc,
+		ak:             ak,
+		storeKey:       storeKey,
+		blockedAddrs:   blockedAddrs,
+		authority:      authority,
 	}
-}
-
-// AppendSendRestriction adds the provided SendRestrictionFn to run after previously provided restrictions.
-func (k BaseSendKeeper) AppendSendRestriction(restriction types.SendRestrictionFn) {
-	k.sendRestriction.append(restriction)
-}
-
-// PrependSendRestriction adds the provided SendRestrictionFn to run before previously provided restrictions.
-func (k BaseSendKeeper) PrependSendRestriction(restriction types.SendRestrictionFn) {
-	k.sendRestriction.prepend(restriction)
-}
-
-// ClearSendRestriction removes the send restriction (if there is one).
-func (k BaseSendKeeper) ClearSendRestriction() {
-	k.sendRestriction.clear()
 }
 
 // GetAuthority returns the x/bank module's authority.
@@ -150,40 +127,37 @@ func (k BaseSendKeeper) SetParams(ctx sdk.Context, params types.Params) error {
 	return nil
 }
 
-// InputOutputCoins performs multi-send functionality. It accepts an
-// input that corresponds to a series of outputs. It returns an error if the
-// input and outputs don't line up or if any single transfer of tokens fails.
-func (k BaseSendKeeper) InputOutputCoins(ctx sdk.Context, input types.Input, outputs []types.Output) error {
+// InputOutputCoins performs multi-send functionality. It accepts a series of
+// inputs that correspond to a series of outputs. It returns an error if the
+// inputs and outputs don't line up or if any single transfer of tokens fails.
+func (k BaseSendKeeper) InputOutputCoins(ctx sdk.Context, inputs []types.Input, outputs []types.Output) error {
 	// Safety check ensuring that when sending coins the keeper must maintain the
 	// Check supply invariant and validity of Coins.
-	if err := types.ValidateInputOutputs(input, outputs); err != nil {
+	if err := types.ValidateInputsOutputs(inputs, outputs); err != nil {
 		return err
 	}
 
-	inAddress, err := sdk.AccAddressFromBech32(input.Address)
-	if err != nil {
-		return err
-	}
-
-	err = k.subUnlockedCoins(ctx, inAddress, input.Coins)
-	if err != nil {
-		return err
-	}
-
-	ctx.EventManager().EmitEvent(
-		sdk.NewEvent(
-			sdk.EventTypeMessage,
-			sdk.NewAttribute(types.AttributeKeySender, input.Address),
-		),
-	)
-
-	for _, out := range outputs {
-		outAddress, err := sdk.AccAddressFromBech32(out.Address)
+	for _, in := range inputs {
+		inAddress, err := sdk.AccAddressFromBech32(in.Address)
 		if err != nil {
 			return err
 		}
 
-		outAddress, err = k.sendRestriction.apply(ctx, inAddress, outAddress, out.Coins)
+		err = k.subUnlockedCoins(ctx, inAddress, in.Coins)
+		if err != nil {
+			return err
+		}
+
+		ctx.EventManager().EmitEvent(
+			sdk.NewEvent(
+				sdk.EventTypeMessage,
+				sdk.NewAttribute(types.AttributeKeySender, in.Address),
+			),
+		)
+	}
+
+	for _, out := range outputs {
+		outAddress, err := sdk.AccAddressFromBech32(out.Address)
 		if err != nil {
 			return err
 		}
@@ -195,7 +169,7 @@ func (k BaseSendKeeper) InputOutputCoins(ctx sdk.Context, input types.Input, out
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
 				types.EventTypeTransfer,
-				sdk.NewAttribute(types.AttributeKeyRecipient, outAddress.String()),
+				sdk.NewAttribute(types.AttributeKeyRecipient, out.Address),
 				sdk.NewAttribute(sdk.AttributeKeyAmount, out.Coins.String()),
 			),
 		)
@@ -217,12 +191,7 @@ func (k BaseSendKeeper) InputOutputCoins(ctx sdk.Context, input types.Input, out
 // SendCoins transfers amt coins from a sending account to a receiving account.
 // An error is returned upon failure.
 func (k BaseSendKeeper) SendCoins(ctx sdk.Context, fromAddr sdk.AccAddress, toAddr sdk.AccAddress, amt sdk.Coins) error {
-	toAddr, err := k.sendRestriction.apply(ctx, fromAddr, toAddr, amt)
-	if err != nil {
-		return err
-	}
-
-	err = k.subUnlockedCoins(ctx, fromAddr, amt)
+	err := k.subUnlockedCoins(ctx, fromAddr, amt)
 	if err != nil {
 		return err
 	}
@@ -554,42 +523,4 @@ func (k BaseSendKeeper) getSendEnabledOrDefault(store sdk.KVStore, denom string,
 	}
 
 	return defaultVal
-}
-
-// sendRestriction is a struct that houses a SendRestrictionFn.
-// It exists so that the SendRestrictionFn can be updated in the SendKeeper without needing to have a pointer receiver.
-type sendRestriction struct {
-	fn types.SendRestrictionFn
-}
-
-// newSendRestriction creates a new sendRestriction with nil send restriction.
-func newSendRestriction() *sendRestriction {
-	return &sendRestriction{
-		fn: nil,
-	}
-}
-
-// append adds the provided restriction to this, to be run after the existing function.
-func (r *sendRestriction) append(restriction types.SendRestrictionFn) {
-	r.fn = r.fn.Then(restriction)
-}
-
-// prepend adds the provided restriction to this, to be run before the existing function.
-func (r *sendRestriction) prepend(restriction types.SendRestrictionFn) {
-	r.fn = restriction.Then(r.fn)
-}
-
-// clear removes the send restriction (sets it to nil).
-func (r *sendRestriction) clear() {
-	r.fn = nil
-}
-
-var _ types.SendRestrictionFn = (*sendRestriction)(nil).apply
-
-// apply applies the send restriction if there is one. If not, it's a no-op.
-func (r *sendRestriction) apply(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
-	if r == nil || r.fn == nil {
-		return toAddr, nil
-	}
-	return r.fn(ctx, fromAddr, toAddr, amt)
 }

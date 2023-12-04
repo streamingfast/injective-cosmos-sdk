@@ -65,8 +65,8 @@ func (msg MsgSend) GetSigners() []sdk.AccAddress {
 }
 
 // NewMsgMultiSend - construct arbitrary multi-in, multi-out send msg.
-func NewMsgMultiSend(in Input, out []Output) *MsgMultiSend {
-	return &MsgMultiSend{Inputs: []Input{in}, Outputs: out}
+func NewMsgMultiSend(in []Input, out []Output) *MsgMultiSend {
+	return &MsgMultiSend{Inputs: in, Outputs: out}
 }
 
 // Route Implements Msg
@@ -92,7 +92,7 @@ func (msg MsgMultiSend) ValidateBasic() error {
 		return ErrNoOutputs
 	}
 
-	return ValidateInputOutputs(msg.Inputs[0], msg.Outputs)
+	return ValidateInputsOutputs(msg.Inputs, msg.Outputs)
 }
 
 // GetSignBytes Implements Msg.
@@ -102,13 +102,13 @@ func (msg MsgMultiSend) GetSignBytes() []byte {
 
 // GetSigners Implements Msg.
 func (msg MsgMultiSend) GetSigners() []sdk.AccAddress {
-	// should not happen as ValidateBasic would have failed
-	if len(msg.Inputs) == 0 {
-		return nil
+	addrs := make([]sdk.AccAddress, len(msg.Inputs))
+	for i, in := range msg.Inputs {
+		inAddr, _ := sdk.AccAddressFromBech32(in.Address)
+		addrs[i] = inAddr
 	}
 
-	addrs, _ := sdk.AccAddressFromBech32(msg.Inputs[0].Address)
-	return []sdk.AccAddress{addrs}
+	return addrs
 }
 
 // ValidateBasic - validate transaction input
@@ -165,15 +165,17 @@ func NewOutput(addr sdk.AccAddress, coins sdk.Coins) Output {
 	}
 }
 
-// ValidateInputOutputs validates that each respective input and output is
+// ValidateInputsOutputs validates that each respective input and output is
 // valid and that the sum of inputs is equal to the sum of outputs.
-func ValidateInputOutputs(input Input, outputs []Output) error {
+func ValidateInputsOutputs(inputs []Input, outputs []Output) error {
 	var totalIn, totalOut sdk.Coins
 
-	if err := input.ValidateBasic(); err != nil {
-		return err
+	for _, in := range inputs {
+		if err := in.ValidateBasic(); err != nil {
+			return err
+		}
+		totalIn = totalIn.Add(in.Coins...)
 	}
-	totalIn = input.Coins
 
 	for _, out := range outputs {
 		if err := out.ValidateBasic(); err != nil {
