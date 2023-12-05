@@ -22,7 +22,7 @@ var _ Keeper = (*BaseKeeper)(nil)
 // between accounts.
 type Keeper interface {
 	SendKeeper
-	WithMintCoinsRestriction(MintingRestrictionFn) BaseKeeper
+	WithMintCoinsRestriction(types.MintingRestrictionFn) BaseKeeper
 
 	InitGenesis(sdk.Context, *types.GenesisState)
 	ExportGenesis(sdk.Context) *types.GenesisState
@@ -60,10 +60,8 @@ type BaseKeeper struct {
 	ak                     types.AccountKeeper
 	cdc                    codec.BinaryCodec
 	storeKey               storetypes.StoreKey
-	mintCoinsRestrictionFn MintingRestrictionFn
+	mintCoinsRestrictionFn types.MintingRestrictionFn
 }
-
-type MintingRestrictionFn func(ctx sdk.Context, coins sdk.Coins) error
 
 // GetPaginatedTotalSupply queries for the supply, ignoring 0 coins, with a given pagination
 func (k BaseKeeper) GetPaginatedTotalSupply(ctx sdk.Context, pagination *query.PageRequest) (sdk.Coins, *query.PageResponse, error) {
@@ -113,7 +111,7 @@ func NewBaseKeeper(
 		ak:                     ak,
 		cdc:                    cdc,
 		storeKey:               storeKey,
-		mintCoinsRestrictionFn: func(ctx sdk.Context, coins sdk.Coins) error { return nil },
+		mintCoinsRestrictionFn: types.NoOpMintingRestrictionFn,
 	}
 }
 
@@ -122,19 +120,8 @@ func NewBaseKeeper(
 // Previous restriction functions can be nested as such:
 //
 //	bankKeeper.WithMintCoinsRestriction(restriction1).WithMintCoinsRestriction(restriction2)
-func (k BaseKeeper) WithMintCoinsRestriction(check MintingRestrictionFn) BaseKeeper {
-	oldRestrictionFn := k.mintCoinsRestrictionFn
-	k.mintCoinsRestrictionFn = func(ctx sdk.Context, coins sdk.Coins) error {
-		err := check(ctx, coins)
-		if err != nil {
-			return err
-		}
-		err = oldRestrictionFn(ctx, coins)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
+func (k BaseKeeper) WithMintCoinsRestriction(check types.MintingRestrictionFn) BaseKeeper {
+	k.mintCoinsRestrictionFn = check.Then(k.mintCoinsRestrictionFn)
 	return k
 }
 
