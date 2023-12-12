@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"strings"
 
+	errorsmod "cosmossdk.io/errors"
 	gogogrpc "github.com/cosmos/gogoproto/grpc"
 	"github.com/golang/protobuf/proto" //nolint:staticcheck // keep legacy for now
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+	"github.com/pkg/errors"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -97,7 +100,7 @@ func (s txServer) Simulate(ctx context.Context, req *txtypes.SimulateRequest) (*
 
 	gasInfo, result, err := s.simulate(txBytes)
 	if err != nil {
-		return nil, status.Errorf(codes.Unknown, "%v With gas wanted: '%d' and gas used: '%d' ", err, gasInfo.GasWanted, gasInfo.GasUsed)
+		return nil, GRPCWrap(err, codes.Unknown, fmt.Sprintf("%v With gas wanted: '%d' and gas used: '%d' ", err, gasInfo.GasWanted, gasInfo.GasUsed))
 	}
 
 	return &txtypes.SimulateResponse{
@@ -332,4 +335,28 @@ func parseOrderBy(orderBy txtypes.OrderBy) string {
 	default:
 		return "" // Defaults to CometBFT's default, which is `asc` now.
 	}
+}
+
+func GRPCWrap(err error, c codes.Code, msg string) error {
+	if err == nil {
+		return nil
+	}
+
+	st := status.New(c, msg)
+	var sdkErr *errorsmod.Error
+
+	if errors.As(err, &sdkErr) {
+		errorInfo := &errdetails.ErrorInfo{
+			Reason:   sdkErr.Error(),
+			Metadata: map[string]string{"Codespace": sdkErr.Codespace(), "ABCICode": fmt.Sprintf("%d", sdkErr.ABCICode())},
+		}
+
+		var withDetailsErr error
+		st, withDetailsErr = st.WithDetails(errorInfo)
+		if withDetailsErr != nil {
+			return status.Errorf(c, "%v (failed to add error details: %v)", msg, withDetailsErr)
+		}
+	}
+
+	return st.Err()
 }
