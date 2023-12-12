@@ -370,7 +370,13 @@ func (isd IncrementSequenceDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, sim
 		return sdk.Context{}, err
 	}
 
+	feeTx, isFeeTx := tx.(sdk.FeeTx)
 	for _, signer := range signers {
+		// skip sequence increment of fee payer, when multiple signers exist
+		if isFeeTx && len(signers) > 1 && bytes.Equal(feeTx.FeePayer(), signer) {
+			continue
+		}
+
 		acc := isd.ak.GetAccount(ctx, signer)
 		if err := acc.SetSequence(acc.GetSequence() + 1); err != nil {
 			panic(err)
