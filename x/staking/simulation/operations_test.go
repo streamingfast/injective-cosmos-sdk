@@ -370,7 +370,7 @@ func (s *SimTestSuite) TestSimulateMsgBeginRedelegate() {
 }
 
 func (s *SimTestSuite) getTestingValidator0(ctx sdk.Context) types.Validator {
-	commission0 := types.NewCommission(math.LegacyZeroDec(), math.LegacyOneDec(), math.LegacyOneDec())
+	commission0 := types.NewCommission(types.MinCommissionRate, math.LegacyOneDec(), math.LegacyOneDec())
 	return s.getTestingValidator(ctx, commission0, 1)
 }
 

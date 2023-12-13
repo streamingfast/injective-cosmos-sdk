@@ -218,7 +218,7 @@ func TestValidatorSetInitialCommission(t *testing.T) {
 		commission  types.Commission
 		expectedErr bool
 	}{
-		{val, types.NewCommission(math.LegacyZeroDec(), math.LegacyZeroDec(), math.LegacyZeroDec()), false},
+		{val, types.NewCommission(math.LegacyZeroDec(), math.LegacyZeroDec(), math.LegacyZeroDec()), true},
 		{val, types.NewCommission(math.LegacyZeroDec(), math.LegacyNewDecWithPrec(-1, 1), math.LegacyZeroDec()), true},
 		{val, types.NewCommission(math.LegacyZeroDec(), math.LegacyNewDec(15000000000), math.LegacyZeroDec()), true},
 		{val, types.NewCommission(math.LegacyNewDecWithPrec(-1, 1), math.LegacyZeroDec(), math.LegacyZeroDec()), true},
