@@ -178,6 +178,9 @@ func (k msgServer) EditValidator(ctx context.Context, msg *types.MsgEditValidato
 		if msg.CommissionRate.GT(math.LegacyOneDec()) || msg.CommissionRate.IsNegative() {
 			return nil, errorsmod.Wrap(sdkerrors.ErrInvalidRequest, "commission rate must be between 0 and 1 (inclusive)")
 		}
+		if msg.CommissionRate.LT(types.MinCommissionRate) {
+			return nil, errorsmod.Wrapf(types.ErrCommissionTooSmall, "minimum commission rate is %s", types.MinCommissionRate)
+		}
 
 		minCommissionRate, err := k.MinCommissionRate(ctx)
 		if err != nil {
