@@ -301,12 +301,29 @@ func (keeper Keeper) validateInitialDeposit(ctx context.Context, params v1.Param
 		minDepositCoins = params.MinDeposit
 	}
 
+	for _, coin := range initialDeposit {
+		if coin.Denom != "inj" {
+			continue
+		}
+
+		minDepositAmount, ok := sdkmath.NewIntFromString("50000000000000000000") // 50 INJ
+		if !ok {
+			// should never happen, just defensive programming
+			return errors.Wrapf(sdkerrors.ErrInvalidCoins, "invalid minDepositAmount amount: %s", minDepositAmount.String())
+		}
+		if coin.Amount.LT(minDepositAmount) {
+			return errors.Wrapf(sdkerrors.ErrInsufficientFunds, "proposals require a minDepositAmount of at least: %s", minDepositAmount.String())
+		}
+	}
+
 	for i := range minDepositCoins {
 		minDepositCoins[i].Amount = sdkmath.LegacyNewDecFromInt(minDepositCoins[i].Amount).Mul(minInitialDepositRatio).RoundInt()
 	}
+
 	if !initialDeposit.IsAllGTE(minDepositCoins) {
 		return errors.Wrapf(types.ErrMinDepositTooSmall, "was (%s), need (%s)", initialDeposit, minDepositCoins)
 	}
+
 	return nil
 }
 
