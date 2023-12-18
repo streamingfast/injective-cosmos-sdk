@@ -9,6 +9,7 @@ import (
 	errorsmod "cosmossdk.io/errors"
 
 	"github.com/cosmos/cosmos-sdk/codec"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -17,7 +18,7 @@ import (
 
 var (
 	_         authz.MsgServer = Keeper{}
-	GlobalCdc *codec.ProtoCodec
+	GlobalCdc                 = codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 )
 
 // Grant implements the MsgServer.Grant method to create a new grant.
