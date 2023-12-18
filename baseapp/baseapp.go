@@ -184,6 +184,9 @@ type BaseApp struct {
 	// including the goroutine handling.This is experimental and must be enabled
 	// by developers.
 	optimisticExec *oe.OptimisticExecution
+
+	// StreamEvents
+	StreamEvents chan StreamEvents
 }
 
 // NewBaseApp returns a reference to an initialized BaseApp. It accepts a
@@ -203,6 +206,7 @@ func NewBaseApp(
 		txDecoder:        txDecoder,
 		fauxMerkleMode:   false,
 		queryGasLimit:    math.MaxUint64,
+		StreamEvents:     make(chan StreamEvents),
 	}
 
 	for _, option := range options {
@@ -719,6 +723,7 @@ func (app *BaseApp) beginBlock(req *abci.RequestFinalizeBlock) (sdk.BeginBlock, 
 			)
 		}
 
+		app.AddStreamEvents(app.finalizeBlockState.ctx.BlockHeight(), resp.Events, true)
 		resp.Events = sdk.MarkEventsToIndex(resp.Events, app.indexEvents)
 	}
 
@@ -781,6 +786,7 @@ func (app *BaseApp) endBlock(ctx context.Context) (sdk.EndBlock, error) {
 			)
 		}
 
+		app.AddStreamEvents(app.finalizeBlockState.ctx.BlockHeight(), eb.Events, true)
 		eb.Events = sdk.MarkEventsToIndex(eb.Events, app.indexEvents)
 		endblock = eb
 	}
