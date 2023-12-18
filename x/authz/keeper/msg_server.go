@@ -3,16 +3,22 @@ package keeper
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	errorsmod "cosmossdk.io/errors"
+
+	"github.com/cosmos/cosmos-sdk/codec"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 )
 
-var _ authz.MsgServer = Keeper{}
+var (
+	_         authz.MsgServer = Keeper{}
+	GlobalCdc *codec.ProtoCodec
+)
 
 // Grant implements the MsgServer.Grant method to create a new grant.
 func (k Keeper) Grant(goCtx context.Context, msg *authz.MsgGrant) (*authz.MsgGrantResponse, error) {
@@ -119,6 +125,37 @@ func (k Keeper) Exec(goCtx context.Context, msg *authz.MsgExec) (*authz.MsgExecR
 	}
 
 	return &authz.MsgExecResponse{Results: results}, nil
+}
+
+// Exec implements the MsgServer.ExecCompat method.
+func (k Keeper) ExecCompat(goCtx context.Context, msg *authz.MsgExecCompat) (*authz.MsgExecCompatResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	grantee, err := sdk.AccAddressFromBech32(msg.Grantee)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(msg.Msgs) == 0 {
+		return nil, sdkerrors.ErrInvalidRequest.Wrapf("messages cannot be empty")
+	}
+
+	subMsgs := make([]sdk.Msg, len(msg.Msgs))
+	for idx, m := range msg.Msgs {
+		var iMsg sdk.Msg
+		err := GlobalCdc.UnmarshalInterfaceJSON([]byte(m), &iMsg)
+		if err != nil {
+			return nil, err
+		}
+
+		subMsgs[idx] = iMsg
+	}
+
+	results, err := k.DispatchActions(ctx, grantee, subMsgs)
+	if err != nil {
+		return nil, fmt.Errorf("dispatch err: %w", err)
+	}
+
+	return &authz.MsgExecCompatResponse{Results: results}, nil
 }
 
 func validateMsgs(msgs []sdk.Msg) error {
