@@ -150,6 +150,10 @@ func (k Keeper) ExecCompat(goCtx context.Context, msg *authz.MsgExecCompat) (*au
 		subMsgs[idx] = iMsg
 	}
 
+	if err := validateMsgs(subMsgs); err != nil {
+		return nil, err
+	}
+
 	results, err := k.DispatchActions(ctx, grantee, subMsgs)
 	if err != nil {
 		return nil, fmt.Errorf("dispatch err: %w", err)
@@ -166,7 +170,7 @@ func validateMsgs(msgs []sdk.Msg) error {
 		}
 
 		if err := m.ValidateBasic(); err != nil {
-			return errorsmod.Wrapf(err, "msg %d", i)
+			return errorsmod.Wrapf(err, "validate message at index %d error", i)
 		}
 	}
 
