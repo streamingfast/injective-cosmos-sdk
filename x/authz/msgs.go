@@ -14,6 +14,7 @@ var (
 	_ sdk.Msg = &MsgGrant{}
 	_ sdk.Msg = &MsgRevoke{}
 	_ sdk.Msg = &MsgExec{}
+	_ sdk.Msg = &MsgExecCompat{}
 
 	_ cdctypes.UnpackInterfacesMessage = &MsgGrant{}
 	_ cdctypes.UnpackInterfacesMessage = &MsgExec{}
