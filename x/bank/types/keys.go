@@ -17,6 +17,9 @@ const (
 
 	// RouterKey defines the module's message routing key
 	RouterKey = ModuleName
+
+	// TStoreKey defines the primary module transient store key
+	TStoreKey = "transient_bank"
 )
 
 // KVStore keys

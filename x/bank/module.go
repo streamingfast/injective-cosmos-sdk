@@ -171,6 +171,13 @@ func (am AppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONCodec) json.Raw
 // ConsensusVersion implements AppModule/ConsensusVersion.
 func (AppModule) ConsensusVersion() uint64 { return ConsensusVersion }
 
+// EndBlock returns the end blocker for the bank module. It returns no validator
+// updates.
+func (am AppModule) EndBlock(ctx context.Context) error {
+	EndBlocker(sdk.UnwrapSDKContext(ctx), am.keeper)
+	return nil
+}
+
 // AppModuleSimulation functions
 
 // GenerateGenesisState creates a randomized GenState of the bank module.
@@ -206,10 +213,11 @@ func init() {
 type ModuleInputs struct {
 	depinject.In
 
-	Config       *modulev1.Module
-	Cdc          codec.Codec
-	StoreService corestore.KVStoreService
-	Logger       log.Logger
+	Config                *modulev1.Module
+	Cdc                   codec.Codec
+	StoreService          corestore.KVStoreService
+	TransientStoreService corestore.TransientStoreService
+	Logger                log.Logger
 
 	AccountKeeper types.AccountKeeper
 
@@ -249,6 +257,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 	bankKeeper := keeper.NewBaseKeeper(
 		in.Cdc,
 		in.StoreService,
+		in.TransientStoreService,
 		in.AccountKeeper,
 		blockedAddresses,
 		authority.String(),
