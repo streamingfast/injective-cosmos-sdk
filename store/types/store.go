@@ -224,6 +224,12 @@ type CommitMultiStore interface {
 
 	// SetMetrics sets the metrics for the KVStore
 	SetMetrics(metrics metrics.StoreMetrics)
+
+	// SetCommitSync set store commit sync mode
+	SetCommitSync(sync bool)
+
+	// GetCommitSync get store commit sync mode
+	GetCommitSync() bool
 }
 
 //---------subsp-------------------------------
