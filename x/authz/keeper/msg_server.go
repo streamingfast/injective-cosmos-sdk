@@ -8,18 +8,12 @@ import (
 
 	errorsmod "cosmossdk.io/errors"
 
-	"github.com/cosmos/cosmos-sdk/codec"
-	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 )
 
-var (
-	_         authz.MsgServer = Keeper{}
-	GlobalCdc                 = codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
-)
+var _ authz.MsgServer = Keeper{}
 
 // Grant implements the MsgServer.Grant method to create a new grant.
 func (k Keeper) Grant(goCtx context.Context, msg *authz.MsgGrant) (*authz.MsgGrantResponse, error) {
@@ -143,7 +137,7 @@ func (k Keeper) ExecCompat(goCtx context.Context, msg *authz.MsgExecCompat) (*au
 	subMsgs := make([]sdk.Msg, len(msg.Msgs))
 	for idx, m := range msg.Msgs {
 		var iMsg sdk.Msg
-		err := GlobalCdc.UnmarshalInterfaceJSON([]byte(m), &iMsg)
+		err := authz.GlobalCdc.UnmarshalInterfaceJSON([]byte(m), &iMsg)
 		if err != nil {
 			return nil, err
 		}

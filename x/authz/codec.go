@@ -3,10 +3,13 @@ package authz
 import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/legacy"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	types "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/msgservice"
 )
+
+var GlobalCdc = codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 
 // RegisterLegacyAminoCodec registers the necessary x/authz interfaces and concrete types
 // on the provided LegacyAmino codec. These types are used for Amino JSON serialization.
