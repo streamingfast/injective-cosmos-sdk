@@ -162,15 +162,9 @@ require (
 	nhooyr.io/websocket v1.8.6 // indirect
 )
 
-// Here are the short-lived replace from the Cosmos SDK
-// Replace here are pending PRs, or version to be tagged
-// replace (
-// 	<temporary replace>
-// )
-
 // Below are the long-lived replace of the Cosmos SDK
 replace (
-	cosmossdk.io/store => ./store
+	cosmossdk.io/store => github.com/InjectiveLabs/cosmos-sdk/store v0.1.0-alpha.1.0.20231219011149-dc1791121e91
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
 	// dgrijalva/jwt-go is deprecated and doesn't receive security updates.
