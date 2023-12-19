@@ -168,6 +168,14 @@ func (ms multiStore) WorkingHash() []byte {
 	panic("not implemented")
 }
 
+func (ms multiStore) SetCommitSync(_ bool) {
+	panic("not implemented")
+}
+
+func (ms multiStore) GetCommitSync() bool {
+	panic("not implemented")
+}
+
 var _ storetypes.KVStore = kvStore{}
 
 type kvStore struct {
