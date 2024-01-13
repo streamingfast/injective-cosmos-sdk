@@ -1075,6 +1075,11 @@ func NoOpProcessProposal() sdk.ProcessProposalHandler {
 	}
 }
 
+// ChainID returns the chainID of the BaseApp.
+func (app *BaseApp) ChainID() string {
+	return app.chainID
+}
+
 // Close is called in start cmd to gracefully cleanup resources.
 func (app *BaseApp) Close() error {
 	return nil
