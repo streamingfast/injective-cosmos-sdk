@@ -4,6 +4,9 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/opentelemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"os"
 	"sort"
 	"strings"
@@ -193,8 +196,15 @@ func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeg
 	}
 
 	if app.beginBlocker != nil {
+		_, blockSpan := opentelemetry.Tracer.Start(app.deliverState.Context(),
+			"core_begin_block",
+			trace.WithSpanKind(trace.SpanKindProducer), trace.WithNewRoot(), trace.WithAttributes(attribute.Int64("block_height", int64(req.Header.Height))))
+		chain_ctx := trace.ContextWithSpanContext(app.deliverState.ctx, blockSpan.SpanContext())
+		app.deliverState.ctx = app.deliverState.ctx.WithContext(chain_ctx)
+
 		res = app.beginBlocker(app.deliverState.ctx, req)
-		app.AddStreamEvents(req.Header.Height, req.Header.Time, res.Events, false, "begin_block")
+		blockSpan.End()
+		app.AddStreamEvents(req.Header.Height, req.Header.Time, res.Events, false, "begin_block", chain_ctx)
 		res.Events = sdk.MarkEventsToIndex(res.Events, app.indexEvents)
 	}
 	// set the signed validators for addition to context in deliverTx
@@ -217,8 +227,14 @@ func (app *BaseApp) EndBlock(req abci.RequestEndBlock) (res abci.ResponseEndBloc
 	}
 
 	if app.endBlocker != nil {
+		_, blockSpan := opentelemetry.Tracer.Start(app.deliverState.Context(),
+			"core_end_block",
+			trace.WithSpanKind(trace.SpanKindProducer), trace.WithAttributes(attribute.Int64("block_height", int64(req.Height))))
+		chain_ctx := trace.ContextWithSpanContext(app.deliverState.ctx, blockSpan.SpanContext())
+		app.deliverState.ctx = app.deliverState.ctx.WithContext(chain_ctx)
 		res = app.endBlocker(app.deliverState.ctx, req)
-		app.AddStreamEvents(req.Height, app.deliverState.ctx.BlockTime(), res.Events, true, "end_block")
+		blockSpan.End()
+		app.AddStreamEvents(req.Height, app.deliverState.ctx.BlockTime(), res.Events, true, "end_block", chain_ctx)
 		res.Events = sdk.MarkEventsToIndex(res.Events, app.indexEvents)
 	}
 
@@ -413,8 +429,13 @@ func (app *BaseApp) DeliverTx(req abci.RequestDeliverTx) (res abci.ResponseDeliv
 		resultStr = "failed"
 		return sdkerrors.ResponseDeliverTxWithEvents(err, gInfo.GasWanted, gInfo.GasUsed, sdk.MarkEventsToIndex(anteEvents, app.indexEvents), app.trace)
 	}
-
-	app.AddStreamEvents(app.checkState.Context().BlockHeight(), app.checkState.Context().BlockTime(), result.Events, false, "deliver_tx")
+	_, blockSpan := opentelemetry.Tracer.Start(app.deliverState.Context(),
+		"core_deliver_tx",
+		trace.WithSpanKind(trace.SpanKindProducer), trace.WithAttributes(attribute.Int64("block_height", app.deliverState.ctx.BlockHeight())))
+	blockSpan.End()
+	chain_ctx := trace.ContextWithSpanContext(app.deliverState.ctx, blockSpan.SpanContext())
+	app.deliverState.ctx = app.deliverState.ctx.WithContext(chain_ctx)
+	app.AddStreamEvents(app.checkState.Context().BlockHeight(), app.checkState.Context().BlockTime(), result.Events, false, "deliver_tx", chain_ctx)
 
 	return abci.ResponseDeliverTx{
 		GasWanted: int64(gInfo.GasWanted), // TODO: Should type accept unsigned ints?

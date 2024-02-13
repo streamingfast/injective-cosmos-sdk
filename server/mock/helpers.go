@@ -1,7 +1,9 @@
 package mock
 
 import (
+	"context"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/opentelemetry"
 	"os"
 	"testing"
 
@@ -24,7 +26,13 @@ func SetupApp() (abci.Application, func(), error) {
 		return nil, nil, err
 	}
 
+	closeOtel, err := opentelemetry.SetupOTelSDK(context.Background())
+	if err != nil {
+		return nil, nil, err
+	}
+
 	cleanup := func() {
+		defer closeOtel(context.Background())
 		err := os.RemoveAll(rootDir)
 		if err != nil {
 			fmt.Printf("could not delete %s, had error %s\n", rootDir, err.Error())
@@ -32,5 +40,6 @@ func SetupApp() (abci.Application, func(), error) {
 	}
 
 	app, err := NewApp(rootDir, logger)
+
 	return app, cleanup, err
 }
