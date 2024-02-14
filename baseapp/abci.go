@@ -198,7 +198,8 @@ func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeg
 	if app.beginBlocker != nil {
 		_, blockSpan := opentelemetry.Tracer.Start(app.deliverState.Context(),
 			"core_begin_block",
-			trace.WithSpanKind(trace.SpanKindProducer), trace.WithNewRoot(), trace.WithAttributes(attribute.Int64("block_height", int64(req.Header.Height))))
+			trace.WithSpanKind(trace.SpanKindProducer), trace.WithNewRoot(), trace.WithAttributes(attribute.Int64("block_height", int64(req.Header.Height)),
+				attribute.String("curret_time", fmt.Sprintf("%s", time.Now().Format(time.StampNano)))))
 		chain_ctx := trace.ContextWithSpanContext(app.deliverState.ctx, blockSpan.SpanContext())
 		app.deliverState.ctx = app.deliverState.ctx.WithContext(chain_ctx)
 
@@ -229,7 +230,8 @@ func (app *BaseApp) EndBlock(req abci.RequestEndBlock) (res abci.ResponseEndBloc
 	if app.endBlocker != nil {
 		_, blockSpan := opentelemetry.Tracer.Start(app.deliverState.Context(),
 			"core_end_block",
-			trace.WithSpanKind(trace.SpanKindProducer), trace.WithAttributes(attribute.Int64("block_height", int64(req.Height))))
+			trace.WithSpanKind(trace.SpanKindProducer), trace.WithAttributes(attribute.Int64("block_height", int64(req.Height)),
+				attribute.String("curret_time", fmt.Sprintf("%s", time.Now().Format(time.StampNano)))))
 		chain_ctx := trace.ContextWithSpanContext(app.deliverState.ctx, blockSpan.SpanContext())
 		app.deliverState.ctx = app.deliverState.ctx.WithContext(chain_ctx)
 		res = app.endBlocker(app.deliverState.ctx, req)
@@ -431,7 +433,9 @@ func (app *BaseApp) DeliverTx(req abci.RequestDeliverTx) (res abci.ResponseDeliv
 	}
 	_, blockSpan := opentelemetry.Tracer.Start(app.deliverState.Context(),
 		"core_deliver_tx",
-		trace.WithSpanKind(trace.SpanKindProducer), trace.WithAttributes(attribute.Int64("block_height", app.deliverState.ctx.BlockHeight())))
+		trace.WithSpanKind(trace.SpanKindProducer), trace.WithAttributes(
+			attribute.Int64("block_height", app.deliverState.ctx.BlockHeight()),
+			attribute.String("curret_time", fmt.Sprintf("%s", time.Now().Format(time.StampNano)))))
 	blockSpan.End()
 	chain_ctx := trace.ContextWithSpanContext(app.deliverState.ctx, blockSpan.SpanContext())
 	app.deliverState.ctx = app.deliverState.ctx.WithContext(chain_ctx)
