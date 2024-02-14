@@ -203,8 +203,15 @@ func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeg
 		app.deliverState.ctx = app.deliverState.ctx.WithContext(chain_ctx)
 
 		res = app.beginBlocker(app.deliverState.ctx, req)
-		app.AddStreamEvents(req.Header.Height, req.Header.Time, res.Events, false, "begin_block", chain_ctx)
 		blockSpan.End()
+
+		_, blockSpanTry := opentelemetry.Tracer.Start(app.deliverState.Context(),
+			"core_sending_begin_block",
+			trace.WithSpanKind(trace.SpanKindProducer), trace.WithNewRoot(), trace.WithAttributes(attribute.Int64("block_height", int64(req.Header.Height))))
+		chain_ctx = trace.ContextWithSpanContext(app.deliverState.ctx, blockSpanTry.SpanContext())
+		app.deliverState.ctx = app.deliverState.ctx.WithContext(chain_ctx)
+		app.AddStreamEvents(req.Header.Height, req.Header.Time, res.Events, false, "begin_block", chain_ctx)
+		blockSpanTry.End()
 		res.Events = sdk.MarkEventsToIndex(res.Events, app.indexEvents)
 	}
 	// set the signed validators for addition to context in deliverTx
@@ -233,8 +240,17 @@ func (app *BaseApp) EndBlock(req abci.RequestEndBlock) (res abci.ResponseEndBloc
 		chain_ctx := trace.ContextWithSpanContext(app.deliverState.ctx, blockSpan.SpanContext())
 		app.deliverState.ctx = app.deliverState.ctx.WithContext(chain_ctx)
 		res = app.endBlocker(app.deliverState.ctx, req)
-		app.AddStreamEvents(req.Height, app.deliverState.ctx.BlockTime(), res.Events, true, "end_block", chain_ctx)
+
 		blockSpan.End()
+
+		_, blockSpanTry := opentelemetry.Tracer.Start(app.deliverState.Context(),
+			"core_sending_end_block",
+			trace.WithSpanKind(trace.SpanKindProducer), trace.WithNewRoot(), trace.WithAttributes(attribute.Int64("block_height", int64(req.Height))))
+		chain_ctx = trace.ContextWithSpanContext(app.deliverState.ctx, blockSpanTry.SpanContext())
+		app.deliverState.ctx = app.deliverState.ctx.WithContext(chain_ctx)
+
+		app.AddStreamEvents(req.Height, app.deliverState.ctx.BlockTime(), res.Events, true, "end_block", chain_ctx)
+		blockSpanTry.End()
 		res.Events = sdk.MarkEventsToIndex(res.Events, app.indexEvents)
 	}
 
@@ -435,8 +451,16 @@ func (app *BaseApp) DeliverTx(req abci.RequestDeliverTx) (res abci.ResponseDeliv
 
 	chain_ctx := trace.ContextWithSpanContext(app.deliverState.ctx, blockSpan.SpanContext())
 	app.deliverState.ctx = app.deliverState.ctx.WithContext(chain_ctx)
-	app.AddStreamEvents(app.checkState.Context().BlockHeight(), app.checkState.Context().BlockTime(), result.Events, false, "deliver_tx", chain_ctx)
 	blockSpan.End()
+
+	_, blockSpanTry := opentelemetry.Tracer.Start(app.deliverState.Context(),
+		"core_sending_deliver_tx",
+		trace.WithSpanKind(trace.SpanKindProducer), trace.WithNewRoot(), trace.WithAttributes(attribute.Int64("block_height", int64(app.checkState.Context().BlockHeight()))))
+	chain_ctx = trace.ContextWithSpanContext(app.deliverState.Context(), blockSpanTry.SpanContext())
+	app.deliverState.ctx = app.deliverState.ctx.WithContext(chain_ctx)
+
+	app.AddStreamEvents(app.checkState.Context().BlockHeight(), app.checkState.Context().BlockTime(), result.Events, false, "deliver_tx", chain_ctx)
+	blockSpanTry.End()
 
 	return abci.ResponseDeliverTx{
 		GasWanted: int64(gInfo.GasWanted), // TODO: Should type accept unsigned ints?
