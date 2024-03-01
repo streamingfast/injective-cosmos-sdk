@@ -616,9 +616,10 @@ func SignWithLedger(k *Record, msg []byte) (sig []byte, pub types.PubKey, err er
 		return nil, nil, err
 	}
 
-	if !priv.PubKey().VerifySignature(msg, sig) {
-		return nil, nil, errors.New("Ledger generated an invalid signature. Perhaps you have multiple ledgers and need to try another one")
-	}
+	// Moved to injective-core as part of Ledger signing (PR #1557)
+	//if !priv.PubKey().VerifySignature(msg, sig) {
+	//	return nil, nil, errors.New("Ledger generated an invalid signature. Perhaps you have multiple ledgers and need to try another one")
+	//}
 
 	return sig, priv.PubKey(), nil
 }
