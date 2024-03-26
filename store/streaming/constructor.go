@@ -28,6 +28,7 @@ type ServiceType int
 const (
 	Unknown ServiceType = iota
 	File
+	Firehose
 )
 
 // Streaming option keys
@@ -38,7 +39,8 @@ const (
 	OptStreamersFileStopNodeOnError = "streamers.file.stop-node-on-error"
 	OptStreamersFileFsync           = "streamers.file.fsync"
 
-	OptStoreStreamers = "store.streamers"
+	OptStreamersFirehoseStopNodeOnError = "streamers.firehose.stop-node-on-error"
+	OptStoreStreamers                   = "store.streamers"
 )
 
 // ServiceTypeFromString returns the streaming.ServiceType corresponding to the
@@ -47,7 +49,8 @@ func ServiceTypeFromString(name string) ServiceType {
 	switch strings.ToLower(name) {
 	case "file", "f":
 		return File
-
+	case "firehose":
+		return Firehose
 	default:
 		return Unknown
 	}
@@ -58,7 +61,8 @@ func (sst ServiceType) String() string {
 	switch sst {
 	case File:
 		return "file"
-
+	case Firehose:
+		return "firehose"
 	default:
 		return "unknown"
 	}
@@ -67,7 +71,8 @@ func (sst ServiceType) String() string {
 // ServiceConstructorLookupTable is a mapping of streaming.ServiceTypes to
 // streaming.ServiceConstructors types.
 var ServiceConstructorLookupTable = map[ServiceType]ServiceConstructor{
-	File: NewFileStreamingService,
+	File:     NewFileStreamingService,
+	Firehose: NewFirehoseService,
 }
 
 // NewServiceConstructor returns the streaming.ServiceConstructor corresponding
@@ -113,6 +118,16 @@ func NewFileStreamingService(
 	}
 
 	return file.NewStreamingService(fileDir, filePrefix, keys, marshaller, logger, outputMetadata, stopNodeOnErr, fsync)
+}
+
+func NewFirehoseService(
+	opts servertypes.AppOptions,
+	keys []types.StoreKey,
+	marshaller codec.BinaryCodec,
+	logger log.Logger,
+) (baseapp.StreamingService, error) {
+	stopNodeOnErr := cast.ToBool(opts.Get(OptStreamersFirehoseStopNodeOnError))
+	return firehose.NewFirehoseService(keys, logger, stopNodeOnErr)
 }
 
 // LoadStreamingServices is a function for loading StreamingServices onto the
