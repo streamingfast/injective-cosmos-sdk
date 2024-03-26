@@ -8,15 +8,15 @@ import (
 	"sync"
 
 	"github.com/cometbft/cometbft/libs/log"
-	"github.com/spf13/cast"
-
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/codec"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	"github.com/cosmos/cosmos-sdk/store/streaming/file"
+	"github.com/cosmos/cosmos-sdk/store/streaming/firehose"
 	"github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/spf13/cast"
 )
 
 // ServiceConstructor is used to construct a streaming service
