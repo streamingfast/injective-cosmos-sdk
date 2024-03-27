@@ -41,7 +41,7 @@ func NewFirehoseService(storeKeys []types.StoreKey, logger log.Logger, stopNodeO
 	}
 
 	//Emitting log line to inform the firehose console reader that the firehose service has been initialized
-	fmt.Println("FIRE INIT 3.0", "sf.cometbft.type.v38.Block")
+	fmt.Println("FIRE INIT 3.0", "cosmos.firehose.v1.Block")
 
 	return &Service{
 		storeListeners: listeners,
