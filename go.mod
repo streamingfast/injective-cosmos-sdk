@@ -2,8 +2,6 @@ go 1.19
 
 module github.com/cosmos/cosmos-sdk
 
-require github.com/streamingfast/firehose-cosmos v0.6.1-0.20240326124203-f308f4596bb8
-
 require (
 	cosmossdk.io/api v0.3.1
 	cosmossdk.io/core v0.5.1

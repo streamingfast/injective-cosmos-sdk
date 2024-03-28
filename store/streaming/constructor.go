@@ -148,8 +148,6 @@ func LoadStreamingServices(
 	streamers := cast.ToStringSlice(appOpts.Get(OptStoreStreamers))
 	activeStreamers := make([]baseapp.StreamingService, 0, len(streamers))
 
-	fmt.Println("Grrrrr: streamers", streamers)
-
 	for _, streamerName := range streamers {
 		var exposeStoreKeys []types.StoreKey
 
