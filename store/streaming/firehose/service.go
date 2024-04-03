@@ -59,37 +59,33 @@ func (s *Service) Listeners() map[types.StoreKey][]types.WriteListener {
 
 func (s *Service) ListenBeginBlock(ctx context.Context, req abci.RequestBeginBlock, res abci.ResponseBeginBlock) error {
 	sdkCtx := ctx.(sdk.Context)
-	s.block = Block{}
-	s.block.Header = &req.Header
 
-	s.block.Req = &RequestFinalizeBlock{
-		DecidedLastCommit:  req.LastCommitInfo,
-		Misbehavior:        req.ByzantineValidators,
+	s.block = Block{
 		Hash:               req.Hash,
 		Height:             req.Header.Height,
 		Time:               req.Header.Time,
+		Header:             &req.Header,
+		Misbehavior:        req.ByzantineValidators,
+		Events:             res.Events,
 		NextValidatorsHash: sdkCtx.BlockHeader().NextValidatorsHash,
 		ProposerAddress:    sdkCtx.BlockHeader().ProposerAddress,
 	}
-
-	s.block.Res = &ResponseFinalizeBlock{}
-	s.block.Res.Events = res.Events //todo: not sure about this
+	s.block.Header = &req.Header
 
 	return nil
 }
 
 func (s *Service) ListenDeliverTx(ctx context.Context, req abci.RequestDeliverTx, res abci.ResponseDeliverTx) error {
-	s.block.Req.Txs = append(s.block.Req.Txs, req.Tx)
-	s.block.Res.TxResults = append(s.block.Res.TxResults, &res)
+	s.block.Txs = append(s.block.Txs, req.Tx)
+	s.block.TxResults = append(s.block.TxResults, &res)
 
 	return nil
 }
 
 func (s *Service) ListenEndBlock(ctx context.Context, req abci.RequestEndBlock, res abci.ResponseEndBlock) error {
-	s.block.Res.Events = append(s.block.Res.Events, res.Events...) //double check if we also want events from begin block
-	s.block.Res.ValidatorUpdates = res.ValidatorUpdates
-	s.block.Res.ConsensusParamUpdates = res.ConsensusParamUpdates
-	//s.block.Res.AppHash = sdkCtx.BlockHeader().AppHash
+	s.block.Events = append(s.block.Events, res.Events...)
+	s.block.ValidatorUpdates = res.ValidatorUpdates
+	s.block.ConsensusParamUpdates = res.ConsensusParamUpdates
 
 	return nil
 }
@@ -115,7 +111,7 @@ func (s *Service) listenCommit(ctx context.Context, res abci.ResponseCommit) err
 	blockLine := fmt.Sprintf(
 		"FIRE BLOCK %d %s %d %s %d %d %s",
 		s.block.Header.Height,
-		hex.EncodeToString(s.block.Req.Hash),
+		hex.EncodeToString(s.block.Hash),
 		s.block.Header.Height-1,
 		hex.EncodeToString(s.block.Header.LastBlockId.Hash),
 		s.block.Header.Height-1,
