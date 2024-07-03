@@ -9,6 +9,7 @@ import (
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/log"
 	"cosmossdk.io/math"
+	storetypes "cosmossdk.io/store/types"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/telemetry"
@@ -60,6 +61,7 @@ type BaseSendKeeper struct {
 	ak           types.AccountKeeper
 	storeService store.KVStoreService
 	logger       log.Logger
+	objStoreKey  storetypes.StoreKey
 
 	// list of addresses that are restricted from receiving transactions
 	blockedAddrs map[string]bool
@@ -75,6 +77,7 @@ func NewBaseSendKeeper(
 	cdc codec.BinaryCodec,
 	storeService store.KVStoreService,
 	tStoreService store.TransientStoreService,
+	objStoreKey storetypes.StoreKey,
 	ak types.AccountKeeper,
 	blockedAddrs map[string]bool,
 	authority string,
@@ -89,6 +92,7 @@ func NewBaseSendKeeper(
 		cdc:             cdc,
 		ak:              ak,
 		storeService:    storeService,
+		objStoreKey:     objStoreKey,
 		blockedAddrs:    blockedAddrs,
 		authority:       authority,
 		logger:          logger,
@@ -228,6 +232,12 @@ func (k BaseSendKeeper) sendCoin(ctx context.Context, fromAddr, toAddr sdk.AccAd
 		return err
 	}
 
+	k.ensureAccountCreated(ctx, toAddr)
+	k.emitSendCoinsEvents(ctx, fromAddr, toAddr, amt)
+	return nil
+}
+
+func (k BaseSendKeeper) ensureAccountCreated(ctx context.Context, toAddr sdk.AccAddress) {
 	// Create account if recipient does not exist.
 	//
 	// NOTE: This should ultimately be removed in favor a more flexible approach
@@ -237,7 +247,12 @@ func (k BaseSendKeeper) sendCoin(ctx context.Context, fromAddr, toAddr sdk.AccAd
 		defer telemetry.IncrCounter(1, "new", "account")
 		k.ak.SetAccount(ctx, k.ak.NewAccountWithAddress(ctx, toAddr))
 	}
+}
 
+// emitSendCoinsEvents emit send coins events.
+func (k BaseSendKeeper) emitSendCoinsEvents(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) {
+	// bech32 encoding is expensive! Only do it once for fromAddr
+	fromAddrString := fromAddr.String()
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	sdkCtx.EventManager().EmitEvent(
 		sdk.NewEvent(
@@ -246,8 +261,11 @@ func (k BaseSendKeeper) sendCoin(ctx context.Context, fromAddr, toAddr sdk.AccAd
 			sdk.NewAttribute(types.AttributeKeySender, fromAddr.String()),
 			sdk.NewAttribute(sdk.AttributeKeyAmount, amt.String()),
 		),
+		sdk.NewEvent(
+			sdk.EventTypeMessage,
+			sdk.NewAttribute(types.AttributeKeySender, fromAddrString),
+		),
 	)
-	return nil
 }
 
 // validateCoinsBeforeSend is checks extracted from subUnlockedCoins to be run before sendRestrictionFn inside SendCoins
