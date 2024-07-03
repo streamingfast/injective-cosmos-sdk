@@ -90,6 +90,11 @@ func (cms Store) initStore(key types.StoreKey, store types.CacheWrapper) types.C
 	return cache
 }
 
+// LatestVersion returns the branch version of the store
+func (cms Store) LatestVersion() int64 {
+	panic("cannot get latest version from branch cached multi-store")
+}
+
 // SetTracer sets the tracer for the MultiStore that the underlying
 // stores will utilize to trace operations. A MultiStore is returned.
 func (cms Store) SetTracer(w io.Writer) types.MultiStore {
@@ -144,6 +149,11 @@ func (cms Store) CacheWrap() types.CacheWrap {
 	return cms.CacheMultiStore().(types.CacheWrap)
 }
 
+// CacheWrapWithTrace implements the KVStore interface.
+func (cms Store) CacheWrapWithTrace(_ io.Writer, _ types.TraceContext) types.CacheWrap {
+	return cms.CacheWrap()
+}
+
 // Implements MultiStore.
 func (cms Store) CacheMultiStore() types.CacheMultiStore {
 	return NewFromParent(cms.getCacheWrapper, cms.traceWriter, cms.traceContext)
@@ -159,6 +169,15 @@ func (cms Store) getCacheWrapper(key types.StoreKey) types.CacheWrapper {
 		panic(fmt.Sprintf("kv store with key %v has not been registered in stores", key))
 	}
 	return store
+}
+
+// CacheMultiStoreWithVersion implements the MultiStore interface. It will panic
+// as an already cached multi-store cannot load previous versions.
+//
+// TODO: The store implementation can possibly be modified to support this as it
+// seems safe to load previous versions (heights).
+func (cms Store) CacheMultiStoreWithVersion(_ int64) (types.CacheMultiStore, error) {
+	panic("cannot branch cached multi-store with a version")
 }
 
 // GetStore returns an underlying Store by key.

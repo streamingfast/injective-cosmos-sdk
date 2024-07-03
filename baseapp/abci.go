@@ -1249,7 +1249,7 @@ func (app *BaseApp) CreateQueryContext(height int64, prove bool) (sdk.Context, e
 	// use custom query multi-store if provided
 	qms := app.qms
 	if qms == nil {
-		qms = storetypes.RootMultiStore(app.cms)
+		qms = storetypes.MultiStore(app.cms)
 	}
 
 	lastBlockHeight := qms.LatestVersion()

@@ -44,46 +44,49 @@ func (k BaseSendKeeper) SendCoinsFromModuleToAccountVirtual(
 // which are sumed up and added to the real account at the end of block.
 // Events are emiited the same as normal send.
 func (k BaseSendKeeper) SendCoinsToVirtual(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) error {
-	var err error
-	err = k.subUnlockedCoins(ctx, fromAddr, amt)
-	if err != nil {
-		return err
+	for _, coin := range amt {
+		newToAddr, err := k.sendRestriction.apply(ctx, fromAddr, toAddr, coin)
+		if err != nil {
+			return err
+		}
+
+		err = k.subUnlockedCoins(ctx, fromAddr, sdk.NewCoins(coin), false)
+		if err != nil {
+			return err
+		}
+
+		k.addVirtualCoin(ctx, newToAddr, coin)
+		k.emitSendCoinEvents(ctx, fromAddr, toAddr, coin)
 	}
 
-	toAddr, err = k.sendRestriction.apply(ctx, fromAddr, toAddr, amt)
-	if err != nil {
-		return err
-	}
-
-	k.addVirtualCoins(ctx, toAddr, amt)
-	k.emitSendCoinsEvents(ctx, fromAddr, toAddr, amt)
 	return nil
 }
 
 // SendCoinsFromVirtual deduct coins from virtual from account and send to recipient account.
 func (k BaseSendKeeper) SendCoinsFromVirtual(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) error {
-	var err error
-	err = k.subVirtualCoins(ctx, fromAddr, amt)
-	if err != nil {
-		return err
-	}
+	for _, coin := range amt {
+		toAddr, err := k.sendRestriction.apply(ctx, fromAddr, toAddr, coin)
+		if err != nil {
+			return err
+		}
 
-	toAddr, err = k.sendRestriction.apply(ctx, fromAddr, toAddr, amt)
-	if err != nil {
-		return err
-	}
+		err = k.subVirtualCoin(ctx, fromAddr, coin)
+		if err != nil {
+			return err
+		}
 
-	err = k.addCoins(ctx, toAddr, amt)
-	if err != nil {
-		return err
-	}
+		err = k.addCoins(ctx, toAddr, sdk.NewCoins(coin))
+		if err != nil {
+			return err
+		}
 
-	k.ensureAccountCreated(ctx, toAddr)
-	k.emitSendCoinsEvents(ctx, fromAddr, toAddr, amt)
+		k.ensureAccountCreated(ctx, toAddr)
+		k.emitSendCoinEvents(ctx, fromAddr, toAddr, coin)
+	}
 	return nil
 }
 
-func (k BaseSendKeeper) addVirtualCoins(ctx context.Context, addr sdk.AccAddress, amt sdk.Coins) {
+func (k BaseSendKeeper) addVirtualCoin(ctx context.Context, addr sdk.AccAddress, amt sdk.Coin) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	store := sdkCtx.ObjectStore(k.objStoreKey)
 
@@ -96,11 +99,11 @@ func (k BaseSendKeeper) addVirtualCoins(ctx context.Context, addr sdk.AccAddress
 	if value != nil {
 		coins = value.(sdk.Coins)
 	}
-	coins = coins.Add(amt...)
+	coins = coins.Add(amt)
 	store.Set(key, coins)
 }
 
-func (k BaseSendKeeper) subVirtualCoins(ctx context.Context, addr sdk.AccAddress, amt sdk.Coins) error {
+func (k BaseSendKeeper) subVirtualCoin(ctx context.Context, addr sdk.AccAddress, amt sdk.Coin) error {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	store := sdkCtx.ObjectStore(k.objStoreKey)
 
@@ -117,7 +120,7 @@ func (k BaseSendKeeper) subVirtualCoins(ctx context.Context, addr sdk.AccAddress
 		)
 	}
 	spendable := value.(sdk.Coins)
-	balance, hasNeg := spendable.SafeSub(amt...)
+	balance, hasNeg := spendable.SafeSub(amt)
 	if hasNeg {
 		return errorsmod.Wrapf(
 			sdkerrors.ErrInsufficientFunds,

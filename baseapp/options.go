@@ -321,7 +321,7 @@ func (app *BaseApp) SetTxEncoder(txEncoder sdk.TxEncoder) {
 // SetQueryMultiStore set a alternative MultiStore implementation to support grpc query service.
 //
 // Ref: https://github.com/cosmos/cosmos-sdk/issues/13317
-func (app *BaseApp) SetQueryMultiStore(ms storetypes.RootMultiStore) {
+func (app *BaseApp) SetQueryMultiStore(ms storetypes.MultiStore) {
 	app.qms = ms
 }
 
@@ -391,6 +391,7 @@ func (app *BaseApp) SetTraceFlightRecorder(tr *metrics.TraceRecorder) {
 
 func SetTraceFlightRecorder(tr *metrics.TraceRecorder) func(*BaseApp) {
 	return func(app *BaseApp) { app.traceFlightRecorder = tr }
+}
 
 // SetTxExecutor sets a custom tx executor for the BaseApp, usually for parallel execution.
 func (app *BaseApp) SetTxExecutor(executor TxExecutor) {

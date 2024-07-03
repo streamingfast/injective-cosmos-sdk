@@ -57,9 +57,6 @@ type SendRestrictionFn func(ctx context.Context, fromAddr, toAddr sdk.AccAddress
 // IsOnePerModuleType implements the depinject.OnePerModuleType interface.
 func (SendRestrictionFn) IsOnePerModuleType() {}
 
-// IsOnePerModuleType implements the depinject.OnePerModuleType interface.
-func (SendRestrictionFn) IsOnePerModuleType() {}
-
 var _ SendRestrictionFn = NoOpSendRestrictionFn
 
 // NoOpSendRestrictionFn is a no-op SendRestrictionFn.

@@ -206,10 +206,6 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 	)
 }
 
-func (am AppModule) EndBlock(ctx context.Context) error {
-	return am.keeper.CreditVirtualAccounts(ctx)
-}
-
 // App Wiring Setup
 
 func init() {
