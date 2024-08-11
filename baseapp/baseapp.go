@@ -716,12 +716,13 @@ func (app *BaseApp) cacheTxContext(ctx sdk.Context, txBytes []byte) (sdk.Context
 	return ctx.WithMultiStore(msCache), msCache
 }
 
-func (app *BaseApp) preBlock(req *abci.RequestFinalizeBlock) error {
+func (app *BaseApp) preBlock(req *abci.RequestFinalizeBlock) ([]abci.Event, error) {
+	var events []abci.Event
 	if app.preBlocker != nil {
 		ctx := app.finalizeBlockState.Context().WithValue(DoNotFailFastSendContextKey, struct{}{})
 		rsp, err := app.preBlocker(ctx, req)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		// rsp.ConsensusParamsChanged is true from preBlocker means ConsensusParams in store get changed
 		// write the consensus parameters in store to context
@@ -732,8 +733,9 @@ func (app *BaseApp) preBlock(req *abci.RequestFinalizeBlock) error {
 			ctx = ctx.WithBlockGasMeter(gasMeter)
 			app.finalizeBlockState.SetContext(ctx)
 		}
+		events = ctx.EventManager().ABCIEvents()
 	}
-	return nil
+	return events, nil
 }
 
 func (app *BaseApp) beginBlock(_ *abci.RequestFinalizeBlock) (sdk.BeginBlock, error) {
