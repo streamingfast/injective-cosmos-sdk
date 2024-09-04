@@ -45,7 +45,7 @@ func (k BaseSendKeeper) SendCoinsFromModuleToAccountVirtual(
 // Events are emiited the same as normal send.
 func (k BaseSendKeeper) SendCoinsToVirtual(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) error {
 	for _, coin := range amt {
-		newToAddr, err := k.sendRestriction.apply(ctx, fromAddr, toAddr, coin)
+		newToAddr, err := k.sendRestriction.apply(ctx, fromAddr, toAddr, sdk.NewCoins(coin))
 		if err != nil {
 			return err
 		}
@@ -65,7 +65,7 @@ func (k BaseSendKeeper) SendCoinsToVirtual(ctx context.Context, fromAddr, toAddr
 // SendCoinsFromVirtual deduct coins from virtual from account and send to recipient account.
 func (k BaseSendKeeper) SendCoinsFromVirtual(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) error {
 	for _, coin := range amt {
-		toAddr, err := k.sendRestriction.apply(ctx, fromAddr, toAddr, coin)
+		toAddr, err := k.sendRestriction.apply(ctx, fromAddr, toAddr, sdk.NewCoins(coin))
 		if err != nil {
 			return err
 		}

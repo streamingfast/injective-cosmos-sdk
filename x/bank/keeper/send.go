@@ -168,7 +168,7 @@ func (k BaseSendKeeper) InputOutputCoins(ctx context.Context, input types.Input,
 		}
 
 		for _, coin := range out.Coins {
-			newOutAddress, err := k.sendRestriction.apply(ctx, inAddress, outAddress, coin)
+			newOutAddress, err := k.sendRestriction.apply(ctx, inAddress, outAddress, sdk.NewCoins(coin))
 			if err != nil {
 				return err
 			}
@@ -199,7 +199,7 @@ func (k BaseSendKeeper) SendCoins(ctx context.Context, fromAddr, toAddr sdk.AccA
 	}
 
 	for _, coin := range amt {
-		newToAddr, err := k.sendRestriction.apply(ctx, fromAddr, toAddr, coin)
+		newToAddr, err := k.sendRestriction.apply(ctx, fromAddr, toAddr, sdk.NewCoins(coin))
 		if err != nil {
 			return err
 		}
@@ -539,7 +539,7 @@ func (r *sendRestriction) clear() {
 var _ types.SendRestrictionFn = (*sendRestriction)(nil).apply
 
 // apply applies the send restriction if there is one. If not, it's a no-op.
-func (r *sendRestriction) apply(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) (sdk.AccAddress, error) {
+func (r *sendRestriction) apply(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
 	if r == nil || r.fn == nil {
 		return toAddr, nil
 	}
