@@ -270,7 +270,7 @@ func (suite *KeeperTestSuite) mockUnDelegateCoins(ctx context.Context, acc, mAcc
 func (suite *KeeperTestSuite) TestAppendSendRestriction() {
 	var calls []int
 	testRestriction := func(index int) banktypes.SendRestrictionFn {
-		return func(_ context.Context, _, _ sdk.AccAddress, _ sdk.Coins) (sdk.AccAddress, error) {
+		return func(_ context.Context, _, _ sdk.AccAddress, _ sdk.Coin) (sdk.AccAddress, error) {
 			calls = append(calls, index)
 			return nil, nil
 		}
@@ -281,25 +281,25 @@ func (suite *KeeperTestSuite) TestAppendSendRestriction() {
 	// Initial append of the test restriction.
 	bk.SetSendRestriction(nil)
 	bk.AppendSendRestriction(testRestriction(1))
-	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, nil)
+	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, sdk.Coin{})
 	suite.Require().Equal([]int{1}, calls, "restriction calls after first append")
 
 	// Append the test restriction again.
 	calls = nil
 	bk.AppendSendRestriction(testRestriction(2))
-	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, nil)
+	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, sdk.Coin{})
 	suite.Require().Equal([]int{1, 2}, calls, "restriction calls after second append")
 
 	// make sure the original bank keeper has the restrictions too.
 	calls = nil
-	_, _ = suite.bankKeeper.GetSendRestrictionFn()(suite.ctx, nil, nil, nil)
+	_, _ = suite.bankKeeper.GetSendRestrictionFn()(suite.ctx, nil, nil, sdk.Coin{})
 	suite.Require().Equal([]int{1, 2}, calls, "restriction calls from original bank keeper")
 }
 
 func (suite *KeeperTestSuite) TestPrependSendRestriction() {
 	var calls []int
 	testRestriction := func(index int) banktypes.SendRestrictionFn {
-		return func(_ context.Context, _, _ sdk.AccAddress, _ sdk.Coins) (sdk.AccAddress, error) {
+		return func(_ context.Context, _, _ sdk.AccAddress, _ sdk.Coin) (sdk.AccAddress, error) {
 			calls = append(calls, index)
 			return nil, nil
 		}
@@ -310,18 +310,18 @@ func (suite *KeeperTestSuite) TestPrependSendRestriction() {
 	// Initial append of the test restriction.
 	bk.SetSendRestriction(nil)
 	bk.PrependSendRestriction(testRestriction(1))
-	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, nil)
+	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, sdk.Coin{})
 	suite.Require().Equal([]int{1}, calls, "restriction calls after first append")
 
 	// Append the test restriction again.
 	calls = nil
 	bk.PrependSendRestriction(testRestriction(2))
-	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, nil)
+	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, sdk.Coin{})
 	suite.Require().Equal([]int{2, 1}, calls, "restriction calls after second append")
 
 	// make sure the original bank keeper has the restrictions too.
 	calls = nil
-	_, _ = suite.bankKeeper.GetSendRestrictionFn()(suite.ctx, nil, nil, nil)
+	_, _ = suite.bankKeeper.GetSendRestrictionFn()(suite.ctx, nil, nil, sdk.Coin{})
 	suite.Require().Equal([]int{2, 1}, calls, "restriction calls from original bank keeper")
 }
 
@@ -770,12 +770,12 @@ func (suite *KeeperTestSuite) TestInputOutputCoinsWithRestrictions() {
 	var actualRestrictionArgs []*restrictionArgs
 	restrictionError := func(messages ...string) banktypes.SendRestrictionFn {
 		i := -1
-		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
+		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) (sdk.AccAddress, error) {
 			actualRestrictionArgs = append(actualRestrictionArgs, &restrictionArgs{
 				ctx:      ctx,
 				fromAddr: fromAddr,
 				toAddr:   toAddr,
-				amt:      amt,
+				amt:      sdk.NewCoins(amt),
 			})
 			i++
 			if i < len(messages) {
@@ -787,24 +787,24 @@ func (suite *KeeperTestSuite) TestInputOutputCoinsWithRestrictions() {
 		}
 	}
 	restrictionPassthrough := func() banktypes.SendRestrictionFn {
-		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
+		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) (sdk.AccAddress, error) {
 			actualRestrictionArgs = append(actualRestrictionArgs, &restrictionArgs{
 				ctx:      ctx,
 				fromAddr: fromAddr,
 				toAddr:   toAddr,
-				amt:      amt,
+				amt:      sdk.NewCoins(amt),
 			})
 			return toAddr, nil
 		}
 	}
 	restrictionNewTo := func(newToAddrs ...sdk.AccAddress) banktypes.SendRestrictionFn {
 		i := -1
-		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
+		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) (sdk.AccAddress, error) {
 			actualRestrictionArgs = append(actualRestrictionArgs, &restrictionArgs{
 				ctx:      ctx,
 				fromAddr: fromAddr,
 				toAddr:   toAddr,
-				amt:      amt,
+				amt:      sdk.NewCoins(amt),
 			})
 			i++
 			if i < len(newToAddrs) {
@@ -1094,34 +1094,34 @@ func (suite *KeeperTestSuite) TestSendCoinsWithRestrictions() {
 	}
 	var actualRestrictionArgs *restrictionArgs
 	restrictionError := func(message string) banktypes.SendRestrictionFn {
-		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
+		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) (sdk.AccAddress, error) {
 			actualRestrictionArgs = &restrictionArgs{
 				ctx:      ctx,
 				fromAddr: fromAddr,
 				toAddr:   toAddr,
-				amt:      amt,
+				amt:      sdk.NewCoins(amt),
 			}
 			return nil, errors.New(message)
 		}
 	}
 	restrictionPassthrough := func() banktypes.SendRestrictionFn {
-		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
+		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) (sdk.AccAddress, error) {
 			actualRestrictionArgs = &restrictionArgs{
 				ctx:      ctx,
 				fromAddr: fromAddr,
 				toAddr:   toAddr,
-				amt:      amt,
+				amt:      sdk.NewCoins(amt),
 			}
 			return toAddr, nil
 		}
 	}
 	restrictionNewTo := func(newToAddr sdk.AccAddress) banktypes.SendRestrictionFn {
-		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
+		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) (sdk.AccAddress, error) {
 			actualRestrictionArgs = &restrictionArgs{
 				ctx:      ctx,
 				fromAddr: fromAddr,
 				toAddr:   toAddr,
-				amt:      amt,
+				amt:      sdk.NewCoins(amt),
 			}
 			return newToAddr, nil
 		}

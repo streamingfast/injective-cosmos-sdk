@@ -433,24 +433,24 @@ func (s *SendRestrictionTestHelper) NewArgs(name string, fromAddr, toAddr sdk.Ac
 
 // NamedRestriction creates a new SendRestrictionFn function that records the arguments it's called with and returns the provided toAddr.
 func (s *SendRestrictionTestHelper) NamedRestriction(name string) types.SendRestrictionFn {
-	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coins sdk.Coins) (sdk.AccAddress, error) {
-		s.RecordCall(name, fromAddr, toAddr, coins)
+	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coin sdk.Coin) (sdk.AccAddress, error) {
+		s.RecordCall(name, fromAddr, toAddr, sdk.NewCoins(coin))
 		return toAddr, nil
 	}
 }
 
 // NewToRestriction creates a new SendRestrictionFn function that returns a different toAddr than provided.
 func (s *SendRestrictionTestHelper) NewToRestriction(name string, addr sdk.AccAddress) types.SendRestrictionFn {
-	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coins sdk.Coins) (sdk.AccAddress, error) {
-		s.RecordCall(name, fromAddr, toAddr, coins)
+	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coin sdk.Coin) (sdk.AccAddress, error) {
+		s.RecordCall(name, fromAddr, toAddr, sdk.NewCoins(coin))
 		return addr, nil
 	}
 }
 
 // ErrorRestriction creates a new SendRestrictionFn function that returns a nil toAddr and an error.
 func (s *SendRestrictionTestHelper) ErrorRestriction(message string) types.SendRestrictionFn {
-	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coins sdk.Coins) (sdk.AccAddress, error) {
-		s.RecordCall(message, fromAddr, toAddr, coins)
+	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coin sdk.Coin) (sdk.AccAddress, error) {
+		s.RecordCall(message, fromAddr, toAddr, sdk.NewCoins(coin))
 		return nil, errors.New(message)
 	}
 }
@@ -911,7 +911,7 @@ func TestNoOpSendRestrictionFn(t *testing.T) {
 	var addr sdk.AccAddress
 	var err error
 	testFunc := func() {
-		addr, err = types.NoOpSendRestrictionFn(sdk.Context{}, sdk.AccAddress("first_addr"), expAddr, sdk.Coins{})
+		addr, err = types.NoOpSendRestrictionFn(sdk.Context{}, sdk.AccAddress("first_addr"), expAddr, sdk.Coin{})
 	}
 	require.NotPanics(t, testFunc, "NoOpSendRestrictionFn")
 	assert.NoError(t, err, "NoOpSendRestrictionFn error")
