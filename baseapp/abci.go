@@ -724,6 +724,13 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 		ProposerAddress:    req.ProposerAddress,
 		NextValidatorsHash: req.NextValidatorsHash,
 		AppHash:            app.LastCommitID().Hash,
+		LastBlockId: cmtproto.BlockID{
+			Hash: req.LastBlockHash,
+			PartSetHeader: cmtproto.PartSetHeader{
+				Total: uint32(req.LastBlockPartSetTotal),
+				Hash:  req.LastBlockPartSetHash,
+			},
+		},
 	}
 
 	// finalizeBlockState should be set on InitChain or ProcessProposal. If it is
