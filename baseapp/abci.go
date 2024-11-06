@@ -723,7 +723,7 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 		Time:               req.Time,
 		ProposerAddress:    req.ProposerAddress,
 		NextValidatorsHash: req.NextValidatorsHash,
-		AppHash:            req.AppHash,
+		AppHash:            app.LastCommitID().Hash,
 		ValidatorsHash:     req.ValidatorsHash,
 		ConsensusHash:      req.ConsensusHash,
 		DataHash:           req.DataHash,
