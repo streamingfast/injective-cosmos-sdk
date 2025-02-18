@@ -42,7 +42,8 @@ type Context struct {
 	baseCtx context.Context
 	ms      storetypes.MultiStore
 	// Deprecated: Use HeaderService for height, time, and chainID and CometService for the rest
-	header cmtproto.Header
+	header   cmtproto.Header
+	sfheader cmtproto.Header
 	// Deprecated: Use HeaderService for hash
 	headerHash []byte
 	// Deprecated: Use HeaderService for chainID and CometService for the rest
@@ -104,6 +105,7 @@ func (c Context) TransientKVGasConfig() storetypes.GasConfig    { return c.trans
 func (c Context) StreamingManager() storetypes.StreamingManager { return c.streamingManager }
 func (c Context) CometInfo() comet.BlockInfo                    { return c.cometInfo }
 func (c Context) HeaderInfo() header.Info                       { return c.headerInfo }
+func (c Context) SFHeader() cmtproto.Header                     { return c.sfheader }
 func (c Context) TxIndex() int                                  { return c.txIndex }
 func (c Context) MsgIndex() int                                 { return c.msgIndex }
 func (c Context) TxCount() int                                  { return c.txCount }
@@ -177,6 +179,12 @@ func (c Context) WithBlockHeader(header cmtproto.Header) Context {
 	// https://github.com/gogo/protobuf/issues/519
 	header.Time = header.Time.UTC()
 	c.header = header
+	return c
+}
+
+func (c Context) WithSFHeader(header cmtproto.Header) Context {
+	header.Time = header.Time.UTC()
+	c.sfheader = header
 	return c
 }
 

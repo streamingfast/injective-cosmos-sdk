@@ -724,6 +724,23 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 		ProposerAddress:    req.ProposerAddress,
 		NextValidatorsHash: req.NextValidatorsHash,
 		AppHash:            app.LastCommitID().Hash,
+	}
+
+	// finalizeBlockState should be set on InitChain or ProcessProposal. If it is
+	// nil, it means we are replaying this block and we need to set the state here
+	// given that during block replay ProcessProposal is not executed by CometBFT.
+	if app.finalizeBlockState == nil {
+		app.setState(execModeFinalize, header)
+	}
+
+	// Adding SFHeader to the context to allow us to compute the block.header.Hash upstream in the OnCosmosBlockEnd inside of the Firehose tracer
+	sfHeader := cmtproto.Header{
+		ChainID:            app.chainID,
+		Height:             req.Height,
+		Time:               req.Time,
+		ProposerAddress:    req.ProposerAddress,
+		NextValidatorsHash: req.NextValidatorsHash,
+		AppHash:            app.LastCommitID().Hash,
 		ValidatorsHash:     req.ValidatorsHash,
 		ConsensusHash:      req.ConsensusHash,
 		DataHash:           req.DataHash,
@@ -739,13 +756,6 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 		},
 	}
 
-	// finalizeBlockState should be set on InitChain or ProcessProposal. If it is
-	// nil, it means we are replaying this block and we need to set the state here
-	// given that during block replay ProcessProposal is not executed by CometBFT.
-	if app.finalizeBlockState == nil {
-		app.setState(execModeFinalize, header)
-	}
-
 	// metrics and trace
 	heightStr := strconv.Itoa(int(req.Height))
 	metricsCtx, doneFn := metrics.ReportFuncCallAndTimingSdkCtx(app.finalizeBlockState.Context(), metrics.Tags{"svc": "app", "height": heightStr})
@@ -759,6 +769,7 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 	app.finalizeBlockState.SetContext(app.finalizeBlockState.Context().
 		WithBlockHeader(header).
 		WithHeaderHash(req.Hash).
+		WithSFHeader(sfHeader).
 		WithHeaderInfo(coreheader.Info{
 			ChainID: app.chainID,
 			Height:  req.Height,
