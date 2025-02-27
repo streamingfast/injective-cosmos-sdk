@@ -218,7 +218,7 @@ func TestHandleDoubleSign(t *testing.T) {
 	nci := NewCometInfo(abci.FinalizeBlockRequest{
 		Misbehavior: []abci.Misbehavior{{
 			Validator: abci.Validator{Address: valpubkey.Address(), Power: power},
-			Type:      abci.MisbehaviorType_DUPLICATE_VOTE,
+			Type:      abci.MISBEHAVIOR_TYPE_DUPLICATE_VOTE,
 			Time:      time.Now().UTC(),
 			Height:    1,
 		}},
@@ -298,7 +298,7 @@ func TestHandleDoubleSign_TooOld(t *testing.T) {
 	nci := NewCometInfo(abci.FinalizeBlockRequest{
 		Misbehavior: []abci.Misbehavior{{
 			Validator: abci.Validator{Address: valpubkey.Address(), Power: power},
-			Type:      abci.MisbehaviorType_DUPLICATE_VOTE,
+			Type:      abci.MISBEHAVIOR_TYPE_DUPLICATE_VOTE,
 			Time:      ctx.BlockTime(),
 			Height:    0,
 		}},
