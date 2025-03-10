@@ -32,6 +32,11 @@ require (
 )
 
 require (
+	github.com/cometbft/cometbft/api v1.0.0
+	gotest.tools v2.2.0+incompatible
+)
+
+require (
 	cloud.google.com/go v0.112.1 // indirect
 	cloud.google.com/go/compute/metadata v0.5.2 // indirect
 	cloud.google.com/go/iam v1.1.6 // indirect
