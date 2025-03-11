@@ -213,7 +213,7 @@ jobs:
             **/Makefile
             Makefile
       - name: start localnet
-        if: env.GIT_DIFF
+        if: env.GIT_DIFF||env.ACT
         run: |
           make clean localnet-start
       - name: test liveness
