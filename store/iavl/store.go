@@ -31,6 +31,7 @@ var (
 	_ types.CommitKVStore           = (*Store)(nil)
 	_ types.Queryable               = (*Store)(nil)
 	_ types.StoreWithInitialVersion = (*Store)(nil)
+	_ types.PausablePruner          = (*Store)(nil)
 )
 
 // Store Implements types.KVStore and CommitKVStore.
@@ -52,7 +53,7 @@ func LoadStore(db dbm.DB, logger log.Logger, key types.StoreKey, id types.Commit
 // provided DB. An error is returned if the version fails to load, or if called with a positive
 // version on an empty tree.
 func LoadStoreWithInitialVersion(db dbm.DB, logger log.Logger, key types.StoreKey, id types.CommitID, initialVersion uint64, cacheSize int, disableFastNode bool, metrics metrics.StoreMetrics) (types.CommitKVStore, error) {
-	tree := iavl.NewMutableTree(wrapper.NewDBWrapper(db), cacheSize, disableFastNode, logger, iavl.InitialVersionOption(initialVersion))
+	tree := iavl.NewMutableTree(wrapper.NewDBWrapper(db), cacheSize, disableFastNode, logger, iavl.InitialVersionOption(initialVersion), iavl.AsyncPruningOption(false))
 
 	isUpgradeable, err := tree.IsUpgradeable()
 	if err != nil {
@@ -82,6 +83,15 @@ func LoadStoreWithInitialVersion(db dbm.DB, logger log.Logger, key types.StoreKe
 		logger:  logger,
 		metrics: metrics,
 	}, nil
+}
+
+// PausePruning implements CommitKVStore interface.
+func (st *Store) PausePruning(pause bool) {
+	if pause {
+		st.tree.SetCommitting()
+	} else {
+		st.tree.UnsetCommitting()
+	}
 }
 
 // UnsafeNewStore returns a reference to a new IAVL Store with a given mutable

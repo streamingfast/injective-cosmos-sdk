@@ -62,6 +62,7 @@ type Store struct {
 	pruningManager      *pruning.Manager
 	iavlCacheSize       int
 	iavlDisableFastNode bool
+	iavlSyncPruning     bool
 	storesParams        map[types.StoreKey]storeParams
 	stores              map[types.StoreKey]types.CommitKVStore
 	keysByName          map[string]types.StoreKey
@@ -130,6 +131,10 @@ func (rs *Store) SetIAVLCacheSize(cacheSize int) {
 
 func (rs *Store) SetIAVLDisableFastNode(disableFastNode bool) {
 	rs.iavlDisableFastNode = disableFastNode
+}
+
+func (rs *Store) SetIAVLSyncPruning(syncPruning bool) {
+	rs.iavlSyncPruning = syncPruning
 }
 
 // GetStoreType implements Store.
@@ -458,6 +463,16 @@ func (rs *Store) LastCommitID() types.CommitID {
 	return rs.lastCommitInfo.CommitID()
 }
 
+// PausePruning temporarily pauses the pruning of all individual stores which implement
+// the PausablePruner interface.
+func (rs *Store) PausePruning(pause bool) {
+	for _, store := range rs.stores {
+		if pauseable, ok := store.(types.PausablePruner); ok {
+			pauseable.PausePruning(pause)
+		}
+	}
+}
+
 // Commit implements Committer/CommitStore.
 func (rs *Store) Commit() types.CommitID {
 	var previousHeight, version int64
@@ -479,7 +494,14 @@ func (rs *Store) Commit() types.CommitID {
 		rs.logger.Debug("commit header and version mismatch", "header_height", rs.commitHeader.Height, "version", version)
 	}
 
-	rs.lastCommitInfo = commitStores(version, rs.stores, rs.removalMap)
+	func() { // ensure unpause
+		// set the committing flag on all stores to block the pruning
+		rs.PausePruning(true)
+		// unset the committing flag on all stores to continue the pruning
+		defer rs.PausePruning(false)
+		rs.lastCommitInfo = commitStores(version, rs.stores, rs.removalMap)
+	}()
+
 	rs.lastCommitInfo.Timestamp = rs.commitHeader.Time
 	defer rs.flushMetadata(rs.db, version, rs.lastCommitInfo)
 

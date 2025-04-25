@@ -29,6 +29,14 @@ type Committer interface {
 	GetPruning() pruningtypes.PruningOptions
 }
 
+type PausablePruner interface {
+	// PausePruning let the pruning handler know that the store is being committed
+	// or not, so the handler can decide to prune or not the store.
+	//
+	// NOTE: PausePruning(true) should be called before Commit() and PausePruning(false)
+	PausePruning(bool)
+}
+
 // Stores of MultiStore must implement CommitStore.
 type CommitStore interface {
 	Committer
@@ -209,6 +217,9 @@ type CommitMultiStore interface {
 
 	// SetIAVLDisableFastNode enables/disables fastnode feature on iavl.
 	SetIAVLDisableFastNode(disable bool)
+
+	// SetIAVLSyncPruning sets the sync pruning mode of the IAVL tree.
+	SetIAVLSyncPruning(sync bool)
 
 	// RollbackToVersion rollback the db to specific version(height).
 	RollbackToVersion(version int64) error
