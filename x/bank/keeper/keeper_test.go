@@ -663,8 +663,6 @@ func (suite *KeeperTestSuite) TestSendCoinsNewAccount() {
 	balances := sdk.NewCoins(newFooCoin(100), newBarCoin(50))
 
 	suite.mockFundAccount(accAddrs[0])
-	// required since multiple coins are sent to funded account
-	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[0]).Return(true)
 	require.NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, accAddrs[0], balances))
 
 	acc0 := authtypes.NewBaseAccountWithAddress(accAddrs[0])
@@ -676,8 +674,6 @@ func (suite *KeeperTestSuite) TestSendCoinsNewAccount() {
 
 	sendAmt := sdk.NewCoins(newFooCoin(50), newBarCoin(50))
 	suite.mockSendCoins(ctx, acc0, accAddrs[1])
-	// required since multiple coins are sent to receiver account
-	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[1]).Return(true)
 	require.NoError(suite.bankKeeper.SendCoins(ctx, accAddrs[0], accAddrs[1], sendAmt))
 
 	acc2Balances := suite.bankKeeper.GetAllBalances(ctx, accAddrs[1])
@@ -695,8 +691,6 @@ func (suite *KeeperTestSuite) TestInputOutputNewAccount() {
 	balances := sdk.NewCoins(newFooCoin(100), newBarCoin(50))
 
 	suite.mockFundAccount(accAddrs[0])
-	// required since multiple coins are sent to funded account
-	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[0]).Return(true)
 	require.NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, accAddrs[0], balances))
 
 	acc1Balances := suite.bankKeeper.GetAllBalances(ctx, accAddrs[0])
@@ -712,8 +706,7 @@ func (suite *KeeperTestSuite) TestInputOutputNewAccount() {
 	outputs := []banktypes.Output{
 		{Address: accAddrs[1].String(), Coins: sdk.NewCoins(newFooCoin(30), newBarCoin(10))},
 	}
-	// required since multiple coins are sent output accounts
-	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[1]).Return(true)
+
 	require.NoError(suite.bankKeeper.InputOutputCoins(ctx, input, outputs))
 
 	expected := sdk.NewCoins(newFooCoin(30), newBarCoin(10))
@@ -741,8 +734,6 @@ func (suite *KeeperTestSuite) TestInputOutputCoins() {
 	require.Error(suite.bankKeeper.InputOutputCoins(ctx, input, outputs))
 
 	suite.mockFundAccount(accAddrs[0])
-	// required since multiple coins are sent to funded account
-	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[0]).Return(true)
 	require.NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, accAddrs[0], balances))
 
 	insufficientInput := banktypes.Input{
@@ -755,12 +746,8 @@ func (suite *KeeperTestSuite) TestInputOutputCoins() {
 	}
 
 	require.Error(suite.bankKeeper.InputOutputCoins(ctx, insufficientInput, insufficientOutputs))
+
 	suite.mockInputOutputCoins([]sdk.AccountI{acc0}, accAddrs[1:3])
-
-	// required since multiple coins are sent to each output account
-	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[1]).Return(true)
-	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[2]).Return(true)
-
 	require.NoError(suite.bankKeeper.InputOutputCoins(ctx, input, outputs))
 
 	acc1Balances := suite.bankKeeper.GetAllBalances(ctx, accAddrs[0])
@@ -844,8 +831,6 @@ func (suite *KeeperTestSuite) TestInputOutputCoinsWithRestrictions() {
 	toAddr2 := accAddrs[2]
 
 	suite.mockFundAccount(accAddrs[0])
-	// required since multiple coins are sent to funded account
-	suite.authKeeper.EXPECT().HasAccount(setupCtx, accAddrs[0]).Return(true)
 	suite.Require().NoError(banktestutil.FundAccount(setupCtx, suite.bankKeeper, accAddrs[0], balances))
 
 	tests := []struct {
@@ -1072,19 +1057,13 @@ func (suite *KeeperTestSuite) TestSendCoins() {
 	acc0 := authtypes.NewBaseAccountWithAddress(accAddrs[0])
 
 	suite.mockFundAccount(accAddrs[1])
-	// required since multiple coins are sent to funded account
-	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[1]).Return(true)
 	require.NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, accAddrs[1], balances))
 
 	sendAmt := sdk.NewCoins(newFooCoin(50), newBarCoin(25))
 	suite.authKeeper.EXPECT().GetAccount(suite.ctx, accAddrs[0]).Return(acc0)
-	// required since multiple coins are sent to account
-	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[1]).Return(true)
 	require.Error(suite.bankKeeper.SendCoins(ctx, accAddrs[0], accAddrs[1], sendAmt))
 
 	suite.mockFundAccount(accAddrs[0])
-	// required since multiple coins are sent to funded account
-	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[0]).Return(true)
 	require.NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, accAddrs[0], balances))
 	suite.mockSendCoins(ctx, acc0, accAddrs[1])
 	require.NoError(suite.bankKeeper.SendCoins(ctx, accAddrs[0], accAddrs[1], sendAmt))
@@ -1162,9 +1141,6 @@ func (suite *KeeperTestSuite) TestSendCoinsWithRestrictions() {
 	toAddr2 := accAddrs[2]
 
 	suite.mockFundAccount(accAddrs[0])
-	// required since multiple coins are sent to funded account
-
-	suite.authKeeper.EXPECT().HasAccount(setupCtx, accAddrs[0]).Return(true)
 	suite.Require().NoError(banktestutil.FundAccount(setupCtx, suite.bankKeeper, accAddrs[0], balances))
 
 	tests := []struct {
@@ -1231,7 +1207,7 @@ func (suite *KeeperTestSuite) TestSendCoinsWithRestrictions() {
 			fn:        restrictionError("test restriction error"),
 			toAddr:    toAddr1,
 			finalAddr: toAddr1,
-			amt:       sdk.NewCoins(newBarCoin(200)),
+			amt:       sdk.NewCoins(newFooCoin(100), newBarCoin(200)),
 			expArgs: &restrictionArgs{
 				ctx:      suite.ctx,
 				fromAddr: fromAddr,
@@ -1491,22 +1467,14 @@ func (suite *KeeperTestSuite) TestMsgMultiSendEvents() {
 
 	// Set addr's coins but not accAddrs[1]'s coins
 	suite.mockFundAccount(accAddrs[0])
-	// required since multiple coins are sent to funded account
-	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[0]).Return(true)
 	require.NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, accAddrs[0], sdk.NewCoins(sdk.NewInt64Coin(fooDenom, 50), sdk.NewInt64Coin(barDenom, 100))))
+
 	suite.mockInputOutputCoins([]sdk.AccountI{acc0}, accAddrs[2:4])
-	// required since multiple coins are sent to output accounts
-	for _, out := range outputs {
-		if len(out.Coins) > 1 {
-			suite.authKeeper.EXPECT().HasAccount(ctx, out.Address).Return(true)
-		}
-	}
 	require.NoError(suite.bankKeeper.InputOutputCoins(ctx, input, outputs))
 
 	events = ctx.EventManager().ABCIEvents()
 	require.Equal(16, len(events)) // 12 events because account funding causes extra minting + coin_spent + coin_recv events
-	// + plus 4 transfer events as SendCoin is called for each coin sent since
-	// https://github.com/InjectiveLabs/cosmos-sdk/commit/59f4bfe90556ee3b13f6a99fb27759d1ceedfa49
+
 	event1 := sdk.Event{
 		Type:       sdk.EventTypeMessage,
 		Attributes: []abci.EventAttribute{},
@@ -1527,12 +1495,6 @@ func (suite *KeeperTestSuite) TestMsgMultiSendEvents() {
 	newCoins2 = sdk.NewCoins(sdk.NewInt64Coin(barDenom, 100))
 
 	suite.mockInputOutputCoins([]sdk.AccountI{acc0}, accAddrs[2:4])
-	// required since multiple coins are sent to output accounts
-	for _, out := range outputs {
-		if len(out.Coins) > 1 {
-			suite.authKeeper.EXPECT().HasAccount(ctx, out.Address).Return(true)
-		}
-	}
 	require.NoError(suite.bankKeeper.InputOutputCoins(ctx, input, outputs))
 
 	events = ctx.EventManager().ABCIEvents()
@@ -1548,13 +1510,6 @@ func (suite *KeeperTestSuite) TestMsgMultiSendEvents() {
 		abci.EventAttribute{Key: banktypes.AttributeKeySender, Value: accAddrs[0].String()},
 		abci.EventAttribute{Key: sdk.AttributeKeyAmount, Value: newCoins.String()},
 	)
-	event2.Attributes = append(
-		event2.Attributes,
-		abci.EventAttribute{Key: banktypes.AttributeKeySender, Value: accAddrs[0].String()},
-	)
-	event2.Attributes = append(
-		event2.Attributes,
-		abci.EventAttribute{Key: sdk.AttributeKeyAmount, Value: newCoins.String()})
 	event3 := sdk.Event{
 		Type:       banktypes.EventTypeTransfer,
 		Attributes: []abci.EventAttribute{},
@@ -1562,13 +1517,7 @@ func (suite *KeeperTestSuite) TestMsgMultiSendEvents() {
 	event3.Attributes = append(
 		event3.Attributes,
 		abci.EventAttribute{Key: banktypes.AttributeKeyRecipient, Value: accAddrs[3].String()},
-	)
-	event3.Attributes = append(
-		event3.Attributes,
 		abci.EventAttribute{Key: banktypes.AttributeKeySender, Value: accAddrs[0].String()},
-	)
-	event3.Attributes = append(
-		event3.Attributes,
 		abci.EventAttribute{Key: sdk.AttributeKeyAmount, Value: newCoins2.String()},
 	)
 	// events are shifted due to the funding account events

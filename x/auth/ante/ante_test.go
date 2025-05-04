@@ -849,7 +849,6 @@ func TestAnteHandlerMultiSigner(t *testing.T) {
 				suite.ctx, err = suite.DeliverMsgs(t, privs, msgs, feeAmount, gasLimit, accNums, accSeqs, suite.ctx.ChainID(), false)
 				require.NoError(t, err)
 
-<<<<<<< HEAD
 				// In the second transaction, we need to handle the fee payer's sequence differently
 				msgs = []sdk.Msg{msg1, msg2, msg3}
 				privs, accNums, accSeqs = []cryptotypes.PrivKey{accs[0].priv, accs[1].priv, accs[2].priv},
@@ -867,12 +866,6 @@ func TestAnteHandlerMultiSigner(t *testing.T) {
 				} else if bytes.Equal(feePayer, accs[2].acc.GetAddress()) {
 					// If accs[2] was the fee payer, its sequence wasn't incremented
 					accSeqs[2] = accs[2].acc.GetSequence()
-=======
-				// first signer's sequence isn't increased since it's used as fee payer by default
-				// and they're mutiple signer, see c053612
-				for _, acc := range accs[1:] {
-					require.NoError(t, acc.acc.SetSequence(acc.acc.GetSequence()+1))
->>>>>>> 8b7009bbca (* Fix ante tests in x/auth broken by c053612)
 				}
 
 				return TestCaseArgs{
