@@ -742,6 +742,29 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 		app.setState(execModeFinalize, header)
 	}
 
+	// Adding SFHeader to the context to allow us to compute the block.header.Hash upstream in the OnCosmosBlockEnd inside of the Firehose tracer
+	sfHeader := cmtproto.Header{
+		ChainID:            app.chainID,
+		Height:             req.Height,
+		Time:               req.Time,
+		ProposerAddress:    req.ProposerAddress,
+		NextValidatorsHash: req.NextValidatorsHash,
+		AppHash:            app.LastCommitID().Hash,
+		ValidatorsHash:     req.ValidatorsHash,
+		ConsensusHash:      req.ConsensusHash,
+		DataHash:           req.DataHash,
+		EvidenceHash:       req.EvidenceHash,
+		LastCommitHash:     req.LastCommitHash,
+		LastResultsHash:    req.LastResultsHash,
+		LastBlockId: cmtproto.BlockID{
+			Hash: req.LastBlockHash,
+			PartSetHeader: cmtproto.PartSetHeader{
+				Total: uint32(req.LastBlockPartSetTotal),
+				Hash:  req.LastBlockPartSetHash,
+			},
+		},
+	}
+
 	// metrics and trace
 	heightStr := strconv.Itoa(int(req.Height))
 	metricsCtx, doneFn := metrics.ReportFuncCallAndTimingSdkCtx(app.finalizeBlockState.Context(), metrics.Tags{"svc": "app", "height": heightStr})
@@ -754,6 +777,7 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 	// Context is now updated with Header information.
 	app.finalizeBlockState.SetContext(app.finalizeBlockState.Context().
 		WithBlockHeader(header).
+		WithSFHeader(sfHeader).
 		WithHeaderHash(req.Hash).
 		WithHeaderInfo(coreheader.Info{
 			ChainID: app.chainID,
@@ -788,6 +812,10 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 	}
 
 	events = append(events, preblockEvents...)
+
+	if app.getCtxFunc != nil {
+		app.finalizeBlockState.SetContext(app.getCtxFunc(app.finalizeBlockState.Context()))
+	}
 
 	beginBlock, err := app.beginBlock(req)
 	if err != nil {

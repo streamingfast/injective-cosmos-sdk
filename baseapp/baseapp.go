@@ -209,6 +209,9 @@ type BaseApp struct {
 
 	traceFlightRecorder *metrics.TraceRecorder
 
+	// Optional alternative to set an sdk context on the BaseApp
+	getCtxFunc func(ctx sdk.Context) sdk.Context
+
 	// txResultsPostHook can be used to alter TxResults inside block results,
 	// For example, to fix EVM transaction logs and put correct tx and msg indexes in them, since
 	// we can't do that during execution of individual messages (we do not track indexes throughout block execution,
@@ -759,6 +762,11 @@ func (app *BaseApp) preBlock(req *abci.FinalizeBlockRequest) ([]abci.Event, erro
 		}
 	}
 	return events, nil
+}
+
+// Set the context getter function on the BaseApp
+func (app *BaseApp) SetGetCtxFunc(getCtxFunc func(ctx sdk.Context) sdk.Context) {
+	app.getCtxFunc = getCtxFunc
 }
 
 func (app *BaseApp) beginBlock(_ *abci.FinalizeBlockRequest) (sdk.BeginBlock, error) {
