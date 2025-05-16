@@ -206,6 +206,9 @@ type BaseApp struct {
 	StreamEvents   chan StreamEvents
 
 	traceFlightRecorder *metrics.TraceRecorder
+
+	// Optional alternative to set an sdk context on the BaseApp
+	getCtxFunc func(ctx sdk.Context) sdk.Context
 }
 
 // NewBaseApp returns a reference to an initialized BaseApp. It accepts a
@@ -751,6 +754,11 @@ func (app *BaseApp) preBlock(req *abci.FinalizeBlockRequest) ([]abci.Event, erro
 		}
 	}
 	return events, nil
+}
+
+// Set the context getter function on the BaseApp
+func (app *BaseApp) SetGetCtxFunc(getCtxFunc func(ctx sdk.Context) sdk.Context) {
+	app.getCtxFunc = getCtxFunc
 }
 
 func (app *BaseApp) beginBlock(_ *abci.FinalizeBlockRequest) (sdk.BeginBlock, error) {
