@@ -24,12 +24,6 @@ import (
 // File for storing in-package BaseApp optional functions,
 // for options that need access to non-exported fields of the BaseApp
 
-func SetIAVLSyncPruning(sync bool) func(app *BaseApp) {
-	return func(bapp *BaseApp) {
-		bapp.cms.SetIAVLSyncPruning(sync)
-	}
-}
-
 // SetPruning sets a pruning option on the multistore associated with the app
 func SetPruning(opts pruningtypes.PruningOptions) func(*BaseApp) {
 	return func(bapp *BaseApp) { bapp.cms.SetPruning(opts) }
@@ -321,7 +315,7 @@ func (app *BaseApp) SetTxEncoder(txEncoder sdk.TxEncoder) {
 // SetQueryMultiStore set a alternative MultiStore implementation to support grpc query service.
 //
 // Ref: https://github.com/cosmos/cosmos-sdk/issues/13317
-func (app *BaseApp) SetQueryMultiStore(ms storetypes.RootMultiStore) {
+func (app *BaseApp) SetQueryMultiStore(ms storetypes.MultiStore) {
 	app.qms = ms
 }
 
