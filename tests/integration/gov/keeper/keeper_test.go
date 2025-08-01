@@ -58,7 +58,7 @@ func initFixture(t testing.TB) *fixture {
 	cdc := moduletestutil.MakeTestEncodingConfig(auth.AppModuleBasic{}, bank.AppModuleBasic{}, gov.AppModuleBasic{}).Codec
 
 	logger := log.NewTestLogger(t)
-	cms := integration.CreateMultiStore(keys, tkeys, okeys, logger)
+	cms := integration.CreateMultiStore(keys, tkeys, logger)
 	if err := cms.LoadLatestVersion(); err != nil {
 		t.Fatalf("failed to load latest version: %v", err)
 	}

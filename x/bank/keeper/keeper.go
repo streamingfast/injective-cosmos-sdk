@@ -99,7 +99,7 @@ func NewBaseKeeper(
 	logger = logger.With(log.ModuleKey, "x/"+types.ModuleName)
 
 	return BaseKeeper{
-		BaseSendKeeper:         NewBaseSendKeeper(cdc, storeService, tStoreService, objStoreKey, ak, blockedAddrs, authority, logger),
+		BaseSendKeeper:         NewBaseSendKeeper(cdc, storeService, tStoreService, ak, blockedAddrs, authority, logger),
 		ak:                     ak,
 		cdc:                    cdc,
 		storeService:           storeService,
