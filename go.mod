@@ -213,8 +213,8 @@ replace (
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
 
 	// Use CometBFT v1.0.1 with Mempool lanes and DOG
-	github.com/cometbft/cometbft => github.com/streamingfast/cometbft v1.0.1-inj.3-firehose
-	github.com/cometbft/cometbft/api => github.com/streamingfast/cometbft/api v1.0.1-0.20250804190352-08fed011b64f
+	github.com/cometbft/cometbft => github.com/streamingfast/cometbft v1.0.2-0.20251016185654-95e6c4dd3009
+	github.com/cometbft/cometbft/api => github.com/streamingfast/cometbft/api v1.0.1-0.20251016185654-95e6c4dd3009
 
 	// dgrijalva/jwt-go is deprecated and doesn't receive security updates.
 	// TODO: remove it: https://github.com/cosmos/cosmos-sdk/issues/13134
