@@ -856,7 +856,10 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 	}, nil
 }
 
-func (app *BaseApp) executeTxs(ctx context.Context, txs [][]byte) ([]*abci.ExecTxResult, error) {
+func (app *BaseApp) executeTxs(ctx context.Context, txs [][]byte) (res []*abci.ExecTxResult, err error) {
+	sdkCtx := app.finalizeBlockState.Context()
+	defer app.meter.FuncTiming(&sdkCtx, "executeTxs", metrics.TraceTag("height", sdkCtx.BlockHeight()))(&err)
+
 	txResults := make([]*abci.ExecTxResult, 0, len(txs))
 	for txIdx, rawTx := range txs {
 		var response *abci.ExecTxResult
