@@ -5,6 +5,7 @@ import (
 
 	"cosmossdk.io/x/circuit/types"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 )
 
@@ -22,12 +23,15 @@ func NewQueryServer(keeper Keeper) types.QueryServer {
 
 // Account returns account permissions.
 func (qs QueryServer) Account(ctx context.Context, req *types.QueryAccountRequest) (*types.AccountResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer qs.keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Account")()
+
 	add, err := qs.keeper.addressCodec.StringToBytes(req.Address)
 	if err != nil {
 		return nil, err
 	}
 
-	perms, err := qs.keeper.Permissions.Get(ctx, add)
+	perms, err := qs.keeper.Permissions.Get(sdkCtx, add)
 	if err != nil {
 		return nil, err
 	}
@@ -37,8 +41,11 @@ func (qs QueryServer) Account(ctx context.Context, req *types.QueryAccountReques
 
 // Account returns account permissions.
 func (qs QueryServer) Accounts(ctx context.Context, req *types.QueryAccountsRequest) (*types.AccountsResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer qs.keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Accounts")()
+
 	results, pageRes, err := query.CollectionPaginate(
-		ctx,
+		sdkCtx,
 		qs.keeper.Permissions,
 		req.Pagination,
 		func(key []byte, value types.Permissions) (*types.GenesisAccountPermissions, error) {
@@ -61,9 +68,12 @@ func (qs QueryServer) Accounts(ctx context.Context, req *types.QueryAccountsRequ
 
 // DisabledList returns a list of disabled message urls
 func (qs QueryServer) DisabledList(ctx context.Context, req *types.QueryDisabledListRequest) (*types.DisabledListResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer qs.keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DisabledList")()
+
 	// Iterate over disabled list and perform the callback
 	var msgs []string
-	err := qs.keeper.DisableList.Walk(ctx, nil, func(msgUrl string) (bool, error) {
+	err := qs.keeper.DisableList.Walk(sdkCtx, nil, func(msgUrl string) (bool, error) {
 		msgs = append(msgs, msgUrl)
 		return false, nil
 	})

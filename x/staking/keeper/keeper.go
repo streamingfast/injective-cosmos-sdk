@@ -2,14 +2,15 @@ package keeper
 
 import (
 	"context"
-	"fmt"
-
-	abci "github.com/cometbft/cometbft/abci/types"
 
 	addresscodec "cosmossdk.io/core/address"
 	storetypes "cosmossdk.io/core/store"
 	"cosmossdk.io/log"
 	"cosmossdk.io/math"
+	"fmt"
+	metrics "github.com/InjectiveLabs/metrics/v2"
+
+	abci "github.com/cometbft/cometbft/abci/types"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -24,6 +25,7 @@ var _ types.DelegationSet = Keeper{}
 
 // Keeper of the x/staking store
 type Keeper struct {
+	meter                 metrics.Meter
 	storeService          storetypes.KVStoreService
 	cdc                   codec.BinaryCodec
 	authKeeper            types.AccountKeeper
@@ -77,6 +79,7 @@ func NewKeeper(
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx context.Context) log.Logger {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Logger")()
 	return sdkCtx.Logger().With("module", "x/"+types.ModuleName)
 }
 
@@ -102,7 +105,10 @@ func (k *Keeper) SetHooks(sh types.StakingHooks) {
 
 // GetLastTotalPower loads the last total validator power.
 func (k Keeper) GetLastTotalPower(ctx context.Context) (math.Int, error) {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetLastTotalPower")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := store.Get(types.LastTotalPowerKey)
 	if err != nil {
 		return math.ZeroInt(), err
@@ -123,7 +129,10 @@ func (k Keeper) GetLastTotalPower(ctx context.Context) (math.Int, error) {
 
 // SetLastTotalPower sets the last total validator power.
 func (k Keeper) SetLastTotalPower(ctx context.Context, power math.Int) error {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetLastTotalPower")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := k.cdc.Marshal(&sdk.IntProto{Int: power})
 	if err != nil {
 		return err
@@ -148,7 +157,10 @@ func (k Keeper) ConsensusAddressCodec() addresscodec.Codec {
 
 // SetValidatorUpdates sets the ABCI validator power updates for the current block.
 func (k Keeper) SetValidatorUpdates(ctx context.Context, valUpdates []abci.ValidatorUpdate) error {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetValidatorUpdates")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := k.cdc.Marshal(&types.ValidatorUpdates{Updates: valUpdates})
 	if err != nil {
 		return err
@@ -158,7 +170,10 @@ func (k Keeper) SetValidatorUpdates(ctx context.Context, valUpdates []abci.Valid
 
 // GetValidatorUpdates returns the ABCI validator power updates within the current block.
 func (k Keeper) GetValidatorUpdates(ctx context.Context) ([]abci.ValidatorUpdate, error) {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetValidatorUpdates")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := store.Get(types.ValidatorUpdatesKey)
 	if err != nil {
 		return nil, err
@@ -171,4 +186,12 @@ func (k Keeper) GetValidatorUpdates(ctx context.Context) ([]abci.ValidatorUpdate
 	}
 
 	return valUpdates.Updates, nil
+}
+
+func (k *Keeper) Meter(ctx context.Context) metrics.Meter {
+	if k.meter == nil {
+		k.meter = sdk.UnwrapSDKContext(ctx).Meter().SubMeter(types.ModuleName, metrics.Tag("svc", types.ModuleName))
+	}
+
+	return k.meter
 }

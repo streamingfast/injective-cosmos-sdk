@@ -16,6 +16,9 @@ import (
 // Tally iterates over the votes and updates the tally of a proposal based on the voting power of the
 // voters
 func (keeper Keeper) Tally(ctx context.Context, proposal v1.Proposal) (passes, burnDeposits bool, tallyResults v1.TallyResult, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Tally")()
+
 	results := make(map[v1.VoteOption]math.LegacyDec)
 	results[v1.OptionYes] = math.LegacyZeroDec()
 	results[v1.OptionAbstain] = math.LegacyZeroDec()
@@ -26,7 +29,7 @@ func (keeper Keeper) Tally(ctx context.Context, proposal v1.Proposal) (passes, b
 	currValidators := make(map[string]v1.ValidatorGovInfo)
 
 	// fetch all the bonded validators, insert them into currValidators
-	err = keeper.sk.IterateBondedValidatorsByPower(ctx, func(index int64, validator stakingtypes.ValidatorI) (stop bool) {
+	err = keeper.sk.IterateBondedValidatorsByPower(sdkCtx, func(index int64, validator stakingtypes.ValidatorI) (stop bool) {
 		valBz, err := keeper.sk.ValidatorAddressCodec().StringToBytes(validator.GetOperator())
 		if err != nil {
 			return false
@@ -46,7 +49,7 @@ func (keeper Keeper) Tally(ctx context.Context, proposal v1.Proposal) (passes, b
 	}
 
 	rng := collections.NewPrefixedPairRange[uint64, sdk.AccAddress](proposal.Id)
-	err = keeper.Votes.Walk(ctx, rng, func(key collections.Pair[uint64, sdk.AccAddress], vote v1.Vote) (bool, error) {
+	err = keeper.Votes.Walk(sdkCtx, rng, func(key collections.Pair[uint64, sdk.AccAddress], vote v1.Vote) (bool, error) {
 		// if validator, just record it in the map
 		voter, err := keeper.authKeeper.AddressCodec().StringToBytes(vote.Voter)
 		if err != nil {
@@ -63,7 +66,7 @@ func (keeper Keeper) Tally(ctx context.Context, proposal v1.Proposal) (passes, b
 		}
 
 		// iterate over all delegations from voter, deduct from any delegated-to validators
-		err = keeper.sk.IterateDelegations(ctx, voter, func(index int64, delegation stakingtypes.DelegationI) (stop bool) {
+		err = keeper.sk.IterateDelegations(sdkCtx, voter, func(index int64, delegation stakingtypes.DelegationI) (stop bool) {
 			valAddrStr := delegation.GetValidatorAddr()
 
 			if val, ok := currValidators[valAddrStr]; ok {
@@ -89,7 +92,7 @@ func (keeper Keeper) Tally(ctx context.Context, proposal v1.Proposal) (passes, b
 			return false, err
 		}
 
-		return false, keeper.Votes.Remove(ctx, collections.Join(vote.ProposalId, sdk.AccAddress(voter)))
+		return false, keeper.Votes.Remove(sdkCtx, collections.Join(vote.ProposalId, sdk.AccAddress(voter)))
 	})
 
 	if err != nil {
@@ -113,7 +116,7 @@ func (keeper Keeper) Tally(ctx context.Context, proposal v1.Proposal) (passes, b
 		totalVotingPower = totalVotingPower.Add(votingPower)
 	}
 
-	params, err := keeper.Params.Get(ctx)
+	params, err := keeper.Params.Get(sdkCtx)
 	if err != nil {
 		return false, false, tallyResults, err
 	}
@@ -121,7 +124,7 @@ func (keeper Keeper) Tally(ctx context.Context, proposal v1.Proposal) (passes, b
 
 	// TODO: Upgrade the spec to cover all of these cases & remove pseudocode.
 	// If there is no staked coins, the proposal fails
-	totalBonded, err := keeper.sk.TotalBondedTokens(ctx)
+	totalBonded, err := keeper.sk.TotalBondedTokens(sdkCtx)
 	if err != nil {
 		return false, false, tallyResults, err
 	}

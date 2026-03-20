@@ -12,7 +12,10 @@ import (
 // Unjail calls the staking Unjail function to unjail a validator if the
 // jailed period has concluded
 func (k Keeper) Unjail(ctx context.Context, validatorAddr sdk.ValAddress) error {
-	validator, err := k.sk.Validator(ctx, validatorAddr)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Unjail")()
+
+	validator, err := k.sk.Validator(sdkCtx, validatorAddr)
 	if err != nil {
 		return err
 	}
@@ -21,7 +24,7 @@ func (k Keeper) Unjail(ctx context.Context, validatorAddr sdk.ValAddress) error 
 	}
 
 	// cannot be unjailed if no self-delegation exists
-	selfDel, err := k.sk.Delegation(ctx, sdk.AccAddress(validatorAddr), validatorAddr)
+	selfDel, err := k.sk.Delegation(sdkCtx, sdk.AccAddress(validatorAddr), validatorAddr)
 	if err != nil {
 		return err
 	}
@@ -55,7 +58,7 @@ func (k Keeper) Unjail(ctx context.Context, validatorAddr sdk.ValAddress) error 
 	// that the validator was never bonded and must've been jailed due to falling
 	// below their minimum self-delegation. The validator can unjail at any point
 	// assuming they've now bonded above their minimum self-delegation.
-	info, err := k.GetValidatorSigningInfo(ctx, consAddr)
+	info, err := k.GetValidatorSigningInfo(sdkCtx, consAddr)
 	if err == nil {
 		// cannot be unjailed if tombstoned
 		if info.Tombstoned {
@@ -63,11 +66,10 @@ func (k Keeper) Unjail(ctx context.Context, validatorAddr sdk.ValAddress) error 
 		}
 
 		// cannot be unjailed until out of jail
-		sdkCtx := sdk.UnwrapSDKContext(ctx)
 		if sdkCtx.BlockHeader().Time.Before(info.JailedUntil) {
 			return types.ErrValidatorJailed
 		}
 	}
 
-	return k.sk.Unjail(ctx, consAddr)
+	return k.sk.Unjail(sdkCtx, consAddr)
 }

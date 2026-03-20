@@ -11,18 +11,24 @@ import (
 
 // NewAccountWithAddress implements AccountKeeperI.
 func (ak AccountKeeper) NewAccountWithAddress(ctx context.Context, addr sdk.AccAddress) sdk.AccountI {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "NewAccountWithAddress")()
+
 	acc := ak.proto()
 	err := acc.SetAddress(addr)
 	if err != nil {
 		panic(err)
 	}
 
-	return ak.NewAccount(ctx, acc)
+	return ak.NewAccount(sdkCtx, acc)
 }
 
 // NewAccount sets the next account number to a given account interface
 func (ak AccountKeeper) NewAccount(ctx context.Context, acc sdk.AccountI) sdk.AccountI {
-	if err := acc.SetAccountNumber(ak.NextAccountNumber(ctx)); err != nil {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "NewAccount")()
+
+	if err := acc.SetAccountNumber(ak.NextAccountNumber(sdkCtx)); err != nil {
 		panic(err)
 	}
 
@@ -31,13 +37,19 @@ func (ak AccountKeeper) NewAccount(ctx context.Context, acc sdk.AccountI) sdk.Ac
 
 // HasAccount implements AccountKeeperI.
 func (ak AccountKeeper) HasAccount(ctx context.Context, addr sdk.AccAddress) bool {
-	has, _ := ak.Accounts.Has(ctx, addr)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "HasAccount")()
+
+	has, _ := ak.Accounts.Has(sdkCtx, addr)
 	return has
 }
 
 // GetAccount implements AccountKeeperI.
 func (ak AccountKeeper) GetAccount(ctx context.Context, addr sdk.AccAddress) sdk.AccountI {
-	acc, err := ak.Accounts.Get(ctx, addr)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetAccount")()
+
+	acc, err := ak.Accounts.Get(sdkCtx, addr)
 	if err != nil && !errors.Is(err, collections.ErrNotFound) {
 		panic(err)
 	}
@@ -46,7 +58,10 @@ func (ak AccountKeeper) GetAccount(ctx context.Context, addr sdk.AccAddress) sdk
 
 // GetAllAccounts returns all accounts in the accountKeeper.
 func (ak AccountKeeper) GetAllAccounts(ctx context.Context) (accounts []sdk.AccountI) {
-	ak.IterateAccounts(ctx, func(acc sdk.AccountI) (stop bool) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetAllAccounts")()
+
+	ak.IterateAccounts(sdkCtx, func(acc sdk.AccountI) (stop bool) {
 		accounts = append(accounts, acc)
 		return false
 	})
@@ -56,7 +71,10 @@ func (ak AccountKeeper) GetAllAccounts(ctx context.Context) (accounts []sdk.Acco
 
 // SetAccount implements AccountKeeperI.
 func (ak AccountKeeper) SetAccount(ctx context.Context, acc sdk.AccountI) {
-	err := ak.Accounts.Set(ctx, acc.GetAddress(), acc)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetAccount")()
+
+	err := ak.Accounts.Set(sdkCtx, acc.GetAddress(), acc)
 	if err != nil {
 		panic(err)
 	}
@@ -65,7 +83,10 @@ func (ak AccountKeeper) SetAccount(ctx context.Context, acc sdk.AccountI) {
 // RemoveAccount removes an account for the account mapper store.
 // NOTE: this will cause supply invariant violation if called
 func (ak AccountKeeper) RemoveAccount(ctx context.Context, acc sdk.AccountI) {
-	err := ak.Accounts.Remove(ctx, acc.GetAddress())
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "RemoveAccount")()
+
+	err := ak.Accounts.Remove(sdkCtx, acc.GetAddress())
 	if err != nil {
 		panic(err)
 	}
@@ -74,7 +95,10 @@ func (ak AccountKeeper) RemoveAccount(ctx context.Context, acc sdk.AccountI) {
 // IterateAccounts iterates over all the stored accounts and performs a callback function.
 // Stops iteration when callback returns true.
 func (ak AccountKeeper) IterateAccounts(ctx context.Context, cb func(account sdk.AccountI) (stop bool)) {
-	err := ak.Accounts.Walk(ctx, nil, func(_ sdk.AccAddress, value sdk.AccountI) (bool, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "IterateAccounts")()
+
+	err := ak.Accounts.Walk(sdkCtx, nil, func(_ sdk.AccAddress, value sdk.AccountI) (bool, error) {
 		return cb(value), nil
 	})
 	if err != nil {

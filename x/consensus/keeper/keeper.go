@@ -3,21 +3,21 @@ package keeper
 import (
 	"context"
 
-	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
-	cmttypes "github.com/cometbft/cometbft/types"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"cosmossdk.io/collections"
 	"cosmossdk.io/core/event"
 	storetypes "cosmossdk.io/core/store"
 	"cosmossdk.io/errors"
+	"github.com/InjectiveLabs/metrics/v2"
+	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
+	cmttypes "github.com/cometbft/cometbft/types"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/consensus/exported"
 	"github.com/cosmos/cosmos-sdk/x/consensus/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var StoreKey = "Consensus"
@@ -26,8 +26,11 @@ type Keeper struct {
 	storeService storetypes.KVStoreService
 	event        event.Service
 
-	authority   string
+	authority string
+
 	ParamsStore collections.Item[cmtproto.ConsensusParams]
+
+	meter metrics.Meter
 }
 
 var _ exported.ConsensusParamSetter = Keeper{}.ParamsStore
@@ -52,7 +55,10 @@ var _ types.QueryServer = Keeper{}
 
 // Params queries params of consensus module
 func (k Keeper) Params(ctx context.Context, _ *types.QueryParamsRequest) (*types.QueryParamsResponse, error) {
-	params, err := k.ParamsStore.Get(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Params")()
+
+	params, err := k.ParamsStore.Get(sdkCtx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -65,6 +71,9 @@ func (k Keeper) Params(ctx context.Context, _ *types.QueryParamsRequest) (*types
 var _ types.MsgServer = Keeper{}
 
 func (k Keeper) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (*types.MsgUpdateParamsResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UpdateParams")()
+
 	if k.GetAuthority() != msg.Authority {
 		return nil, errors.Wrapf(govtypes.ErrInvalidSigner, "invalid authority; expected %s, got %s", k.GetAuthority(), msg.Authority)
 	}
@@ -74,7 +83,7 @@ func (k Keeper) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (*
 		return nil, err
 	}
 
-	paramsProto, err := k.ParamsStore.Get(ctx)
+	paramsProto, err := k.ParamsStore.Get(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -92,18 +101,16 @@ func (k Keeper) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (*
 		return nil, err
 	}
 
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
-
 	if err := params.ValidateUpdate(&consensusParams, sdkCtx.BlockHeader().Height); err != nil {
 		return nil, err
 	}
 
-	if err := k.ParamsStore.Set(ctx, nextParams.ToProto()); err != nil {
+	if err := k.ParamsStore.Set(sdkCtx, nextParams.ToProto()); err != nil {
 		return nil, err
 	}
 
-	if err := k.event.EventManager(ctx).EmitKV(
-		ctx,
+	if err := k.event.EventManager(sdkCtx).EmitKV(
+		sdkCtx,
 		"update_consensus_params",
 		event.Attribute{Key: "authority", Value: msg.Authority},
 		event.Attribute{Key: "parameters", Value: consensusParams.String()}); err != nil {
@@ -111,4 +118,12 @@ func (k Keeper) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (*
 	}
 
 	return &types.MsgUpdateParamsResponse{}, nil
+}
+
+func (k *Keeper) Meter(ctx context.Context) metrics.Meter {
+	if k.meter == nil {
+		k.meter = sdk.UnwrapSDKContext(ctx).Meter().SubMeter(types.ModuleName, metrics.Tag("svc", types.ModuleName))
+	}
+
+	return k.meter
 }

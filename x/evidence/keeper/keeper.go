@@ -2,9 +2,6 @@ package keeper
 
 import (
 	"context"
-	"encoding/hex"
-	"fmt"
-	"strings"
 
 	"cosmossdk.io/collections"
 	"cosmossdk.io/core/address"
@@ -14,15 +11,20 @@ import (
 	"cosmossdk.io/log"
 	"cosmossdk.io/x/evidence/exported"
 	"cosmossdk.io/x/evidence/types"
+	"encoding/hex"
+	"fmt"
+	metrics "github.com/InjectiveLabs/metrics/v2"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"strings"
 )
 
 // Keeper defines the evidence module's keeper. The keeper is responsible for
 // managing persistence, state transitions and query handling for the evidence
 // module.
 type Keeper struct {
+	meter          metrics.Meter
 	cdc            codec.BinaryCodec
 	storeService   store.KVStoreService
 	router         types.Router
@@ -62,6 +64,7 @@ func NewKeeper(
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx context.Context) log.Logger {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Logger")()
 	return sdkCtx.Logger().With("module", "x/"+types.ModuleName)
 }
 
@@ -98,7 +101,10 @@ func (k Keeper) GetEvidenceHandler(evidenceRoute string) (types.Handler, error) 
 // registered Handler exists or if the Handler fails. Otherwise, the evidence is
 // persisted.
 func (k Keeper) SubmitEvidence(ctx context.Context, evidence exported.Evidence) error {
-	if _, err := k.Evidences.Get(ctx, evidence.Hash()); err == nil {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SubmitEvidence")()
+
+	if _, err := k.Evidences.Get(sdkCtx, evidence.Hash()); err == nil {
 		return errors.Wrap(types.ErrEvidenceExists, strings.ToUpper(hex.EncodeToString(evidence.Hash())))
 	}
 	if !k.router.HasRoute(evidence.Route()) {
@@ -106,11 +112,9 @@ func (k Keeper) SubmitEvidence(ctx context.Context, evidence exported.Evidence) 
 	}
 
 	handler := k.router.GetRoute(evidence.Route())
-	if err := handler(ctx, evidence); err != nil {
+	if err := handler(sdkCtx, evidence); err != nil {
 		return errors.Wrap(types.ErrInvalidEvidence, err.Error())
 	}
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	sdkCtx.EventManager().EmitEvent(
 		sdk.NewEvent(
 			types.EventTypeSubmitEvidence,
@@ -118,5 +122,13 @@ func (k Keeper) SubmitEvidence(ctx context.Context, evidence exported.Evidence) 
 		),
 	)
 
-	return k.Evidences.Set(ctx, evidence.Hash(), evidence)
+	return k.Evidences.Set(sdkCtx, evidence.Hash(), evidence)
+}
+
+func (k *Keeper) Meter(ctx context.Context) metrics.Meter {
+	if k.meter == nil {
+		k.meter = sdk.UnwrapSDKContext(ctx).Meter().SubMeter(types.ModuleName, metrics.Tag("svc", types.ModuleName))
+	}
+
+	return k.meter
 }

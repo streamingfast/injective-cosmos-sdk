@@ -16,6 +16,9 @@ var _ types.MsgServer = &Keeper{}
 // VerifyInvariant implements MsgServer.VerifyInvariant method.
 // It defines a method to verify a particular invariant.
 func (k *Keeper) VerifyInvariant(goCtx context.Context, msg *types.MsgVerifyInvariant) (*types.MsgVerifyInvariantResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "VerifyInvariant")()
+
 	if msg.Sender == "" {
 		return nil, sdkerrors.ErrInvalidAddress.Wrap("empty address string is not allowed")
 	}
@@ -24,19 +27,18 @@ func (k *Keeper) VerifyInvariant(goCtx context.Context, msg *types.MsgVerifyInva
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid sender address: %s", err)
 	}
 
-	ctx := sdk.UnwrapSDKContext(goCtx)
-	params, err := k.ConstantFee.Get(goCtx)
+	params, err := k.ConstantFee.Get(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
 	constantFee := sdk.NewCoins(params)
 
-	if err := k.SendCoinsFromAccountToFeeCollector(ctx, sender, constantFee); err != nil {
+	if err := k.SendCoinsFromAccountToFeeCollector(sdkCtx, sender, constantFee); err != nil {
 		return nil, err
 	}
 
 	// use a cached context to avoid gas costs during invariants
-	cacheCtx, _ := ctx.CacheContext()
+	cacheCtx, _ := sdkCtx.CacheContext()
 
 	found := false
 	msgFullRoute := msg.FullInvariantRoute()
@@ -64,7 +66,7 @@ func (k *Keeper) VerifyInvariant(goCtx context.Context, msg *types.MsgVerifyInva
 		panic(res)
 	}
 
-	ctx.EventManager().EmitEvents(sdk.Events{
+	sdkCtx.EventManager().EmitEvents(sdk.Events{
 		sdk.NewEvent(
 			types.EventTypeInvariant,
 			sdk.NewAttribute(types.AttributeKeyRoute, msg.InvariantRoute),
@@ -77,6 +79,9 @@ func (k *Keeper) VerifyInvariant(goCtx context.Context, msg *types.MsgVerifyInva
 // UpdateParams implements MsgServer.UpdateParams method.
 // It defines a method to update the x/crisis module parameters.
 func (k *Keeper) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (*types.MsgUpdateParamsResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UpdateParams")()
+
 	if k.authority != msg.Authority {
 		return nil, errors.Wrapf(govtypes.ErrInvalidSigner, "invalid authority; expected %s, got %s", k.authority, msg.Authority)
 	}
@@ -89,7 +94,7 @@ func (k *Keeper) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (
 		return nil, errors.Wrap(sdkerrors.ErrInvalidCoins, "negative constant fee")
 	}
 
-	if err := k.ConstantFee.Set(ctx, msg.ConstantFee); err != nil {
+	if err := k.ConstantFee.Set(sdkCtx, msg.ConstantFee); err != nil {
 		return nil, err
 	}
 

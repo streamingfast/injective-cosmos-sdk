@@ -1,12 +1,13 @@
 package keeper
 
 import (
-	"fmt"
-	"time"
+	"context"
 
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/log"
 	storetypes "cosmossdk.io/store/types"
+	"fmt"
+	metrics "github.com/InjectiveLabs/metrics/v2"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -14,6 +15,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/group"
 	"github.com/cosmos/cosmos-sdk/x/group/errors"
 	"github.com/cosmos/cosmos-sdk/x/group/internal/orm"
+	"time"
 )
 
 const (
@@ -46,7 +48,8 @@ const (
 )
 
 type Keeper struct {
-	key storetypes.StoreKey
+	meter metrics.Meter
+	key   storetypes.StoreKey
 
 	accKeeper group.AccountKeeper
 
@@ -218,21 +221,29 @@ func NewKeeper(storeKey storetypes.StoreKey, cdc codec.Codec, router baseapp.Mes
 
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx sdk.Context) log.Logger {
+	defer k.Meter(ctx).FuncTiming(&ctx, "Logger")()
+
 	return ctx.Logger().With("module", fmt.Sprintf("x/%s", group.ModuleName))
 }
 
 // GetGroupSequence returns the current value of the group table sequence
 func (k Keeper) GetGroupSequence(ctx sdk.Context) uint64 {
+	defer k.Meter(ctx).FuncTiming(&ctx, "GetGroupSequence")()
+
 	return k.groupTable.Sequence().CurVal(ctx.KVStore(k.key))
 }
 
 // GetGroupPolicySeq returns the current value of the group policy table sequence
 func (k Keeper) GetGroupPolicySeq(ctx sdk.Context) uint64 {
+	defer k.Meter(ctx).FuncTiming(&ctx, "GetGroupPolicySeq")()
+
 	return k.groupPolicySeq.CurVal(ctx.KVStore(k.key))
 }
 
 // proposalsByVPEnd returns all proposals whose voting_period_end is after the `endTime` time argument.
 func (k Keeper) proposalsByVPEnd(ctx sdk.Context, endTime time.Time) (proposals []group.Proposal, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "proposalsByVPEnd")()
+
 	timeBytes := sdk.FormatTimeBytes(endTime)
 	it, err := k.proposalsByVotingPeriodEnd.PrefixScan(ctx.KVStore(k.key), nil, timeBytes)
 	if err != nil {
@@ -266,6 +277,8 @@ func (k Keeper) proposalsByVPEnd(ctx sdk.Context, endTime time.Time) (proposals 
 
 // pruneProposal deletes a proposal from state.
 func (k Keeper) pruneProposal(ctx sdk.Context, proposalID uint64) error {
+	defer k.Meter(ctx).FuncTiming(&ctx, "pruneProposal")()
+
 	store := ctx.KVStore(k.key)
 
 	err := k.proposalTable.Delete(store, proposalID)
@@ -280,6 +293,8 @@ func (k Keeper) pruneProposal(ctx sdk.Context, proposalID uint64) error {
 // abortProposals iterates through all proposals by group policy index
 // and marks submitted proposals as aborted.
 func (k Keeper) abortProposals(ctx sdk.Context, groupPolicyAddr sdk.AccAddress) error {
+	defer k.Meter(ctx).FuncTiming(&ctx, "abortProposals")()
+
 	proposals, err := k.proposalsByGroupPolicy(ctx, groupPolicyAddr)
 	if err != nil {
 		return err
@@ -301,6 +316,8 @@ func (k Keeper) abortProposals(ctx sdk.Context, groupPolicyAddr sdk.AccAddress) 
 
 // proposalsByGroupPolicy returns all proposals for a given group policy.
 func (k Keeper) proposalsByGroupPolicy(ctx sdk.Context, groupPolicyAddr sdk.AccAddress) ([]group.Proposal, error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "proposalsByGroupPolicy")()
+
 	proposalIt, err := k.proposalByGroupPolicyIndex.Get(ctx.KVStore(k.key), groupPolicyAddr.Bytes())
 	if err != nil {
 		return nil, err
@@ -325,6 +342,8 @@ func (k Keeper) proposalsByGroupPolicy(ctx sdk.Context, groupPolicyAddr sdk.AccA
 
 // pruneVotes prunes all votes for a proposal from state.
 func (k Keeper) pruneVotes(ctx sdk.Context, proposalID uint64) error {
+	defer k.Meter(ctx).FuncTiming(&ctx, "pruneVotes")()
+
 	votes, err := k.votesByProposal(ctx, proposalID)
 	if err != nil {
 		return err
@@ -343,6 +362,8 @@ func (k Keeper) pruneVotes(ctx sdk.Context, proposalID uint64) error {
 
 // votesByProposal returns all votes for a given proposal.
 func (k Keeper) votesByProposal(ctx sdk.Context, proposalID uint64) ([]group.Vote, error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "votesByProposal")()
+
 	it, err := k.voteByProposalIndex.Get(ctx.KVStore(k.key), proposalID)
 	if err != nil {
 		return nil, err
@@ -368,6 +389,8 @@ func (k Keeper) votesByProposal(ctx sdk.Context, proposalID uint64) ([]group.Vot
 // `voting_period + max_execution_period` is greater than the current block
 // time.
 func (k Keeper) PruneProposals(ctx sdk.Context) error {
+	defer k.Meter(ctx).FuncTiming(&ctx, "PruneProposals")()
+
 	proposals, err := k.proposalsByVPEnd(ctx, ctx.BlockTime().Add(-k.config.MaxExecutionPeriod))
 	if err != nil {
 		return nil
@@ -395,6 +418,8 @@ func (k Keeper) PruneProposals(ctx sdk.Context) error {
 // has ended, tallies their votes, prunes them, and updates the proposal's
 // `FinalTallyResult` field.
 func (k Keeper) TallyProposalsAtVPEnd(ctx sdk.Context) error {
+	defer k.Meter(ctx).FuncTiming(&ctx, "TallyProposalsAtVPEnd")()
+
 	proposals, err := k.proposalsByVPEnd(ctx, ctx.BlockTime())
 	if err != nil {
 		return nil
@@ -440,4 +465,12 @@ func (k Keeper) TallyProposalsAtVPEnd(ctx sdk.Context) error {
 		// REJECTED.
 	}
 	return nil
+}
+
+func (k *Keeper) Meter(ctx context.Context) metrics.Meter {
+	if k.meter == nil {
+		k.meter = sdk.UnwrapSDKContext(ctx).Meter().SubMeter(group.ModuleName, metrics.Tag("svc", group.ModuleName))
+	}
+
+	return k.meter
 }

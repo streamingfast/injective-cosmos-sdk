@@ -12,7 +12,10 @@ import (
 
 // GetHistoricalInfo gets the historical info at a given height
 func (k Keeper) GetHistoricalInfo(ctx context.Context, height int64) (types.HistoricalInfo, error) {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetHistoricalInfo")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	key := types.GetHistoricalInfoKey(height)
 
 	value, err := store.Get(key)
@@ -29,7 +32,10 @@ func (k Keeper) GetHistoricalInfo(ctx context.Context, height int64) (types.Hist
 
 // SetHistoricalInfo sets the historical info at a given height
 func (k Keeper) SetHistoricalInfo(ctx context.Context, height int64, hi *types.HistoricalInfo) error {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetHistoricalInfo")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	key := types.GetHistoricalInfoKey(height)
 	value, err := k.cdc.Marshal(hi)
 	if err != nil {
@@ -40,7 +46,10 @@ func (k Keeper) SetHistoricalInfo(ctx context.Context, height int64, hi *types.H
 
 // DeleteHistoricalInfo deletes the historical info at a given height
 func (k Keeper) DeleteHistoricalInfo(ctx context.Context, height int64) error {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "DeleteHistoricalInfo")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	key := types.GetHistoricalInfoKey(height)
 
 	return store.Delete(key)
@@ -50,7 +59,10 @@ func (k Keeper) DeleteHistoricalInfo(ctx context.Context, height int64) error {
 // objects. For each HistoricalInfo object, cb will be called. If the cb returns
 // true, the iterator will break and close.
 func (k Keeper) IterateHistoricalInfo(ctx context.Context, cb func(types.HistoricalInfo) bool) error {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IterateHistoricalInfo")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	iterator, err := store.Iterator(types.HistoricalInfoKey, storetypes.PrefixEndBytes(types.HistoricalInfoKey))
 	if err != nil {
 		return err
@@ -72,8 +84,11 @@ func (k Keeper) IterateHistoricalInfo(ctx context.Context, cb func(types.Histori
 
 // GetAllHistoricalInfo returns all stored HistoricalInfo objects.
 func (k Keeper) GetAllHistoricalInfo(ctx context.Context) ([]types.HistoricalInfo, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetAllHistoricalInfo")()
+
 	var infos []types.HistoricalInfo
-	err := k.IterateHistoricalInfo(ctx, func(histInfo types.HistoricalInfo) bool {
+	err := k.IterateHistoricalInfo(sdkCtx, func(histInfo types.HistoricalInfo) bool {
 		infos = append(infos, histInfo)
 		return false
 	})
@@ -84,12 +99,13 @@ func (k Keeper) GetAllHistoricalInfo(ctx context.Context) ([]types.HistoricalInf
 // TrackHistoricalInfo saves the latest historical-info and deletes the oldest
 // heights that are below pruning height
 func (k Keeper) TrackHistoricalInfo(ctx context.Context) error {
-	entryNum, err := k.HistoricalEntries(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "TrackHistoricalInfo")()
+
+	entryNum, err := k.HistoricalEntries(sdkCtx)
 	if err != nil {
 		return err
 	}
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 
 	// Prune store to ensure we only have parameter-defined historical entries.
 	// In most cases, this will involve removing a single historical entry.
@@ -99,14 +115,14 @@ func (k Keeper) TrackHistoricalInfo(ctx context.Context) error {
 	// over the historical entries starting from the most recent version to be pruned
 	// and then return at the first empty entry.
 	for i := sdkCtx.BlockHeight() - int64(entryNum); i >= 0; i-- {
-		_, err := k.GetHistoricalInfo(ctx, i)
+		_, err := k.GetHistoricalInfo(sdkCtx, i)
 		if err != nil {
 			if errors.Is(err, types.ErrNoHistoricalInfo) {
 				break
 			}
 			return err
 		}
-		if err = k.DeleteHistoricalInfo(ctx, i); err != nil {
+		if err = k.DeleteHistoricalInfo(sdkCtx, i); err != nil {
 			return err
 		}
 	}
@@ -117,13 +133,13 @@ func (k Keeper) TrackHistoricalInfo(ctx context.Context) error {
 	}
 
 	// Create HistoricalInfo struct
-	lastVals, err := k.GetLastValidators(ctx)
+	lastVals, err := k.GetLastValidators(sdkCtx)
 	if err != nil {
 		return err
 	}
 
-	historicalEntry := types.NewHistoricalInfo(sdkCtx.BlockHeader(), types.Validators{Validators: lastVals, ValidatorCodec: k.validatorAddressCodec}, k.PowerReduction(ctx))
+	historicalEntry := types.NewHistoricalInfo(sdkCtx.BlockHeader(), types.Validators{Validators: lastVals, ValidatorCodec: k.validatorAddressCodec}, k.PowerReduction(sdkCtx))
 
 	// Set latest HistoricalInfo at current height
-	return k.SetHistoricalInfo(ctx, sdkCtx.BlockHeight(), &historicalEntry)
+	return k.SetHistoricalInfo(sdkCtx, sdkCtx.BlockHeight(), &historicalEntry)
 }

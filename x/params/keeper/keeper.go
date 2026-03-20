@@ -1,8 +1,10 @@
 package keeper
 
 import (
+	"context"
 	"cosmossdk.io/log"
 	storetypes "cosmossdk.io/store/types"
+	metrics "github.com/InjectiveLabs/metrics/v2"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -12,6 +14,7 @@ import (
 
 // Keeper of the global paramstore
 type Keeper struct {
+	meter       metrics.Meter
 	cdc         codec.BinaryCodec
 	legacyAmino *codec.LegacyAmino
 	key         storetypes.StoreKey
@@ -32,6 +35,8 @@ func NewKeeper(cdc codec.BinaryCodec, legacyAmino *codec.LegacyAmino, key, tkey 
 
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx sdk.Context) log.Logger {
+	defer k.Meter(ctx).FuncTiming(&ctx, "Logger")()
+
 	return ctx.Logger().With("module", "x/"+proposal.ModuleName)
 }
 
@@ -71,4 +76,12 @@ func (k Keeper) GetSubspaces() []types.Subspace {
 	}
 
 	return spaces
+}
+
+func (k *Keeper) Meter(ctx context.Context) metrics.Meter {
+	if k.meter == nil {
+		k.meter = sdk.UnwrapSDKContext(ctx).Meter().SubMeter(proposal.ModuleName, metrics.Tag("svc", proposal.ModuleName))
+	}
+
+	return k.meter
 }

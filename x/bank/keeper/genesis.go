@@ -13,12 +13,15 @@ import (
 
 // InitGenesis initializes the bank module's state from a given genesis state.
 func (k BaseKeeper) InitGenesis(ctx context.Context, genState *types.GenesisState) {
-	if err := k.SetParams(ctx, genState.Params); err != nil {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "InitGenesis")()
+
+	if err := k.SetParams(sdkCtx, genState.Params); err != nil {
 		panic(err)
 	}
 
 	for _, se := range genState.GetAllSendEnabled() {
-		k.SetSendEnabled(ctx, se.Denom, se.Enabled)
+		k.SetSendEnabled(sdkCtx, se.Denom, se.Enabled)
 	}
 	totalSupplyMap := sdk.NewMapCoins(sdk.Coins{})
 
@@ -32,7 +35,7 @@ func (k BaseKeeper) InitGenesis(ctx context.Context, genState *types.GenesisStat
 		}
 
 		for _, coin := range balance.Coins {
-			err := k.Balances.Set(ctx, collections.Join(sdk.AccAddress(bz), coin.Denom), coin.Amount)
+			err := k.Balances.Set(sdkCtx, collections.Join(sdk.AccAddress(bz), coin.Denom), coin.Amount)
 			if err != nil {
 				panic(err)
 			}
@@ -47,27 +50,30 @@ func (k BaseKeeper) InitGenesis(ctx context.Context, genState *types.GenesisStat
 	}
 
 	for _, supply := range totalSupply {
-		k.setSupply(ctx, supply)
+		k.setSupply(sdkCtx, supply)
 	}
 
 	for _, meta := range genState.DenomMetadata {
-		k.SetDenomMetaData(ctx, meta)
+		k.SetDenomMetaData(sdkCtx, meta)
 	}
 }
 
 // ExportGenesis returns the bank module's genesis state.
 func (k BaseKeeper) ExportGenesis(ctx context.Context) *types.GenesisState {
-	totalSupply, _, err := k.GetPaginatedTotalSupply(ctx, &query.PageRequest{Limit: query.PaginationMaxLimit})
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "ExportGenesis")()
+
+	totalSupply, _, err := k.GetPaginatedTotalSupply(sdkCtx, &query.PageRequest{Limit: query.PaginationMaxLimit})
 	if err != nil {
 		panic(fmt.Errorf("unable to fetch total supply %v", err))
 	}
 
 	rv := types.NewGenesisState(
-		k.GetParams(ctx),
-		k.GetAccountsBalances(ctx),
+		k.GetParams(sdkCtx),
+		k.GetAccountsBalances(sdkCtx),
 		totalSupply,
-		k.GetAllDenomMetaData(ctx),
-		k.GetAllSendEnabledEntries(ctx),
+		k.GetAllDenomMetaData(sdkCtx),
+		k.GetAllSendEnabledEntries(sdkCtx),
 	)
 	return rv
 }

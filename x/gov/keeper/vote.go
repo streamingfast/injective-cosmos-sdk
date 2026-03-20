@@ -14,8 +14,11 @@ import (
 
 // AddVote adds a vote on a specific proposal
 func (keeper Keeper) AddVote(ctx context.Context, proposalID uint64, voterAddr sdk.AccAddress, options v1.WeightedVoteOptions, metadata string) error {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "AddVote")()
+
 	// Check if proposal is in voting period.
-	inVotingPeriod, err := keeper.VotingPeriodProposals.Has(ctx, proposalID)
+	inVotingPeriod, err := keeper.VotingPeriodProposals.Has(sdkCtx, proposalID)
 	if err != nil {
 		return err
 	}
@@ -36,18 +39,16 @@ func (keeper Keeper) AddVote(ctx context.Context, proposalID uint64, voterAddr s
 	}
 
 	vote := v1.NewVote(proposalID, voterAddr, options, metadata)
-	err = keeper.Votes.Set(ctx, collections.Join(proposalID, voterAddr), vote)
+	err = keeper.Votes.Set(sdkCtx, collections.Join(proposalID, voterAddr), vote)
 	if err != nil {
 		return err
 	}
 
 	// called after a vote on a proposal is cast
-	err = keeper.Hooks().AfterProposalVote(ctx, proposalID, voterAddr)
+	err = keeper.Hooks().AfterProposalVote(sdkCtx, proposalID, voterAddr)
 	if err != nil {
 		return err
 	}
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	sdkCtx.EventManager().EmitEvent(
 		sdk.NewEvent(
 			types.EventTypeProposalVote,
@@ -62,8 +63,11 @@ func (keeper Keeper) AddVote(ctx context.Context, proposalID uint64, voterAddr s
 
 // deleteVotes deletes all the votes from a given proposalID.
 func (keeper Keeper) deleteVotes(ctx context.Context, proposalID uint64) error {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "deleteVotes")()
+
 	rng := collections.NewPrefixedPairRange[uint64, sdk.AccAddress](proposalID)
-	err := keeper.Votes.Clear(ctx, rng)
+	err := keeper.Votes.Clear(sdkCtx, rng)
 	if err != nil {
 		return err
 	}

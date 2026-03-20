@@ -22,6 +22,7 @@ func NewMigrator(keeper Keeper, ss exported.Subspace) Migrator {
 
 // Migrate1to2 migrates from version 1 to 2.
 func (m Migrator) Migrate1to2(ctx sdk.Context) error {
+
 	return v2.MigrateStore(ctx, m.keeper.storeService)
 }
 
@@ -30,6 +31,7 @@ func (m Migrator) Migrate1to2(ctx sdk.Context) error {
 // and managed by the x/params modules and stores them directly into the x/slashing
 // module state.
 func (m Migrator) Migrate2to3(ctx sdk.Context) error {
+
 	store := runtime.KVStoreAdapter(m.keeper.storeService.OpenKVStore(ctx))
 	return v3.Migrate(ctx, store, m.legacySubspace, m.keeper.cdc)
 }
@@ -38,6 +40,7 @@ func (m Migrator) Migrate2to3(ctx sdk.Context) error {
 // version 3 to version 4. Specifically, it migrates the validator missed block
 // bitmap.
 func (m Migrator) Migrate3to4(ctx sdk.Context) error {
+
 	store := runtime.KVStoreAdapter(m.keeper.storeService.OpenKVStore(ctx))
 	params, err := m.keeper.GetParams(ctx)
 	if err != nil {

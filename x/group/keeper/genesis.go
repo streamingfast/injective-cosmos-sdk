@@ -14,6 +14,8 @@ import (
 
 // InitGenesis initializes the group module's genesis state.
 func (k Keeper) InitGenesis(ctx types.Context, cdc codec.JSONCodec, data json.RawMessage) []abci.ValidatorUpdate {
+	defer k.Meter(ctx).FuncTiming(&ctx, "InitGenesis")()
+
 	var genesisState group.GenesisState
 	cdc.MustUnmarshalJSON(data, &genesisState)
 
@@ -46,6 +48,8 @@ func (k Keeper) InitGenesis(ctx types.Context, cdc codec.JSONCodec, data json.Ra
 
 // ExportGenesis returns the group module's exported genesis.
 func (k Keeper) ExportGenesis(ctx types.Context, _ codec.JSONCodec) *group.GenesisState {
+	defer k.Meter(ctx).FuncTiming(&ctx, "ExportGenesis")()
+
 	genesisState := group.NewGenesisState()
 
 	var groups []*group.GroupInfo

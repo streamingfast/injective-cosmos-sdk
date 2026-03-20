@@ -70,7 +70,10 @@ type BaseKeeper struct {
 
 // GetPaginatedTotalSupply queries for the supply, ignoring 0 coins, with a given pagination
 func (k BaseKeeper) GetPaginatedTotalSupply(ctx context.Context, pagination *query.PageRequest) (sdk.Coins, *query.PageResponse, error) {
-	coins, pageResp, err := query.CollectionPaginate(ctx, k.Supply, pagination, func(key string, value math.Int) (sdk.Coin, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetPaginatedTotalSupply")()
+
+	coins, pageResp, err := query.CollectionPaginate(sdkCtx, k.Supply, pagination, func(key string, value math.Int) (sdk.Coin, error) {
 		return sdk.NewCoin(key, value), nil
 	})
 	if err != nil {
@@ -129,7 +132,10 @@ func (k BaseKeeper) WithMintCoinsRestriction(check types.MintingRestrictionFn) B
 // address to a ModuleAccount address. If any of the delegation amounts are negative,
 // an error is returned.
 func (k BaseKeeper) DelegateCoins(ctx context.Context, delegatorAddr, moduleAccAddr sdk.AccAddress, amt sdk.Coins) error {
-	moduleAcc := k.ak.GetAccount(ctx, moduleAccAddr)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegateCoins")()
+
+	moduleAcc := k.ak.GetAccount(sdkCtx, moduleAccAddr)
 	if moduleAcc == nil {
 		return errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "module account %s does not exist", moduleAccAddr)
 	}
@@ -141,7 +147,7 @@ func (k BaseKeeper) DelegateCoins(ctx context.Context, delegatorAddr, moduleAccA
 	balances := sdk.NewCoins()
 
 	for _, coin := range amt {
-		balance := k.GetBalance(ctx, delegatorAddr, coin.GetDenom())
+		balance := k.GetBalance(sdkCtx, delegatorAddr, coin.GetDenom())
 		if balance.IsLT(coin) {
 			return errorsmod.Wrapf(
 				sdkerrors.ErrInsufficientFunds, "failed to delegate; %s is smaller than %s", balance, amt,
@@ -149,22 +155,21 @@ func (k BaseKeeper) DelegateCoins(ctx context.Context, delegatorAddr, moduleAccA
 		}
 
 		balances = balances.Add(balance)
-		err := k.setBalance(ctx, delegatorAddr, balance.Sub(coin))
+		err := k.setBalance(sdkCtx, delegatorAddr, balance.Sub(coin))
 		if err != nil {
 			return err
 		}
 	}
 
-	if err := k.trackDelegation(ctx, delegatorAddr, balances, amt); err != nil {
+	if err := k.trackDelegation(sdkCtx, delegatorAddr, balances, amt); err != nil {
 		return errorsmod.Wrap(err, "failed to track delegation")
 	}
 	// emit coin spent event
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	sdkCtx.EventManager().EmitEvent(
 		types.NewCoinSpentEvent(delegatorAddr, amt),
 	)
 
-	err := k.addCoins(ctx, moduleAccAddr, amt)
+	err := k.addCoins(sdkCtx, moduleAccAddr, amt)
 	if err != nil {
 		return err
 	}
@@ -178,7 +183,10 @@ func (k BaseKeeper) DelegateCoins(ctx context.Context, delegatorAddr, moduleAccA
 // address to the delegator address. If any of the undelegation amounts are
 // negative, an error is returned.
 func (k BaseKeeper) UndelegateCoins(ctx context.Context, moduleAccAddr, delegatorAddr sdk.AccAddress, amt sdk.Coins) error {
-	moduleAcc := k.ak.GetAccount(ctx, moduleAccAddr)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UndelegateCoins")()
+
+	moduleAcc := k.ak.GetAccount(sdkCtx, moduleAccAddr)
 	if moduleAcc == nil {
 		return errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "module account %s does not exist", moduleAccAddr)
 	}
@@ -187,16 +195,16 @@ func (k BaseKeeper) UndelegateCoins(ctx context.Context, moduleAccAddr, delegato
 		return errorsmod.Wrap(sdkerrors.ErrInvalidCoins, amt.String())
 	}
 
-	err := k.subUnlockedCoins(ctx, moduleAccAddr, amt, false)
+	err := k.subUnlockedCoins(sdkCtx, moduleAccAddr, amt, false)
 	if err != nil {
 		return err
 	}
 
-	if err := k.trackUndelegation(ctx, delegatorAddr, amt); err != nil {
+	if err := k.trackUndelegation(sdkCtx, delegatorAddr, amt); err != nil {
 		return errorsmod.Wrap(err, "failed to track undelegation")
 	}
 
-	err = k.addCoins(ctx, delegatorAddr, amt)
+	err = k.addCoins(sdkCtx, delegatorAddr, amt)
 	if err != nil {
 		return err
 	}
@@ -206,7 +214,10 @@ func (k BaseKeeper) UndelegateCoins(ctx context.Context, moduleAccAddr, delegato
 
 // GetSupply retrieves the Supply from store
 func (k BaseKeeper) GetSupply(ctx context.Context, denom string) sdk.Coin {
-	amt, err := k.Supply.Get(ctx, denom)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetSupply")()
+
+	amt, err := k.Supply.Get(sdkCtx, denom)
 	if err != nil {
 		return sdk.NewCoin(denom, math.ZeroInt())
 	}
@@ -215,27 +226,39 @@ func (k BaseKeeper) GetSupply(ctx context.Context, denom string) sdk.Coin {
 
 // HasSupply checks if the supply coin exists in store.
 func (k BaseKeeper) HasSupply(ctx context.Context, denom string) bool {
-	has, err := k.Supply.Has(ctx, denom)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "HasSupply")()
+
+	has, err := k.Supply.Has(sdkCtx, denom)
 	return has && err == nil
 }
 
 // GetDenomMetaData retrieves the denomination metadata. returns the metadata and true if the denom exists,
 // false otherwise.
 func (k BaseKeeper) GetDenomMetaData(ctx context.Context, denom string) (types.Metadata, bool) {
-	m, err := k.BaseViewKeeper.DenomMetadata.Get(ctx, denom)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetDenomMetaData")()
+
+	m, err := k.BaseViewKeeper.DenomMetadata.Get(sdkCtx, denom)
 	return m, err == nil
 }
 
 // HasDenomMetaData checks if the denomination metadata exists in store.
 func (k BaseKeeper) HasDenomMetaData(ctx context.Context, denom string) bool {
-	has, err := k.BaseViewKeeper.DenomMetadata.Has(ctx, denom)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "HasDenomMetaData")()
+
+	has, err := k.BaseViewKeeper.DenomMetadata.Has(sdkCtx, denom)
 	return has && err == nil
 }
 
 // GetAllDenomMetaData retrieves all denominations metadata
 func (k BaseKeeper) GetAllDenomMetaData(ctx context.Context) []types.Metadata {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetAllDenomMetaData")()
+
 	denomMetaData := make([]types.Metadata, 0)
-	k.IterateAllDenomMetaData(ctx, func(metadata types.Metadata) bool {
+	k.IterateAllDenomMetaData(sdkCtx, func(metadata types.Metadata) bool {
 		denomMetaData = append(denomMetaData, metadata)
 		return false
 	})
@@ -247,7 +270,10 @@ func (k BaseKeeper) GetAllDenomMetaData(ctx context.Context) []types.Metadata {
 // provides the metadata to a callback. If true is returned from the
 // callback, iteration is halted.
 func (k BaseKeeper) IterateAllDenomMetaData(ctx context.Context, cb func(types.Metadata) bool) {
-	err := k.BaseViewKeeper.DenomMetadata.Walk(ctx, nil, func(_ string, metadata types.Metadata) (stop bool, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IterateAllDenomMetaData")()
+
+	err := k.BaseViewKeeper.DenomMetadata.Walk(sdkCtx, nil, func(_ string, metadata types.Metadata) (stop bool, err error) {
 		return cb(metadata), nil
 	})
 	if err != nil {
@@ -257,7 +283,10 @@ func (k BaseKeeper) IterateAllDenomMetaData(ctx context.Context, cb func(types.M
 
 // SetDenomMetaData sets the denominations metadata
 func (k BaseKeeper) SetDenomMetaData(ctx context.Context, denomMetaData types.Metadata) {
-	_ = k.BaseViewKeeper.DenomMetadata.Set(ctx, denomMetaData.Base, denomMetaData)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetDenomMetaData")()
+
+	_ = k.BaseViewKeeper.DenomMetadata.Set(sdkCtx, denomMetaData.Base, denomMetaData)
 }
 
 // SendCoinsFromModuleToAccount transfers coins from a ModuleAccount to an AccAddress.
@@ -266,6 +295,9 @@ func (k BaseKeeper) SetDenomMetaData(ctx context.Context, denomMetaData types.Me
 func (k BaseKeeper) SendCoinsFromModuleToAccount(
 	ctx context.Context, senderModule string, recipientAddr sdk.AccAddress, amt sdk.Coins,
 ) error {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SendCoinsFromModuleToAccount")()
+
 	senderAddr := k.ak.GetModuleAddress(senderModule)
 	if senderAddr == nil {
 		panic(errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "module account %s does not exist", senderModule))
@@ -275,7 +307,7 @@ func (k BaseKeeper) SendCoinsFromModuleToAccount(
 		return errorsmod.Wrapf(sdkerrors.ErrUnauthorized, "%s is not allowed to receive funds", recipientAddr)
 	}
 
-	return k.SendCoins(ctx, senderAddr, recipientAddr, amt)
+	return k.SendCoins(sdkCtx, senderAddr, recipientAddr, amt)
 }
 
 // SendCoinsFromModuleToModule transfers coins from a ModuleAccount to another.
@@ -283,17 +315,20 @@ func (k BaseKeeper) SendCoinsFromModuleToAccount(
 func (k BaseKeeper) SendCoinsFromModuleToModule(
 	ctx context.Context, senderModule, recipientModule string, amt sdk.Coins,
 ) error {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SendCoinsFromModuleToModule")()
+
 	senderAddr := k.ak.GetModuleAddress(senderModule)
 	if senderAddr == nil {
 		panic(errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "module account %s does not exist", senderModule))
 	}
 
-	recipientAcc := k.ak.GetModuleAccount(ctx, recipientModule)
+	recipientAcc := k.ak.GetModuleAccount(sdkCtx, recipientModule)
 	if recipientAcc == nil {
 		panic(errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "module account %s does not exist", recipientModule))
 	}
 
-	return k.SendCoins(ctx, senderAddr, recipientAcc.GetAddress(), amt)
+	return k.SendCoins(sdkCtx, senderAddr, recipientAcc.GetAddress(), amt)
 }
 
 // SendCoinsFromAccountToModule transfers coins from an AccAddress to a ModuleAccount.
@@ -301,12 +336,15 @@ func (k BaseKeeper) SendCoinsFromModuleToModule(
 func (k BaseKeeper) SendCoinsFromAccountToModule(
 	ctx context.Context, senderAddr sdk.AccAddress, recipientModule string, amt sdk.Coins,
 ) error {
-	recipientAcc := k.ak.GetModuleAccount(ctx, recipientModule)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SendCoinsFromAccountToModule")()
+
+	recipientAcc := k.ak.GetModuleAccount(sdkCtx, recipientModule)
 	if recipientAcc == nil {
 		panic(errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "module account %s does not exist", recipientModule))
 	}
 
-	return k.SendCoins(ctx, senderAddr, recipientAcc.GetAddress(), amt)
+	return k.SendCoins(sdkCtx, senderAddr, recipientAcc.GetAddress(), amt)
 }
 
 // DelegateCoinsFromAccountToModule delegates coins and transfers them from a
@@ -315,7 +353,10 @@ func (k BaseKeeper) SendCoinsFromAccountToModule(
 func (k BaseKeeper) DelegateCoinsFromAccountToModule(
 	ctx context.Context, senderAddr sdk.AccAddress, recipientModule string, amt sdk.Coins,
 ) error {
-	recipientAcc := k.ak.GetModuleAccount(ctx, recipientModule)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegateCoinsFromAccountToModule")()
+
+	recipientAcc := k.ak.GetModuleAccount(sdkCtx, recipientModule)
 	if recipientAcc == nil {
 		panic(errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "module account %s does not exist", recipientModule))
 	}
@@ -324,7 +365,7 @@ func (k BaseKeeper) DelegateCoinsFromAccountToModule(
 		panic(errorsmod.Wrapf(sdkerrors.ErrUnauthorized, "module account %s does not have permissions to receive delegated coins", recipientModule))
 	}
 
-	return k.DelegateCoins(ctx, senderAddr, recipientAcc.GetAddress(), amt)
+	return k.DelegateCoins(sdkCtx, senderAddr, recipientAcc.GetAddress(), amt)
 }
 
 // UndelegateCoinsFromModuleToAccount undelegates the unbonding coins and transfers
@@ -333,7 +374,10 @@ func (k BaseKeeper) DelegateCoinsFromAccountToModule(
 func (k BaseKeeper) UndelegateCoinsFromModuleToAccount(
 	ctx context.Context, senderModule string, recipientAddr sdk.AccAddress, amt sdk.Coins,
 ) error {
-	acc := k.ak.GetModuleAccount(ctx, senderModule)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UndelegateCoinsFromModuleToAccount")()
+
+	acc := k.ak.GetModuleAccount(sdkCtx, senderModule)
 	if acc == nil {
 		panic(errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "module account %s does not exist", senderModule))
 	}
@@ -342,20 +386,21 @@ func (k BaseKeeper) UndelegateCoinsFromModuleToAccount(
 		panic(errorsmod.Wrapf(sdkerrors.ErrUnauthorized, "module account %s does not have permissions to undelegate coins", senderModule))
 	}
 
-	return k.UndelegateCoins(ctx, acc.GetAddress(), recipientAddr, amt)
+	return k.UndelegateCoins(sdkCtx, acc.GetAddress(), recipientAddr, amt)
 }
 
 // MintCoins creates new coins from thin air and adds it to the module account.
 // It will panic if the module account does not exist or is unauthorized.
 func (k BaseKeeper) MintCoins(ctx context.Context, moduleName string, amounts sdk.Coins) error {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "MintCoins")()
 
-	err := k.mintCoinsRestrictionFn(ctx, amounts)
+	err := k.mintCoinsRestrictionFn(sdkCtx, amounts)
 	if err != nil {
 		k.logger.Error(fmt.Sprintf("Module %q attempted to mint coins %s it doesn't have permission for, error %v", moduleName, amounts, err))
 		return err
 	}
-	acc := k.ak.GetModuleAccount(ctx, moduleName)
+	acc := k.ak.GetModuleAccount(sdkCtx, moduleName)
 	if acc == nil {
 		panic(errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "module account %s does not exist", moduleName))
 	}
@@ -364,15 +409,15 @@ func (k BaseKeeper) MintCoins(ctx context.Context, moduleName string, amounts sd
 		panic(errorsmod.Wrapf(sdkerrors.ErrUnauthorized, "module account %s does not have permissions to mint tokens", moduleName))
 	}
 
-	err = k.addCoins(ctx, acc.GetAddress(), amounts)
+	err = k.addCoins(sdkCtx, acc.GetAddress(), amounts)
 	if err != nil {
 		return err
 	}
 
 	for _, amount := range amounts {
-		supply := k.GetSupply(ctx, amount.GetDenom())
+		supply := k.GetSupply(sdkCtx, amount.GetDenom())
 		supply = supply.Add(amount)
-		k.setSupply(ctx, supply)
+		k.setSupply(sdkCtx, supply)
 	}
 
 	k.logger.Debug("minted coins from module account", "amount", amounts.String(), "from", moduleName)
@@ -388,7 +433,10 @@ func (k BaseKeeper) MintCoins(ctx context.Context, moduleName string, amounts sd
 // BurnCoins burns coins deletes coins from the balance of the module account.
 // It will panic if the module account does not exist or is unauthorized.
 func (k BaseKeeper) BurnCoins(ctx context.Context, moduleName string, amounts sdk.Coins) error {
-	acc := k.ak.GetModuleAccount(ctx, moduleName)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "BurnCoins")()
+
+	acc := k.ak.GetModuleAccount(sdkCtx, moduleName)
 	if acc == nil {
 		panic(errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "module account %s does not exist", moduleName))
 	}
@@ -397,21 +445,20 @@ func (k BaseKeeper) BurnCoins(ctx context.Context, moduleName string, amounts sd
 		panic(errorsmod.Wrapf(sdkerrors.ErrUnauthorized, "module account %s does not have permissions to burn tokens", moduleName))
 	}
 
-	err := k.subUnlockedCoins(ctx, acc.GetAddress(), amounts, false)
+	err := k.subUnlockedCoins(sdkCtx, acc.GetAddress(), amounts, false)
 	if err != nil {
 		return err
 	}
 
 	for _, amount := range amounts {
-		supply := k.GetSupply(ctx, amount.GetDenom())
+		supply := k.GetSupply(sdkCtx, amount.GetDenom())
 		supply = supply.Sub(amount)
-		k.setSupply(ctx, supply)
+		k.setSupply(sdkCtx, supply)
 	}
 
 	k.logger.Debug("burned tokens from module account", "amount", amounts.String(), "from", moduleName)
 
 	// emit burn event
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	sdkCtx.EventManager().EmitEvent(
 		types.NewCoinBurnEvent(acc.GetAddress(), amounts),
 	)
@@ -421,17 +468,23 @@ func (k BaseKeeper) BurnCoins(ctx context.Context, moduleName string, amounts sd
 
 // setSupply sets the supply for the given coin
 func (k BaseKeeper) setSupply(ctx context.Context, coin sdk.Coin) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "setSupply")()
+
 	// Bank invariants and IBC requires to remove zero coins.
 	if coin.IsZero() {
-		_ = k.Supply.Remove(ctx, coin.Denom)
+		_ = k.Supply.Remove(sdkCtx, coin.Denom)
 	} else {
-		_ = k.Supply.Set(ctx, coin.Denom, coin.Amount)
+		_ = k.Supply.Set(sdkCtx, coin.Denom, coin.Amount)
 	}
 }
 
 // trackDelegation tracks the delegation of the given account if it is a vesting account
 func (k BaseKeeper) trackDelegation(ctx context.Context, addr sdk.AccAddress, balance, amt sdk.Coins) error {
-	acc := k.ak.GetAccount(ctx, addr)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "trackDelegation")()
+
+	acc := k.ak.GetAccount(sdkCtx, addr)
 	if acc == nil {
 		return errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "account %s does not exist", addr)
 	}
@@ -439,9 +492,8 @@ func (k BaseKeeper) trackDelegation(ctx context.Context, addr sdk.AccAddress, ba
 	vacc, ok := acc.(types.VestingAccount)
 	if ok {
 		// TODO: return error on account.TrackDelegation
-		sdkCtx := sdk.UnwrapSDKContext(ctx)
 		vacc.TrackDelegation(sdkCtx.BlockHeader().Time, balance, amt)
-		k.ak.SetAccount(ctx, acc)
+		k.ak.SetAccount(sdkCtx, acc)
 	}
 
 	return nil
@@ -449,7 +501,10 @@ func (k BaseKeeper) trackDelegation(ctx context.Context, addr sdk.AccAddress, ba
 
 // trackUndelegation trakcs undelegation of the given account if it is a vesting account
 func (k BaseKeeper) trackUndelegation(ctx context.Context, addr sdk.AccAddress, amt sdk.Coins) error {
-	acc := k.ak.GetAccount(ctx, addr)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "trackUndelegation")()
+
+	acc := k.ak.GetAccount(sdkCtx, addr)
 	if acc == nil {
 		return errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "account %s does not exist", addr)
 	}
@@ -458,7 +513,7 @@ func (k BaseKeeper) trackUndelegation(ctx context.Context, addr sdk.AccAddress, 
 	if ok {
 		// TODO: return error on account.TrackUndelegation
 		vacc.TrackUndelegation(amt)
-		k.ak.SetAccount(ctx, acc)
+		k.ak.SetAccount(sdkCtx, acc)
 	}
 
 	return nil
@@ -468,7 +523,10 @@ func (k BaseKeeper) trackUndelegation(ctx context.Context, addr sdk.AccAddress, 
 // with the balance of each coin.
 // The iteration stops if the callback returns true.
 func (k BaseViewKeeper) IterateTotalSupply(ctx context.Context, cb func(sdk.Coin) bool) {
-	err := k.Supply.Walk(ctx, nil, func(s string, m math.Int) (bool, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IterateTotalSupply")()
+
+	err := k.Supply.Walk(sdkCtx, nil, func(s string, m math.Int) (bool, error) {
 		return cb(sdk.NewCoin(s, m)), nil
 	})
 	if err != nil {

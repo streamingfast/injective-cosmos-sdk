@@ -9,6 +9,7 @@ import (
 	"cosmossdk.io/core/address"
 	storetypes "cosmossdk.io/core/store"
 	"cosmossdk.io/log"
+	"github.com/InjectiveLabs/metrics/v2"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -17,6 +18,7 @@ import (
 
 // Keeper - crisis keeper
 type Keeper struct {
+	meter          metrics.Meter
 	routes         []types.InvarRoute
 	invCheckPeriod uint
 	storeService   storetypes.KVStoreService
@@ -70,6 +72,8 @@ func (k *Keeper) GetAuthority() string {
 // Logger returns a module-specific logger.
 func (k *Keeper) Logger(ctx context.Context) log.Logger {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Logger")()
+
 	return sdkCtx.Logger().With("module", "x/"+types.ModuleName)
 }
 
@@ -96,6 +100,8 @@ func (k *Keeper) Invariants() []sdk.Invariant {
 // AssertInvariants asserts all registered invariants. If any invariant fails,
 // the method panics.
 func (k *Keeper) AssertInvariants(ctx sdk.Context) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "AssertInvariants")()
+
 	logger := k.Logger(ctx)
 
 	start := time.Now()
@@ -123,5 +129,16 @@ func (k *Keeper) InvCheckPeriod() uint { return k.invCheckPeriod }
 
 // SendCoinsFromAccountToFeeCollector transfers amt to the fee collector account.
 func (k *Keeper) SendCoinsFromAccountToFeeCollector(ctx context.Context, senderAddr sdk.AccAddress, amt sdk.Coins) error {
-	return k.supplyKeeper.SendCoinsFromAccountToModule(ctx, senderAddr, k.feeCollectorName, amt)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SendCoinsFromAccountToFeeCollector")()
+
+	return k.supplyKeeper.SendCoinsFromAccountToModule(sdkCtx, senderAddr, k.feeCollectorName, amt)
+}
+
+func (k *Keeper) Meter(ctx context.Context) metrics.Meter {
+	if k.meter == nil {
+		k.meter = sdk.UnwrapSDKContext(ctx).Meter().SubMeter(types.ModuleName, metrics.Tag("svc", types.ModuleName))
+	}
+
+	return k.meter
 }

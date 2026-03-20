@@ -28,6 +28,9 @@ func NewMsgServerImpl(keeper Keeper) types.MsgServer {
 }
 
 func (k msgServer) SetWithdrawAddress(ctx context.Context, msg *types.MsgSetWithdrawAddress) (*types.MsgSetWithdrawAddressResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetWithdrawAddress")()
+
 	delegatorAddress, err := k.authKeeper.AddressCodec().StringToBytes(msg.DelegatorAddress)
 	if err != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid delegator address: %s", err)
@@ -38,7 +41,7 @@ func (k msgServer) SetWithdrawAddress(ctx context.Context, msg *types.MsgSetWith
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid withdraw address: %s", err)
 	}
 
-	err = k.SetWithdrawAddr(ctx, delegatorAddress, withdrawAddress)
+	err = k.SetWithdrawAddr(sdkCtx, delegatorAddress, withdrawAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +50,9 @@ func (k msgServer) SetWithdrawAddress(ctx context.Context, msg *types.MsgSetWith
 }
 
 func (k msgServer) WithdrawDelegatorReward(ctx context.Context, msg *types.MsgWithdrawDelegatorReward) (*types.MsgWithdrawDelegatorRewardResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "WithdrawDelegatorReward")()
+
 	valAddr, err := k.stakingKeeper.ValidatorAddressCodec().StringToBytes(msg.ValidatorAddress)
 	if err != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid validator address: %s", err)
@@ -57,7 +63,7 @@ func (k msgServer) WithdrawDelegatorReward(ctx context.Context, msg *types.MsgWi
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid delegator address: %s", err)
 	}
 
-	amount, err := k.WithdrawDelegationRewards(ctx, delegatorAddress, valAddr)
+	amount, err := k.WithdrawDelegationRewards(sdkCtx, delegatorAddress, valAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -78,12 +84,15 @@ func (k msgServer) WithdrawDelegatorReward(ctx context.Context, msg *types.MsgWi
 }
 
 func (k msgServer) WithdrawValidatorCommission(ctx context.Context, msg *types.MsgWithdrawValidatorCommission) (*types.MsgWithdrawValidatorCommissionResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "WithdrawValidatorCommission")()
+
 	valAddr, err := k.stakingKeeper.ValidatorAddressCodec().StringToBytes(msg.ValidatorAddress)
 	if err != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid validator address: %s", err)
 	}
 
-	amount, err := k.Keeper.WithdrawValidatorCommission(ctx, valAddr)
+	amount, err := k.Keeper.WithdrawValidatorCommission(sdkCtx, valAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +113,9 @@ func (k msgServer) WithdrawValidatorCommission(ctx context.Context, msg *types.M
 }
 
 func (k msgServer) FundCommunityPool(ctx context.Context, msg *types.MsgFundCommunityPool) (*types.MsgFundCommunityPoolResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "FundCommunityPool")()
+
 	depositor, err := k.authKeeper.AddressCodec().StringToBytes(msg.Depositor)
 	if err != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid depositor address: %s", err)
@@ -113,7 +125,7 @@ func (k msgServer) FundCommunityPool(ctx context.Context, msg *types.MsgFundComm
 		return nil, err
 	}
 
-	if err := k.Keeper.FundCommunityPool(ctx, msg.Amount, depositor); err != nil {
+	if err := k.Keeper.FundCommunityPool(sdkCtx, msg.Amount, depositor); err != nil {
 		return nil, err
 	}
 
@@ -121,6 +133,9 @@ func (k msgServer) FundCommunityPool(ctx context.Context, msg *types.MsgFundComm
 }
 
 func (k msgServer) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (*types.MsgUpdateParamsResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "UpdateParams")()
+
 	if err := k.validateAuthority(msg.Authority); err != nil {
 		return nil, err
 	}
@@ -134,7 +149,7 @@ func (k msgServer) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams)
 		return nil, err
 	}
 
-	if err := k.Params.Set(ctx, msg.Params); err != nil {
+	if err := k.Params.Set(sdkCtx, msg.Params); err != nil {
 		return nil, err
 	}
 
@@ -142,6 +157,9 @@ func (k msgServer) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams)
 }
 
 func (k msgServer) CommunityPoolSpend(ctx context.Context, msg *types.MsgCommunityPoolSpend) (*types.MsgCommunityPoolSpendResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "CommunityPoolSpend")()
+
 	if err := k.validateAuthority(msg.Authority); err != nil {
 		return nil, err
 	}
@@ -159,23 +177,26 @@ func (k msgServer) CommunityPoolSpend(ctx context.Context, msg *types.MsgCommuni
 		return nil, errors.Wrapf(sdkerrors.ErrUnauthorized, "%s is not allowed to receive external funds", msg.Recipient)
 	}
 
-	if err := k.DistributeFromFeePool(ctx, msg.Amount, recipient); err != nil {
+	if err := k.DistributeFromFeePool(sdkCtx, msg.Amount, recipient); err != nil {
 		return nil, err
 	}
 
-	logger := k.Logger(ctx)
+	logger := k.Logger(sdkCtx)
 	logger.Info("transferred from the community pool to recipient", "amount", msg.Amount.String(), "recipient", msg.Recipient)
 
 	return &types.MsgCommunityPoolSpendResponse{}, nil
 }
 
 func (k msgServer) DepositValidatorRewardsPool(ctx context.Context, msg *types.MsgDepositValidatorRewardsPool) (*types.MsgDepositValidatorRewardsPoolResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DepositValidatorRewardsPool")()
+
 	depositor, err := k.authKeeper.AddressCodec().StringToBytes(msg.Depositor)
 	if err != nil {
 		return nil, err
 	}
 
-	bondDenom, err := k.stakingKeeper.BondDenom(ctx)
+	bondDenom, err := k.stakingKeeper.BondDenom(sdkCtx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get bond denom")
 	}
@@ -187,7 +208,7 @@ func (k msgServer) DepositValidatorRewardsPool(ctx context.Context, msg *types.M
 	}
 
 	// deposit coins from depositor's account to the distribution module
-	if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, depositor, types.ModuleName, msg.Amount); err != nil {
+	if err := k.bankKeeper.SendCoinsFromAccountToModule(sdkCtx, depositor, types.ModuleName, msg.Amount); err != nil {
 		return nil, err
 	}
 
@@ -196,7 +217,7 @@ func (k msgServer) DepositValidatorRewardsPool(ctx context.Context, msg *types.M
 		return nil, err
 	}
 
-	validator, err := k.stakingKeeper.Validator(ctx, valAddr)
+	validator, err := k.stakingKeeper.Validator(sdkCtx, valAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -208,18 +229,18 @@ func (k msgServer) DepositValidatorRewardsPool(ctx context.Context, msg *types.M
 	// Allocate tokens from the distribution module to the validator, which are
 	// then distributed to the validator's delegators.
 	reward := sdk.NewDecCoinsFromCoins(msg.Amount...)
-	if err = k.AllocateTokensToValidator(ctx, validator, reward); err != nil {
+	if err = k.AllocateTokensToValidator(sdkCtx, validator, reward); err != nil {
 		return nil, err
 	}
 
 	// make sure the reward pool isn't already full.
 	if !validator.GetTokens().IsZero() {
-		rewards, err := k.GetValidatorCurrentRewards(ctx, valAddr)
+		rewards, err := k.GetValidatorCurrentRewards(sdkCtx, valAddr)
 		if err != nil {
 			return nil, err
 		}
 		current := rewards.Rewards
-		historical, err := k.GetValidatorHistoricalRewards(ctx, valAddr, rewards.Period-1)
+		historical, err := k.GetValidatorHistoricalRewards(sdkCtx, valAddr, rewards.Period-1)
 		if err != nil {
 			return nil, err
 		}
@@ -242,7 +263,7 @@ func (k msgServer) DepositValidatorRewardsPool(ctx context.Context, msg *types.M
 		}
 	}
 
-	logger := k.Logger(ctx)
+	logger := k.Logger(sdkCtx)
 	logger.Info(
 		"transferred from rewards to validator rewards pool",
 		"depositor", msg.Depositor,

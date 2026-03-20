@@ -13,6 +13,8 @@ import (
 // Tally is a function that tallies a proposal by iterating through its votes,
 // and returns the tally result without modifying the proposal or any state.
 func (k Keeper) Tally(ctx sdk.Context, p group.Proposal, groupID uint64) (group.TallyResult, error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "Tally")()
+
 	// If proposal has already been tallied and updated, then its status is
 	// accepted/rejected, in which case we just return the previously stored result.
 	//

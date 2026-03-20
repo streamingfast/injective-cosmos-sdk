@@ -16,6 +16,9 @@ var _ authz.MsgServer = Keeper{}
 
 // Grant implements the MsgServer.Grant method to create a new grant.
 func (k Keeper) Grant(goCtx context.Context, msg *authz.MsgGrant) (*authz.MsgGrantResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Grant")()
+
 	if strings.EqualFold(msg.Grantee, msg.Granter) {
 		return nil, authz.ErrGranteeIsGranter
 	}
@@ -35,15 +38,15 @@ func (k Keeper) Grant(goCtx context.Context, msg *authz.MsgGrant) (*authz.MsgGra
 	}
 
 	// create the account if it is not in account state
-	ctx := sdk.UnwrapSDKContext(goCtx)
-	granteeAcc := k.authKeeper.GetAccount(ctx, grantee)
+
+	granteeAcc := k.authKeeper.GetAccount(sdkCtx, grantee)
 	if granteeAcc == nil {
 		if k.bankKeeper.BlockedAddr(grantee) {
 			return nil, sdkerrors.ErrUnauthorized.Wrapf("%s is not allowed to receive funds", grantee)
 		}
 
-		granteeAcc = k.authKeeper.NewAccountWithAddress(ctx, grantee)
-		k.authKeeper.SetAccount(ctx, granteeAcc)
+		granteeAcc = k.authKeeper.NewAccountWithAddress(sdkCtx, grantee)
+		k.authKeeper.SetAccount(sdkCtx, granteeAcc)
 	}
 
 	authorization, err := msg.GetAuthorization()
@@ -56,7 +59,7 @@ func (k Keeper) Grant(goCtx context.Context, msg *authz.MsgGrant) (*authz.MsgGra
 		return nil, sdkerrors.ErrInvalidType.Wrapf("%s doesn't exist.", t)
 	}
 
-	err = k.SaveGrant(ctx, grantee, granter, authorization, msg.Grant.Expiration)
+	err = k.SaveGrant(sdkCtx, grantee, granter, authorization, msg.Grant.Expiration)
 	if err != nil {
 		return nil, err
 	}
@@ -66,6 +69,9 @@ func (k Keeper) Grant(goCtx context.Context, msg *authz.MsgGrant) (*authz.MsgGra
 
 // Revoke implements the MsgServer.Revoke method.
 func (k Keeper) Revoke(goCtx context.Context, msg *authz.MsgRevoke) (*authz.MsgRevokeResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Revoke")()
+
 	if strings.EqualFold(msg.Grantee, msg.Granter) {
 		return nil, authz.ErrGranteeIsGranter
 	}
@@ -84,8 +90,7 @@ func (k Keeper) Revoke(goCtx context.Context, msg *authz.MsgRevoke) (*authz.MsgR
 		return nil, sdkerrors.ErrInvalidRequest.Wrap("missing msg method name")
 	}
 
-	ctx := sdk.UnwrapSDKContext(goCtx)
-	if err = k.DeleteGrant(ctx, grantee, granter, msg.MsgTypeUrl); err != nil {
+	if err = k.DeleteGrant(sdkCtx, grantee, granter, msg.MsgTypeUrl); err != nil {
 		return nil, err
 	}
 
@@ -94,7 +99,9 @@ func (k Keeper) Revoke(goCtx context.Context, msg *authz.MsgRevoke) (*authz.MsgR
 
 // Exec implements the MsgServer.Exec method.
 func (k Keeper) Exec(goCtx context.Context, msg *authz.MsgExec) (*authz.MsgExecResponse, error) {
-	ctx := sdk.UnwrapSDKContext(goCtx)
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Exec")()
+
 	if msg.Grantee == "" {
 		return nil, errors.New("empty address string is not allowed")
 	}
@@ -117,7 +124,7 @@ func (k Keeper) Exec(goCtx context.Context, msg *authz.MsgExec) (*authz.MsgExecR
 		return nil, err
 	}
 
-	results, err := k.DispatchActions(ctx, grantee, msgs)
+	results, err := k.DispatchActions(sdkCtx, grantee, msgs)
 	if err != nil {
 		return nil, err
 	}
@@ -143,5 +150,8 @@ func validateMsgs(msgs []sdk.Msg) error {
 // ExecCompat implements the MsgServer.ExecCompat method.
 // Deprecated: This method is deprecated and disabled. It will be removed in a future version.
 func (k Keeper) ExecCompat(goCtx context.Context, msg *authz.MsgExecCompat) (*authz.MsgExecCompatResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "ExecCompat")()
+
 	return nil, sdkerrors.ErrInvalidRequest.Wrap("MsgExecCompat is deprecated and has been disabled")
 }

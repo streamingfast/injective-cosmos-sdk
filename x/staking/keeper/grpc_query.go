@@ -29,6 +29,9 @@ func NewQuerier(keeper *Keeper) Querier {
 
 // Validators queries all validators that match the given status
 func (k Querier) Validators(ctx context.Context, req *types.QueryValidatorsRequest) (*types.QueryValidatorsResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Validators")()
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
@@ -38,7 +41,7 @@ func (k Querier) Validators(ctx context.Context, req *types.QueryValidatorsReque
 		return nil, status.Errorf(codes.InvalidArgument, "invalid validator status %s", req.Status)
 	}
 
-	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(sdkCtx))
 	valStore := prefix.NewStore(store, types.ValidatorsKey)
 
 	validators, pageRes, err := query.GenericFilteredPaginate(k.cdc, valStore, req.Pagination, func(key []byte, val *types.Validator) (*types.Validator, error) {
@@ -64,6 +67,9 @@ func (k Querier) Validators(ctx context.Context, req *types.QueryValidatorsReque
 
 // Validator queries validator info for given validator address
 func (k Querier) Validator(ctx context.Context, req *types.QueryValidatorRequest) (*types.QueryValidatorResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Validator")()
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
@@ -77,7 +83,7 @@ func (k Querier) Validator(ctx context.Context, req *types.QueryValidatorRequest
 		return nil, err
 	}
 
-	validator, err := k.GetValidator(ctx, valAddr)
+	validator, err := k.GetValidator(sdkCtx, valAddr)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "validator %s not found", req.ValidatorAddr)
 	}
@@ -87,6 +93,9 @@ func (k Querier) Validator(ctx context.Context, req *types.QueryValidatorRequest
 
 // ValidatorDelegations queries delegate info for given validator
 func (k Querier) ValidatorDelegations(ctx context.Context, req *types.QueryValidatorDelegationsRequest) (*types.QueryValidatorDelegationsResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "ValidatorDelegations")()
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
@@ -100,7 +109,7 @@ func (k Querier) ValidatorDelegations(ctx context.Context, req *types.QueryValid
 		return nil, err
 	}
 
-	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(sdkCtx))
 	delStore := prefix.NewStore(store, types.GetDelegationsByValPrefixKey(valAddr))
 
 	var (
@@ -120,7 +129,7 @@ func (k Querier) ValidatorDelegations(ctx context.Context, req *types.QueryValid
 		return nil
 	})
 	if err != nil {
-		delegations, pageResponse, err := k.getValidatorDelegationsLegacy(ctx, req)
+		delegations, pageResponse, err := k.getValidatorDelegationsLegacy(sdkCtx, req)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -133,7 +142,7 @@ func (k Querier) ValidatorDelegations(ctx context.Context, req *types.QueryValid
 		pageRes = pageResponse
 	}
 
-	delResponses, err := delegationsToDelegationResponses(ctx, k.Keeper, dels)
+	delResponses, err := delegationsToDelegationResponses(sdkCtx, k.Keeper, dels)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -144,7 +153,10 @@ func (k Querier) ValidatorDelegations(ctx context.Context, req *types.QueryValid
 }
 
 func (k Querier) getValidatorDelegationsLegacy(ctx context.Context, req *types.QueryValidatorDelegationsRequest) ([]*types.Delegation, *query.PageResponse, error) {
-	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "getValidatorDelegationsLegacy")()
+
+	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(sdkCtx))
 
 	valStore := prefix.NewStore(store, types.DelegationKey)
 	return query.GenericFilteredPaginate(k.cdc, valStore, req.Pagination, func(key []byte, delegation *types.Delegation) (*types.Delegation, error) {
@@ -165,6 +177,9 @@ func (k Querier) getValidatorDelegationsLegacy(ctx context.Context, req *types.Q
 
 // ValidatorUnbondingDelegations queries unbonding delegations of a validator
 func (k Querier) ValidatorUnbondingDelegations(ctx context.Context, req *types.QueryValidatorUnbondingDelegationsRequest) (*types.QueryValidatorUnbondingDelegationsResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "ValidatorUnbondingDelegations")()
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
@@ -179,7 +194,7 @@ func (k Querier) ValidatorUnbondingDelegations(ctx context.Context, req *types.Q
 		return nil, err
 	}
 
-	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(sdkCtx))
 	srcValPrefix := types.GetUBDsByValIndexKey(valAddr)
 	ubdStore := prefix.NewStore(store, srcValPrefix)
 	pageRes, err := query.Paginate(ubdStore, req.Pagination, func(key, value []byte) error {
@@ -205,6 +220,9 @@ func (k Querier) ValidatorUnbondingDelegations(ctx context.Context, req *types.Q
 
 // Delegation queries delegate info for given validator delegator pair
 func (k Querier) Delegation(ctx context.Context, req *types.QueryDelegationRequest) (*types.QueryDelegationResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Delegation")()
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
@@ -226,7 +244,7 @@ func (k Querier) Delegation(ctx context.Context, req *types.QueryDelegationReque
 		return nil, err
 	}
 
-	delegation, err := k.GetDelegation(ctx, delAddr, valAddr)
+	delegation, err := k.GetDelegation(sdkCtx, delAddr, valAddr)
 	if err != nil {
 		return nil, status.Errorf(
 			codes.NotFound,
@@ -234,7 +252,7 @@ func (k Querier) Delegation(ctx context.Context, req *types.QueryDelegationReque
 			req.DelegatorAddr, req.ValidatorAddr)
 	}
 
-	delResponse, err := delegationToDelegationResponse(ctx, k.Keeper, delegation)
+	delResponse, err := delegationToDelegationResponse(sdkCtx, k.Keeper, delegation)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -244,6 +262,9 @@ func (k Querier) Delegation(ctx context.Context, req *types.QueryDelegationReque
 
 // UnbondingDelegation queries unbonding info for given validator delegator pair
 func (k Querier) UnbondingDelegation(ctx context.Context, req *types.QueryUnbondingDelegationRequest) (*types.QueryUnbondingDelegationResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "UnbondingDelegation")()
+
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
 	}
@@ -265,7 +286,7 @@ func (k Querier) UnbondingDelegation(ctx context.Context, req *types.QueryUnbond
 		return nil, err
 	}
 
-	unbond, err := k.GetUnbondingDelegation(ctx, delAddr, valAddr)
+	unbond, err := k.GetUnbondingDelegation(sdkCtx, delAddr, valAddr)
 	if err != nil {
 		return nil, status.Errorf(
 			codes.NotFound,
@@ -278,6 +299,9 @@ func (k Querier) UnbondingDelegation(ctx context.Context, req *types.QueryUnbond
 
 // DelegatorDelegations queries all delegations of a given delegator address
 func (k Querier) DelegatorDelegations(ctx context.Context, req *types.QueryDelegatorDelegationsRequest) (*types.QueryDelegatorDelegationsResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegatorDelegations")()
+
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
 	}
@@ -292,7 +316,7 @@ func (k Querier) DelegatorDelegations(ctx context.Context, req *types.QueryDeleg
 		return nil, err
 	}
 
-	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(sdkCtx))
 	delStore := prefix.NewStore(store, types.GetDelegationsKey(delAddr))
 	pageRes, err := query.Paginate(delStore, req.Pagination, func(key, value []byte) error {
 		delegation, err := types.UnmarshalDelegation(k.cdc, value)
@@ -306,7 +330,7 @@ func (k Querier) DelegatorDelegations(ctx context.Context, req *types.QueryDeleg
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	delegationResps, err := delegationsToDelegationResponses(ctx, k.Keeper, delegations)
+	delegationResps, err := delegationsToDelegationResponses(sdkCtx, k.Keeper, delegations)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -316,6 +340,9 @@ func (k Querier) DelegatorDelegations(ctx context.Context, req *types.QueryDeleg
 
 // DelegatorValidator queries validator info for given delegator validator pair
 func (k Querier) DelegatorValidator(ctx context.Context, req *types.QueryDelegatorValidatorRequest) (*types.QueryDelegatorValidatorResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegatorValidator")()
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
@@ -337,7 +364,7 @@ func (k Querier) DelegatorValidator(ctx context.Context, req *types.QueryDelegat
 		return nil, err
 	}
 
-	validator, err := k.GetDelegatorValidator(ctx, delAddr, valAddr)
+	validator, err := k.GetDelegatorValidator(sdkCtx, delAddr, valAddr)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -347,6 +374,9 @@ func (k Querier) DelegatorValidator(ctx context.Context, req *types.QueryDelegat
 
 // DelegatorUnbondingDelegations queries all unbonding delegations of a given delegator address
 func (k Querier) DelegatorUnbondingDelegations(ctx context.Context, req *types.QueryDelegatorUnbondingDelegationsRequest) (*types.QueryDelegatorUnbondingDelegationsResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegatorUnbondingDelegations")()
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
@@ -361,7 +391,7 @@ func (k Querier) DelegatorUnbondingDelegations(ctx context.Context, req *types.Q
 		return nil, err
 	}
 
-	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(sdkCtx))
 	unbStore := prefix.NewStore(store, types.GetUBDsKey(delAddr))
 	pageRes, err := query.Paginate(unbStore, req.Pagination, func(key, value []byte) error {
 		unbond, err := types.UnmarshalUBD(k.cdc, value)
@@ -381,14 +411,20 @@ func (k Querier) DelegatorUnbondingDelegations(ctx context.Context, req *types.Q
 }
 
 func (k Querier) AllowedDelegationTransferReceivers(ctx context.Context, _ *types.QueryAllowedDelegationTransferReceiversRequest) (*types.QueryAllowedDelegationTransferReceiversResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "AllowedDelegationTransferReceivers")()
+
 	resp := &types.QueryAllowedDelegationTransferReceiversResponse{
-		Addresses: k.GetAllAllowedDelegationTransferReceivers(ctx),
+		Addresses: k.GetAllAllowedDelegationTransferReceivers(sdkCtx),
 	}
 	return resp, nil
 }
 
 // HistoricalInfo queries the historical info for given height
 func (k Querier) HistoricalInfo(ctx context.Context, req *types.QueryHistoricalInfoRequest) (*types.QueryHistoricalInfoResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "HistoricalInfo")()
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
@@ -397,7 +433,7 @@ func (k Querier) HistoricalInfo(ctx context.Context, req *types.QueryHistoricalI
 		return nil, status.Error(codes.InvalidArgument, "height cannot be negative")
 	}
 
-	hi, err := k.GetHistoricalInfo(ctx, req.Height)
+	hi, err := k.GetHistoricalInfo(sdkCtx, req.Height)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "historical info for height %d not found", req.Height)
 	}
@@ -407,6 +443,9 @@ func (k Querier) HistoricalInfo(ctx context.Context, req *types.QueryHistoricalI
 
 // Redelegations queries redelegations of given address
 func (k Querier) Redelegations(ctx context.Context, req *types.QueryRedelegationsRequest) (*types.QueryRedelegationsResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Redelegations")()
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
@@ -415,10 +454,10 @@ func (k Querier) Redelegations(ctx context.Context, req *types.QueryRedelegation
 	var pageRes *query.PageResponse
 	var err error
 
-	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(sdkCtx))
 	switch {
 	case req.DelegatorAddr != "" && req.SrcValidatorAddr != "" && req.DstValidatorAddr != "":
-		redels, err = queryRedelegation(ctx, k, req)
+		redels, err = queryRedelegation(sdkCtx, k, req)
 	case req.DelegatorAddr == "" && req.SrcValidatorAddr != "" && req.DstValidatorAddr == "":
 		redels, pageRes, err = queryRedelegationsFromSrcValidator(store, k, req)
 	default:
@@ -427,7 +466,7 @@ func (k Querier) Redelegations(ctx context.Context, req *types.QueryRedelegation
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	redelResponses, err := redelegationsToRedelegationResponses(ctx, k.Keeper, redels)
+	redelResponses, err := redelegationsToRedelegationResponses(sdkCtx, k.Keeper, redels)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -437,6 +476,9 @@ func (k Querier) Redelegations(ctx context.Context, req *types.QueryRedelegation
 
 // DelegatorValidators queries all validators info for given delegator address
 func (k Querier) DelegatorValidators(ctx context.Context, req *types.QueryDelegatorValidatorsRequest) (*types.QueryDelegatorValidatorsResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegatorValidators")()
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
@@ -446,7 +488,7 @@ func (k Querier) DelegatorValidators(ctx context.Context, req *types.QueryDelega
 	}
 	var validators types.Validators
 
-	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(sdkCtx))
 	delAddr, err := k.authKeeper.AddressCodec().StringToBytes(req.DelegatorAddr)
 	if err != nil {
 		return nil, err
@@ -464,7 +506,7 @@ func (k Querier) DelegatorValidators(ctx context.Context, req *types.QueryDelega
 			return err
 		}
 
-		validator, err := k.GetValidator(ctx, valAddr)
+		validator, err := k.GetValidator(sdkCtx, valAddr)
 		if err != nil {
 			return err
 		}
@@ -481,16 +523,19 @@ func (k Querier) DelegatorValidators(ctx context.Context, req *types.QueryDelega
 
 // Pool queries the pool info
 func (k Querier) Pool(ctx context.Context, _ *types.QueryPoolRequest) (*types.QueryPoolResponse, error) {
-	bondDenom, err := k.BondDenom(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Pool")()
+
+	bondDenom, err := k.BondDenom(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
-	bondedPool := k.GetBondedPool(ctx)
-	notBondedPool := k.GetNotBondedPool(ctx)
+	bondedPool := k.GetBondedPool(sdkCtx)
+	notBondedPool := k.GetNotBondedPool(sdkCtx)
 
 	pool := types.NewPool(
-		k.bankKeeper.GetBalance(ctx, notBondedPool.GetAddress(), bondDenom).Amount,
-		k.bankKeeper.GetBalance(ctx, bondedPool.GetAddress(), bondDenom).Amount,
+		k.bankKeeper.GetBalance(sdkCtx, notBondedPool.GetAddress(), bondDenom).Amount,
+		k.bankKeeper.GetBalance(sdkCtx, bondedPool.GetAddress(), bondDenom).Amount,
 	)
 
 	return &types.QueryPoolResponse{Pool: pool}, nil
@@ -498,7 +543,10 @@ func (k Querier) Pool(ctx context.Context, _ *types.QueryPoolRequest) (*types.Qu
 
 // Params queries the staking parameters
 func (k Querier) Params(ctx context.Context, _ *types.QueryParamsRequest) (*types.QueryParamsResponse, error) {
-	params, err := k.GetParams(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Params")()
+
+	params, err := k.GetParams(sdkCtx)
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,8 @@ import (
 // InitGenesis initializes default parameters and the keeper's address to
 // pubkey map.
 func (keeper Keeper) InitGenesis(ctx sdk.Context, stakingKeeper types.StakingKeeper, data *types.GenesisState) {
+	defer keeper.Meter(ctx).FuncTiming(&ctx, "InitGenesis")()
+
 	stakingKeeper.IterateValidators(ctx,
 		func(index int64, validator stakingtypes.ValidatorI) bool {
 			consPk, err := validator.ConsPubKey()
@@ -51,6 +53,8 @@ func (keeper Keeper) InitGenesis(ctx sdk.Context, stakingKeeper types.StakingKee
 // to a genesis file, which can be imported again
 // with InitGenesis
 func (keeper Keeper) ExportGenesis(ctx sdk.Context) (data *types.GenesisState) {
+	defer keeper.Meter(ctx).FuncTiming(&ctx, "ExportGenesis")()
+
 	params, err := keeper.GetParams(ctx)
 	if err != nil {
 		panic(err)

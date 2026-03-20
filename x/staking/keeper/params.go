@@ -12,33 +12,48 @@ import (
 
 // UnbondingTime - The time duration for unbonding
 func (k Keeper) UnbondingTime(ctx context.Context) (time.Duration, error) {
-	params, err := k.GetParams(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UnbondingTime")()
+
+	params, err := k.GetParams(sdkCtx)
 	return params.UnbondingTime, err
 }
 
 // MaxValidators - Maximum number of validators
 func (k Keeper) MaxValidators(ctx context.Context) (uint32, error) {
-	params, err := k.GetParams(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "MaxValidators")()
+
+	params, err := k.GetParams(sdkCtx)
 	return params.MaxValidators, err
 }
 
 // MaxEntries - Maximum number of simultaneous unbonding
 // delegations or redelegations (per pair/trio)
 func (k Keeper) MaxEntries(ctx context.Context) (uint32, error) {
-	params, err := k.GetParams(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "MaxEntries")()
+
+	params, err := k.GetParams(sdkCtx)
 	return params.MaxEntries, err
 }
 
 // HistoricalEntries = number of historical info entries
 // to persist in store
 func (k Keeper) HistoricalEntries(ctx context.Context) (uint32, error) {
-	params, err := k.GetParams(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "HistoricalEntries")()
+
+	params, err := k.GetParams(sdkCtx)
 	return params.HistoricalEntries, err
 }
 
 // BondDenom - Bondable coin denomination
 func (k Keeper) BondDenom(ctx context.Context) (string, error) {
-	params, err := k.GetParams(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "BondDenom")()
+
+	params, err := k.GetParams(sdkCtx)
 	return params.BondDenom, err
 }
 
@@ -47,19 +62,28 @@ func (k Keeper) BondDenom(ctx context.Context) (string, error) {
 // TODO: we might turn this into an on-chain param:
 // https://github.com/cosmos/cosmos-sdk/issues/8365
 func (k Keeper) PowerReduction(ctx context.Context) math.Int {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "PowerReduction")()
+
 	return sdk.DefaultPowerReduction
 }
 
 // MinCommissionRate - Minimum validator commission rate
 func (k Keeper) MinCommissionRate(ctx context.Context) (math.LegacyDec, error) {
-	params, err := k.GetParams(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "MinCommissionRate")()
+
+	params, err := k.GetParams(sdkCtx)
 	return params.MinCommissionRate, err
 }
 
 // SetParams sets the x/staking module parameters.
 // CONTRACT: This method performs no validation of the parameters.
 func (k Keeper) SetParams(ctx context.Context, params types.Params) error {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetParams")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := k.cdc.Marshal(&params)
 	if err != nil {
 		return err
@@ -69,7 +93,10 @@ func (k Keeper) SetParams(ctx context.Context, params types.Params) error {
 
 // GetParams gets the x/staking module parameters.
 func (k Keeper) GetParams(ctx context.Context) (params types.Params, err error) {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetParams")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := store.Get(types.ParamsKey)
 	if err != nil {
 		return params, err

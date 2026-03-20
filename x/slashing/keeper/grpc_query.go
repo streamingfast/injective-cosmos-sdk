@@ -11,6 +11,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/runtime"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/cosmos/cosmos-sdk/x/slashing/types"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 var _ types.QueryServer = Querier{}
@@ -25,17 +27,23 @@ func NewQuerier(keeper Keeper) Querier {
 
 // Params returns parameters of x/slashing module
 func (k Keeper) Params(ctx context.Context, req *types.QueryParamsRequest) (*types.QueryParamsResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Params")()
+
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
 	}
 
-	params, err := k.GetParams(ctx)
+	params, err := k.GetParams(sdkCtx)
 
 	return &types.QueryParamsResponse{Params: params}, err
 }
 
 // SigningInfo returns signing-info of a specific validator.
 func (k Keeper) SigningInfo(ctx context.Context, req *types.QuerySigningInfoRequest) (*types.QuerySigningInfoResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SigningInfo")()
+
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
 	}
@@ -49,7 +57,7 @@ func (k Keeper) SigningInfo(ctx context.Context, req *types.QuerySigningInfoRequ
 		return nil, err
 	}
 
-	signingInfo, err := k.GetValidatorSigningInfo(ctx, consAddr)
+	signingInfo, err := k.GetValidatorSigningInfo(sdkCtx, consAddr)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "SigningInfo not found for validator %s", req.ConsAddress)
 	}
@@ -59,11 +67,14 @@ func (k Keeper) SigningInfo(ctx context.Context, req *types.QuerySigningInfoRequ
 
 // SigningInfos returns signing-infos of all validators.
 func (k Keeper) SigningInfos(ctx context.Context, req *types.QuerySigningInfosRequest) (*types.QuerySigningInfosResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SigningInfos")()
+
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
 	}
 
-	store := k.storeService.OpenKVStore(ctx)
+	store := k.storeService.OpenKVStore(sdkCtx)
 	var signInfos []types.ValidatorSigningInfo
 
 	sigInfoStore := prefix.NewStore(runtime.KVStoreAdapter(store), types.ValidatorSigningInfoKeyPrefix)

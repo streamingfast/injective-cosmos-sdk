@@ -15,6 +15,9 @@ var _ nft.MsgServer = Keeper{}
 
 // Send implements Send method of the types.MsgServer.
 func (k Keeper) Send(goCtx context.Context, msg *nft.MsgSend) (*nft.MsgSendResponse, error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Send")()
+
 	if len(msg.ClassId) == 0 {
 		return nil, nft.ErrEmptyClassID
 	}
@@ -33,17 +36,16 @@ func (k Keeper) Send(goCtx context.Context, msg *nft.MsgSend) (*nft.MsgSendRespo
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "Invalid receiver address (%s)", msg.Receiver)
 	}
 
-	ctx := sdk.UnwrapSDKContext(goCtx)
-	owner := k.GetOwner(ctx, msg.ClassId, msg.Id)
+	owner := k.GetOwner(sdkCtx, msg.ClassId, msg.Id)
 	if !bytes.Equal(owner, sender) {
 		return nil, errorsmod.Wrapf(sdkerrors.ErrUnauthorized, "%s is not the owner of nft %s", msg.Sender, msg.Id)
 	}
 
-	if err := k.Transfer(ctx, msg.ClassId, msg.Id, receiver); err != nil {
+	if err := k.Transfer(sdkCtx, msg.ClassId, msg.Id, receiver); err != nil {
 		return nil, err
 	}
 
-	ctx.EventManager().EmitTypedEvent(&nft.EventSend{
+	sdkCtx.EventManager().EmitTypedEvent(&nft.EventSend{
 		ClassId:  msg.ClassId,
 		Id:       msg.Id,
 		Sender:   msg.Sender,

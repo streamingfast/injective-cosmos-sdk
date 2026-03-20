@@ -17,14 +17,15 @@ import (
 // HandleValidatorSignature handles a validator signature, must be called once per validator per block.
 func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.Address, power int64, signed comet.BlockIDFlag) error {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	logger := k.Logger(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "HandleValidatorSignature")()
+	logger := k.Logger(sdkCtx)
 	height := sdkCtx.BlockHeight()
 
 	// fetch the validator public key
 	consAddr := sdk.ConsAddress(addr)
 
 	// don't update missed blocks when validator's jailed
-	isJailed, err := k.sk.IsValidatorJailed(ctx, consAddr)
+	isJailed, err := k.sk.IsValidatorJailed(sdkCtx, consAddr)
 	if err != nil {
 		return err
 	}
@@ -34,12 +35,12 @@ func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.A
 	}
 
 	// fetch signing info
-	signInfo, err := k.GetValidatorSigningInfo(ctx, consAddr)
+	signInfo, err := k.GetValidatorSigningInfo(sdkCtx, consAddr)
 	if err != nil {
 		return err
 	}
 
-	signedBlocksWindow, err := k.SignedBlocksWindow(ctx)
+	signedBlocksWindow, err := k.SignedBlocksWindow(sdkCtx)
 	if err != nil {
 		return err
 	}
@@ -53,7 +54,7 @@ func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.A
 	signInfo.IndexOffset++
 
 	// determine if the validator signed the previous block
-	previous, err := k.GetMissedBlockBitmapValue(ctx, consAddr, index)
+	previous, err := k.GetMissedBlockBitmapValue(sdkCtx, consAddr, index)
 	if err != nil {
 		return errors.Wrap(err, "failed to get the validator's bitmap value")
 	}
@@ -63,7 +64,7 @@ func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.A
 	case !previous && missed:
 		// Bitmap value has changed from not missed to missed, so we flip the bit
 		// and increment the counter.
-		if err := k.SetMissedBlockBitmapValue(ctx, consAddr, index, true); err != nil {
+		if err := k.SetMissedBlockBitmapValue(sdkCtx, consAddr, index, true); err != nil {
 			return err
 		}
 
@@ -72,7 +73,7 @@ func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.A
 	case previous && !missed:
 		// Bitmap value has changed from missed to not missed, so we flip the bit
 		// and decrement the counter.
-		if err := k.SetMissedBlockBitmapValue(ctx, consAddr, index, false); err != nil {
+		if err := k.SetMissedBlockBitmapValue(sdkCtx, consAddr, index, false); err != nil {
 			return err
 		}
 
@@ -82,7 +83,7 @@ func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.A
 		// bitmap value at this index has not changed, no need to update counter
 	}
 
-	minSignedPerWindow, err := k.MinSignedPerWindow(ctx)
+	minSignedPerWindow, err := k.MinSignedPerWindow(sdkCtx)
 	if err != nil {
 		return err
 	}
@@ -111,7 +112,7 @@ func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.A
 
 	// if we are past the minimum height and the validator has missed too many blocks, punish them
 	if height > minHeight && signInfo.MissedBlocksCounter > maxMissed {
-		validator, err := k.sk.ValidatorByConsAddr(ctx, consAddr)
+		validator, err := k.sk.ValidatorByConsAddr(sdkCtx, consAddr)
 		if err != nil {
 			return err
 		}
@@ -124,12 +125,12 @@ func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.A
 			// That's fine since this is just used to filter unbonding delegations & redelegations.
 			distributionHeight := height - sdk.ValidatorUpdateDelay - 1
 
-			slashFractionDowntime, err := k.SlashFractionDowntime(ctx)
+			slashFractionDowntime, err := k.SlashFractionDowntime(sdkCtx)
 			if err != nil {
 				return err
 			}
 
-			coinsBurned, err := k.sk.SlashWithInfractionReason(ctx, consAddr, distributionHeight, power, slashFractionDowntime, stakingtypes.Infraction_INFRACTION_DOWNTIME)
+			coinsBurned, err := k.sk.SlashWithInfractionReason(sdkCtx, consAddr, distributionHeight, power, slashFractionDowntime, stakingtypes.Infraction_INFRACTION_DOWNTIME)
 			if err != nil {
 				return err
 			}
@@ -146,7 +147,7 @@ func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.A
 			)
 			k.sk.Jail(sdkCtx, consAddr)
 
-			downtimeJailDur, err := k.DowntimeJailDuration(ctx)
+			downtimeJailDur, err := k.DowntimeJailDuration(sdkCtx)
 			if err != nil {
 				return err
 			}
@@ -156,7 +157,7 @@ func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.A
 			// immediately slashed for downtime upon re-bonding.
 			signInfo.MissedBlocksCounter = 0
 			signInfo.IndexOffset = 0
-			err = k.DeleteMissedBlockBitmap(ctx, consAddr)
+			err = k.DeleteMissedBlockBitmap(sdkCtx, consAddr)
 			if err != nil {
 				return err
 			}
@@ -180,5 +181,5 @@ func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.A
 	}
 
 	// Set the updated signing info
-	return k.SetValidatorSigningInfo(ctx, consAddr, signInfo)
+	return k.SetValidatorSigningInfo(sdkCtx, consAddr, signInfo)
 }

@@ -9,6 +9,8 @@ import (
 
 // InitGenesis sets distribution information for genesis
 func (k Keeper) InitGenesis(ctx sdk.Context, data types.GenesisState) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "InitGenesis")()
+
 	var moduleHoldings sdk.DecCoins
 
 	err := k.FeePool.Set(ctx, data.FeePool)
@@ -135,6 +137,8 @@ func (k Keeper) InitGenesis(ctx sdk.Context, data types.GenesisState) {
 
 // ExportGenesis returns a GenesisState for a given context and keeper.
 func (k Keeper) ExportGenesis(ctx sdk.Context) *types.GenesisState {
+	defer k.Meter(ctx).FuncTiming(&ctx, "ExportGenesis")()
+
 	feePool, err := k.FeePool.Get(ctx)
 	if err != nil {
 		panic(err)

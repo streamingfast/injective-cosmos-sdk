@@ -10,7 +10,10 @@ import (
 // DistributeFromFeePool distributes funds from the distribution module account to
 // a receiver address while updating the community pool
 func (k Keeper) DistributeFromFeePool(ctx context.Context, amount sdk.Coins, receiveAddr sdk.AccAddress) error {
-	feePool, err := k.FeePool.Get(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "DistributeFromFeePool")()
+
+	feePool, err := k.FeePool.Get(sdkCtx)
 	if err != nil {
 		return err
 	}
@@ -25,10 +28,10 @@ func (k Keeper) DistributeFromFeePool(ctx context.Context, amount sdk.Coins, rec
 
 	feePool.CommunityPool = newPool
 
-	err = k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, receiveAddr, amount)
+	err = k.bankKeeper.SendCoinsFromModuleToAccount(sdkCtx, types.ModuleName, receiveAddr, amount)
 	if err != nil {
 		return err
 	}
 
-	return k.FeePool.Set(ctx, feePool)
+	return k.FeePool.Set(sdkCtx, feePool)
 }
