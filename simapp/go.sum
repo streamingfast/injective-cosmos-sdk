@@ -213,10 +213,10 @@ github.com/DataDog/datadog-go v3.2.0+incompatible h1:qSG2N4FghB1He/r2mFrWKCaL7dX
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/DataDog/zstd v1.5.6 h1:LbEglqepa/ipmmQJUDnSsfvA8e8IStVcGaFWDuxvGOY=
 github.com/DataDog/zstd v1.5.6/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwSAmyw=
-github.com/InjectiveLabs/cometbft v1.0.1-inj.3 h1:wVl4vPhyTh6uuwT0BfH3pbF9W0QqEnZYRgB/2IDFXR0=
-github.com/InjectiveLabs/cometbft v1.0.1-inj.3/go.mod h1:RgHHndb7wdtm9etmVj4tDn1NynC9YKIEJW9UUI3FCn4=
-github.com/InjectiveLabs/cometbft/api v1.0.0-inj.2 h1:uXsmBVeBickTjZ2GqPNYXShoboRw1m2Cq1bKv4QCe0o=
-github.com/InjectiveLabs/cometbft/api v1.0.0-inj.2/go.mod h1:Ivh6nSCTJPQOyfQo8dgnyu/T88it092sEqSrZSmTQN8=
+github.com/InjectiveLabs/cometbft v1.0.2-0.20260330123826-74c034356ad6 h1:6Sackqvid2Qj4cpl4y7DIR0S5bVyE/OjzasSmGdUrdY=
+github.com/InjectiveLabs/cometbft v1.0.2-0.20260330123826-74c034356ad6/go.mod h1:U34DYdUTNyEdnB89+eqZy+SO9g7sFRwJQg7La+o/pHk=
+github.com/InjectiveLabs/cometbft/api v1.0.1-0.20260330123826-74c034356ad6 h1:ZIyR7ccWtLw+sU4xZwdP1G2l/fbbkvfxbv82d0nDIBI=
+github.com/InjectiveLabs/cometbft/api v1.0.1-0.20260330123826-74c034356ad6/go.mod h1:Ivh6nSCTJPQOyfQo8dgnyu/T88it092sEqSrZSmTQN8=
 github.com/InjectiveLabs/metrics/v2 v2.0.0-beta.8 h1:zvIV7ifNcH2Dvl0RrXd2qYRkaDSc+iP0hqaAhfS85MY=
 github.com/InjectiveLabs/metrics/v2 v2.0.0-beta.8/go.mod h1:fdW28eWh1Ace92UW2TzINdJVaVP7whCmHKkGQZHsxGI=
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
@@ -269,7 +269,6 @@ github.com/bufbuild/protocompile v0.6.0 h1:Uu7WiSQ6Yj9DbkdnOe7U4mNKp58y9WDMKDn28
 github.com/bufbuild/protocompile v0.6.0/go.mod h1:YNP35qEYoYGme7QMtz5SBCoN4kL4g12jTtjuzRNdjpE=
 github.com/bytedance/sonic v1.5.0/go.mod h1:ED5hyg4y6t3/9Ku1R6dU/4KyJ48DZ4jPhfY1O2AihPM=
 github.com/bytedance/sonic v1.9.1/go.mod h1:i736AoUSYt75HyZLoJW9ERYxcy6eaN6h4BZXU064P/U=
-github.com/bytedance/sonic v1.10.0-rc/go.mod h1:ElCzW+ufi8qKqNW0FY314xriJhyJhuoJ3gFZdAHF7NM=
 github.com/bytedance/sonic v1.10.0 h1:qtNZduETEIWJVIyDl01BeNxur2rW9OwTQ/yBqFRkKEk=
 github.com/bytedance/sonic v1.10.0/go.mod h1:iZcSUejdk5aukTND/Eu/ivjQuEL0Cu9/rf50Hi0u/g4=
 github.com/casbin/casbin/v2 v2.1.2/go.mod h1:YcPU1XXisHhLzuxH9coDNf2FbKpjGlbCg3n9yuLkIJQ=
