@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"cosmossdk.io/collections"
 	"cosmossdk.io/core/store"
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/log"
@@ -38,6 +39,8 @@ type Keeper interface {
 	SetDenomMetaData(ctx context.Context, denomMetaData types.Metadata)
 	GetAllDenomMetaData(ctx context.Context) []types.Metadata
 	IterateAllDenomMetaData(ctx context.Context, cb func(types.Metadata) bool)
+	IterateDenoms(ctx context.Context, ranger collections.Ranger[string], cb func(string) bool) error
+	IterateDenomsWithMetaData(ctx context.Context, ranger collections.Ranger[string], cb func(string) bool) error
 	SendCoinsFromModuleToAccount(ctx context.Context, senderModule string, recipientAddr sdk.AccAddress, amt sdk.Coins) error
 	SendCoinsFromModuleToModule(ctx context.Context, senderModule, recipientModule string, amt sdk.Coins) error
 	SendCoinsFromAccountToModule(ctx context.Context, senderAddr sdk.AccAddress, recipientModule string, amt sdk.Coins) error
@@ -253,6 +256,27 @@ func (k BaseKeeper) IterateAllDenomMetaData(ctx context.Context, cb func(types.M
 	if err != nil {
 		panic(err)
 	}
+}
+
+// IterateDenomsWithMetaData iterates over all denoms that has metadata set
+func (k BaseKeeper) IterateDenomsWithMetaData(ctx context.Context, ranger collections.Ranger[string], cb func(string) bool) error {
+	iter, err := k.BaseViewKeeper.DenomMetadata.Iterate(ctx, ranger)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	for ; iter.Valid(); iter.Next() {
+		key, err := iter.Key()
+		if err != nil {
+			return err
+		}
+		if cb(key) {
+			break
+		}
+	}
+
+	return nil
 }
 
 // SetDenomMetaData sets the denominations metadata
@@ -474,4 +498,26 @@ func (k BaseViewKeeper) IterateTotalSupply(ctx context.Context, cb func(sdk.Coin
 	if err != nil {
 		panic(err)
 	}
+}
+
+// IterateDenoms iterates over the all existing denoms that satisfy the Ranger criteria.
+// The iteration stops if the callback returns true.
+func (k BaseViewKeeper) IterateDenoms(ctx context.Context, ranger collections.Ranger[string], cb func(string) bool) error {
+	iter, err := k.Supply.Iterate(ctx, ranger)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	for ; iter.Valid(); iter.Next() {
+		key, err := iter.Key()
+		if err != nil {
+			return err
+		}
+		if cb(key) {
+			break
+		}
+	}
+
+	return nil
 }
