@@ -78,6 +78,7 @@ func startInProcess(cfg Config, val *Validator) error {
 		cmtcfg.DefaultDBProvider,
 		node.DefaultMetricsProvider(cmtCfg.Instrumentation),
 		servercmtlog.CometLoggerWrapper{Logger: logger.With("module", val.Moniker)},
+		nil,
 	)
 	if err != nil {
 		return err
