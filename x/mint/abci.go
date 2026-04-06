@@ -11,6 +11,8 @@ import (
 
 // BeginBlocker mints new tokens for the previous block.
 func BeginBlocker(ctx context.Context, k keeper.Keeper, ic types.InflationCalculationFn) error {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "BeginBlocker")()
 	defer telemetry.ModuleMeasureSince(types.ModuleName, telemetry.Now(), telemetry.MetricKeyBeginBlocker)
 
 	// fetch stored minter & params
@@ -60,7 +62,6 @@ func BeginBlocker(ctx context.Context, k keeper.Keeper, ic types.InflationCalcul
 		defer telemetry.ModuleSetGauge(types.ModuleName, float32(mintedCoin.Amount.Int64()), "minted_tokens")
 	}
 
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	sdkCtx.EventManager().EmitEvent(
 		sdk.NewEvent(
 			types.EventTypeMint,

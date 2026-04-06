@@ -7,6 +7,7 @@ import (
 
 // BeginBlocker is called at the beginning of every block
 func BeginBlocker(ctx sdk.Context, keeper keeper.Keeper) error {
+	defer keeper.Meter(ctx).FuncTiming(&ctx, "BeginBlocker")()
 	// delete all the mature grants
 	return keeper.DequeueAndDeleteExpiredGrants(ctx)
 }

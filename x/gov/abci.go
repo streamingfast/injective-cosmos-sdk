@@ -18,6 +18,7 @@ import (
 
 // EndBlocker called every block, process inflation, update validator set.
 func EndBlocker(ctx sdk.Context, keeper *keeper.Keeper) error {
+	defer keeper.Meter(ctx).FuncTiming(&ctx, "EndBlocker")()
 	defer telemetry.ModuleMeasureSince(types.ModuleName, telemetry.Now(), telemetry.MetricKeyEndBlocker)
 
 	logger := ctx.Logger().With("module", "x/"+types.ModuleName)
