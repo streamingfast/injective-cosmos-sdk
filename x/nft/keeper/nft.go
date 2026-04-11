@@ -12,31 +12,37 @@ import (
 )
 
 // Mint defines a method for minting a new nft
-func (k Keeper) Mint(ctx context.Context, token nft.NFT, receiver sdk.AccAddress) error {
-	if !k.HasClass(ctx, token.ClassId) {
+func (k Keeper) Mint(ctx context.Context, token nft.NFT, receiver sdk.AccAddress) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Mint")(&err)
+
+	if !k.HasClass(sdkCtx, token.ClassId) {
 		return errors.Wrap(nft.ErrClassNotExists, token.ClassId)
 	}
 
-	if k.HasNFT(ctx, token.ClassId, token.Id) {
+	if k.HasNFT(sdkCtx, token.ClassId, token.Id) {
 		return errors.Wrap(nft.ErrNFTExists, token.Id)
 	}
 
-	return k.mintWithNoCheck(ctx, token, receiver)
+	return k.mintWithNoCheck(sdkCtx, token, receiver)
 }
 
 // mintWithNoCheck defines a method for minting a new nft
 // Note: this method does not check whether the class already exists in nft.
 // The upper-layer application needs to check it when it needs to use it.
-func (k Keeper) mintWithNoCheck(ctx context.Context, token nft.NFT, receiver sdk.AccAddress) error {
-	k.setNFT(ctx, token)
-	k.setOwner(ctx, token.ClassId, token.Id, receiver)
-	k.incrTotalSupply(ctx, token.ClassId)
+func (k Keeper) mintWithNoCheck(ctx context.Context, token nft.NFT, receiver sdk.AccAddress) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "mintWithNoCheck")(&err)
+
+	k.setNFT(sdkCtx, token)
+	k.setOwner(sdkCtx, token.ClassId, token.Id, receiver)
+	k.incrTotalSupply(sdkCtx, token.ClassId)
 
 	recStr, err := k.ac.BytesToString(receiver.Bytes())
 	if err != nil {
 		return err
 	}
-	return sdk.UnwrapSDKContext(ctx).EventManager().EmitTypedEvent(&nft.EventMint{
+	return sdkCtx.EventManager().EmitTypedEvent(&nft.EventMint{
 		ClassId: token.ClassId,
 		Id:      token.Id,
 		Owner:   recStr,
@@ -45,35 +51,41 @@ func (k Keeper) mintWithNoCheck(ctx context.Context, token nft.NFT, receiver sdk
 
 // Burn defines a method for burning a nft from a specific account.
 // Note: When the upper module uses this method, it needs to authenticate nft
-func (k Keeper) Burn(ctx context.Context, classID, nftID string) error {
-	if !k.HasClass(ctx, classID) {
+func (k Keeper) Burn(ctx context.Context, classID, nftID string) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Burn")(&err)
+
+	if !k.HasClass(sdkCtx, classID) {
 		return errors.Wrap(nft.ErrClassNotExists, classID)
 	}
 
-	if !k.HasNFT(ctx, classID, nftID) {
+	if !k.HasNFT(sdkCtx, classID, nftID) {
 		return errors.Wrap(nft.ErrNFTNotExists, nftID)
 	}
 
-	k.burnWithNoCheck(ctx, classID, nftID)
+	k.burnWithNoCheck(sdkCtx, classID, nftID)
 	return nil
 }
 
 // burnWithNoCheck defines a method for burning a nft from a specific account.
 // Note: this method does not check whether the class already exists in nft.
 // The upper-layer application needs to check it when it needs to use it
-func (k Keeper) burnWithNoCheck(ctx context.Context, classID, nftID string) error {
-	owner := k.GetOwner(ctx, classID, nftID)
-	nftStore := k.getNFTStore(ctx, classID)
+func (k Keeper) burnWithNoCheck(ctx context.Context, classID, nftID string) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "burnWithNoCheck")(&err)
+
+	owner := k.GetOwner(sdkCtx, classID, nftID)
+	nftStore := k.getNFTStore(sdkCtx, classID)
 	nftStore.Delete([]byte(nftID))
 
-	k.deleteOwner(ctx, classID, nftID, owner)
-	k.decrTotalSupply(ctx, classID)
+	k.deleteOwner(sdkCtx, classID, nftID, owner)
+	k.decrTotalSupply(sdkCtx, classID)
 	ownerStr, err := k.ac.BytesToString(owner.Bytes())
 	if err != nil {
 		return err
 	}
 
-	return sdk.UnwrapSDKContext(ctx).EventManager().EmitTypedEvent(&nft.EventBurn{
+	return sdkCtx.EventManager().EmitTypedEvent(&nft.EventBurn{
 		ClassId: classID,
 		Id:      nftID,
 		Owner:   ownerStr,
@@ -82,15 +94,18 @@ func (k Keeper) burnWithNoCheck(ctx context.Context, classID, nftID string) erro
 
 // Update defines a method for updating an exist nft
 // Note: When the upper module uses this method, it needs to authenticate nft
-func (k Keeper) Update(ctx context.Context, token nft.NFT) error {
-	if !k.HasClass(ctx, token.ClassId) {
+func (k Keeper) Update(ctx context.Context, token nft.NFT) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Update")(&err)
+
+	if !k.HasClass(sdkCtx, token.ClassId) {
 		return errors.Wrap(nft.ErrClassNotExists, token.ClassId)
 	}
 
-	if !k.HasNFT(ctx, token.ClassId, token.Id) {
+	if !k.HasNFT(sdkCtx, token.ClassId, token.Id) {
 		return errors.Wrap(nft.ErrNFTNotExists, token.Id)
 	}
-	k.updateWithNoCheck(ctx, token)
+	k.updateWithNoCheck(sdkCtx, token)
 	return nil
 }
 
@@ -98,7 +113,10 @@ func (k Keeper) Update(ctx context.Context, token nft.NFT) error {
 // Note: this method does not check whether the class already exists in nft.
 // The upper-layer application needs to check it when it needs to use it
 func (k Keeper) updateWithNoCheck(ctx context.Context, token nft.NFT) {
-	k.setNFT(ctx, token)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "updateWithNoCheck")()
+
+	k.setNFT(sdkCtx, token)
 }
 
 // Transfer defines a method for sending a nft from one account to another account.
@@ -107,16 +125,19 @@ func (k Keeper) Transfer(ctx context.Context,
 	classID string,
 	nftID string,
 	receiver sdk.AccAddress,
-) error {
-	if !k.HasClass(ctx, classID) {
+) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Transfer")(&err)
+
+	if !k.HasClass(sdkCtx, classID) {
 		return errors.Wrap(nft.ErrClassNotExists, classID)
 	}
 
-	if !k.HasNFT(ctx, classID, nftID) {
+	if !k.HasNFT(sdkCtx, classID, nftID) {
 		return errors.Wrap(nft.ErrNFTNotExists, nftID)
 	}
 
-	k.transferWithNoCheck(ctx, classID, nftID, receiver)
+	k.transferWithNoCheck(sdkCtx, classID, nftID, receiver)
 	return nil
 }
 
@@ -127,16 +148,22 @@ func (k Keeper) transferWithNoCheck(ctx context.Context,
 	classID string,
 	nftID string,
 	receiver sdk.AccAddress,
-) error {
-	owner := k.GetOwner(ctx, classID, nftID)
-	k.deleteOwner(ctx, classID, nftID, owner)
-	k.setOwner(ctx, classID, nftID, receiver)
+) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "transferWithNoCheck")(&err)
+
+	owner := k.GetOwner(sdkCtx, classID, nftID)
+	k.deleteOwner(sdkCtx, classID, nftID, owner)
+	k.setOwner(sdkCtx, classID, nftID, receiver)
 	return nil
 }
 
 // GetNFT returns the nft information of the specified classID and nftID
 func (k Keeper) GetNFT(ctx context.Context, classID, nftID string) (nft.NFT, bool) {
-	store := k.getNFTStore(ctx, classID)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetNFT")()
+
+	store := k.getNFTStore(sdkCtx, classID)
 	bz := store.Get([]byte(nftID))
 	if len(bz) == 0 {
 		return nft.NFT{}, false
@@ -148,11 +175,14 @@ func (k Keeper) GetNFT(ctx context.Context, classID, nftID string) (nft.NFT, boo
 
 // GetNFTsOfClassByOwner returns all nft information of the specified classID under the specified owner
 func (k Keeper) GetNFTsOfClassByOwner(ctx context.Context, classID string, owner sdk.AccAddress) (nfts []nft.NFT) {
-	ownerStore := k.getClassStoreByOwner(ctx, owner, classID)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetNFTsOfClassByOwner")()
+
+	ownerStore := k.getClassStoreByOwner(sdkCtx, owner, classID)
 	iterator := ownerStore.Iterator(nil, nil)
 	defer iterator.Close()
 	for ; iterator.Valid(); iterator.Next() {
-		nft, has := k.GetNFT(ctx, classID, string(iterator.Key()))
+		nft, has := k.GetNFT(sdkCtx, classID, string(iterator.Key()))
 		if has {
 			nfts = append(nfts, nft)
 		}
@@ -162,7 +192,10 @@ func (k Keeper) GetNFTsOfClassByOwner(ctx context.Context, classID string, owner
 
 // GetNFTsOfClass returns all nft information under the specified classID
 func (k Keeper) GetNFTsOfClass(ctx context.Context, classID string) (nfts []nft.NFT) {
-	nftStore := k.getNFTStore(ctx, classID)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetNFTsOfClass")()
+
+	nftStore := k.getNFTStore(sdkCtx, classID)
 	iterator := nftStore.Iterator(nil, nil)
 	defer iterator.Close()
 	for ; iterator.Valid(); iterator.Next() {
@@ -175,7 +208,11 @@ func (k Keeper) GetNFTsOfClass(ctx context.Context, classID string) (nfts []nft.
 
 // GetOwner returns the owner information of the specified nft
 func (k Keeper) GetOwner(ctx context.Context, classID, nftID string) sdk.AccAddress {
-	store := k.storeService.OpenKVStore(ctx)
+	var err error
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetOwner")(&err)
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := store.Get(ownerStoreKey(classID, nftID))
 	if err != nil {
 		panic(err)
@@ -185,13 +222,20 @@ func (k Keeper) GetOwner(ctx context.Context, classID, nftID string) sdk.AccAddr
 
 // GetBalance returns the specified account, the number of all nfts under the specified classID
 func (k Keeper) GetBalance(ctx context.Context, classID string, owner sdk.AccAddress) uint64 {
-	nfts := k.GetNFTsOfClassByOwner(ctx, classID, owner)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetBalance")()
+
+	nfts := k.GetNFTsOfClassByOwner(sdkCtx, classID, owner)
 	return uint64(len(nfts))
 }
 
 // GetTotalSupply returns the number of all nfts under the specified classID
 func (k Keeper) GetTotalSupply(ctx context.Context, classID string) uint64 {
-	store := k.storeService.OpenKVStore(ctx)
+	var err error
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetTotalSupply")(&err)
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := store.Get(classTotalSupply(classID))
 	if err != nil {
 		panic(err)
@@ -201,63 +245,94 @@ func (k Keeper) GetTotalSupply(ctx context.Context, classID string) uint64 {
 
 // HasNFT determines whether the specified classID and nftID exist
 func (k Keeper) HasNFT(ctx context.Context, classID, id string) bool {
-	store := k.getNFTStore(ctx, classID)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "HasNFT")()
+
+	store := k.getNFTStore(sdkCtx, classID)
 	return store.Has([]byte(id))
 }
 
 func (k Keeper) setNFT(ctx context.Context, token nft.NFT) {
-	nftStore := k.getNFTStore(ctx, token.ClassId)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "setNFT")()
+
+	nftStore := k.getNFTStore(sdkCtx, token.ClassId)
 	bz := k.cdc.MustMarshal(&token)
 	nftStore.Set([]byte(token.Id), bz)
 }
 
 func (k Keeper) setOwner(ctx context.Context, classID, nftID string, owner sdk.AccAddress) {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "setOwner")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	store.Set(ownerStoreKey(classID, nftID), owner.Bytes())
 
-	ownerStore := k.getClassStoreByOwner(ctx, owner, classID)
+	ownerStore := k.getClassStoreByOwner(sdkCtx, owner, classID)
 	ownerStore.Set([]byte(nftID), Placeholder)
 }
 
 func (k Keeper) deleteOwner(ctx context.Context, classID, nftID string, owner sdk.AccAddress) {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "deleteOwner")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	store.Delete(ownerStoreKey(classID, nftID))
 
-	ownerStore := k.getClassStoreByOwner(ctx, owner, classID)
+	ownerStore := k.getClassStoreByOwner(sdkCtx, owner, classID)
 	ownerStore.Delete([]byte(nftID))
 }
 
 func (k Keeper) getNFTStore(ctx context.Context, classID string) prefix.Store {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "getNFTStore")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	return prefix.NewStore(runtime.KVStoreAdapter(store), nftStoreKey(classID))
 }
 
 func (k Keeper) getClassStoreByOwner(ctx context.Context, owner sdk.AccAddress, classID string) prefix.Store {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "getClassStoreByOwner")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	key := nftOfClassByOwnerStoreKey(owner, classID)
 	return prefix.NewStore(runtime.KVStoreAdapter(store), key)
 }
 
 func (k Keeper) prefixStoreNftOfClassByOwner(ctx context.Context, owner sdk.AccAddress) prefix.Store {
-	store := k.storeService.OpenKVStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "prefixStoreNftOfClassByOwner")()
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	key := prefixNftOfClassByOwnerStoreKey(owner)
 	return prefix.NewStore(runtime.KVStoreAdapter(store), key)
 }
 
 func (k Keeper) incrTotalSupply(ctx context.Context, classID string) {
-	supply := k.GetTotalSupply(ctx, classID) + 1
-	k.updateTotalSupply(ctx, classID, supply)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "incrTotalSupply")()
+
+	supply := k.GetTotalSupply(sdkCtx, classID) + 1
+	k.updateTotalSupply(sdkCtx, classID, supply)
 }
 
 func (k Keeper) decrTotalSupply(ctx context.Context, classID string) {
-	supply := k.GetTotalSupply(ctx, classID) - 1
-	k.updateTotalSupply(ctx, classID, supply)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "decrTotalSupply")()
+
+	supply := k.GetTotalSupply(sdkCtx, classID) - 1
+	k.updateTotalSupply(sdkCtx, classID, supply)
 }
 
 func (k Keeper) updateTotalSupply(ctx context.Context, classID string, supply uint64) {
-	store := k.storeService.OpenKVStore(ctx)
+	var err error
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "updateTotalSupply")(&err)
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	supplyKey := classTotalSupply(classID)
-	err := store.Set(supplyKey, sdk.Uint64ToBigEndian(supply))
+	err = store.Set(supplyKey, sdk.Uint64ToBigEndian(supply))
 	if err != nil {
 		panic(err)
 	}

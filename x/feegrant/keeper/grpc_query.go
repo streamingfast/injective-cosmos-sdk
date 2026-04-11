@@ -20,7 +20,10 @@ import (
 var _ feegrant.QueryServer = Keeper{}
 
 // Allowance returns granted allowance to the grantee by the granter.
-func (q Keeper) Allowance(c context.Context, req *feegrant.QueryAllowanceRequest) (*feegrant.QueryAllowanceResponse, error) {
+func (q Keeper) Allowance(c context.Context, req *feegrant.QueryAllowanceRequest) (meterResult *feegrant.QueryAllowanceResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(c)
+	defer q.Meter(c).FuncTiming(&sdkCtx, "Allowance")(&err)
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -35,9 +38,7 @@ func (q Keeper) Allowance(c context.Context, req *feegrant.QueryAllowanceRequest
 		return nil, err
 	}
 
-	ctx := sdk.UnwrapSDKContext(c)
-
-	feeAllowance, err := q.GetAllowance(ctx, granterAddr, granteeAddr)
+	feeAllowance, err := q.GetAllowance(sdkCtx, granterAddr, granteeAddr)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}
@@ -62,7 +63,10 @@ func (q Keeper) Allowance(c context.Context, req *feegrant.QueryAllowanceRequest
 }
 
 // Allowances queries all the allowances granted to the given grantee.
-func (q Keeper) Allowances(c context.Context, req *feegrant.QueryAllowancesRequest) (*feegrant.QueryAllowancesResponse, error) {
+func (q Keeper) Allowances(c context.Context, req *feegrant.QueryAllowancesRequest) (meterResult *feegrant.QueryAllowancesResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(c)
+	defer q.Meter(c).FuncTiming(&sdkCtx, "Allowances")(&err)
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -72,17 +76,15 @@ func (q Keeper) Allowances(c context.Context, req *feegrant.QueryAllowancesReque
 		return nil, err
 	}
 
-	ctx := sdk.UnwrapSDKContext(c)
-
 	var grants []*feegrant.Grant
 
-	store := q.storeService.OpenKVStore(ctx)
+	store := q.storeService.OpenKVStore(sdkCtx)
 	grantsStore := prefix.NewStore(runtime.KVStoreAdapter(store), feegrant.FeeAllowancePrefixByGrantee(granteeAddr))
 
 	pageRes, err := query.Paginate(grantsStore, req.Pagination, func(key, value []byte) error {
 		var grant feegrant.Grant
 
-		if err := q.cdc.Unmarshal(value, &grant); err != nil {
+		if err = q.cdc.Unmarshal(value, &grant); err != nil {
 			return err
 		}
 
@@ -97,7 +99,10 @@ func (q Keeper) Allowances(c context.Context, req *feegrant.QueryAllowancesReque
 }
 
 // AllowancesByGranter queries all the allowances granted by the given granter
-func (q Keeper) AllowancesByGranter(c context.Context, req *feegrant.QueryAllowancesByGranterRequest) (*feegrant.QueryAllowancesByGranterResponse, error) {
+func (q Keeper) AllowancesByGranter(c context.Context, req *feegrant.QueryAllowancesByGranterRequest) (meterResult *feegrant.QueryAllowancesByGranterResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(c)
+	defer q.Meter(c).FuncTiming(&sdkCtx, "AllowancesByGranter")(&err)
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -107,9 +112,7 @@ func (q Keeper) AllowancesByGranter(c context.Context, req *feegrant.QueryAllowa
 		return nil, err
 	}
 
-	ctx := sdk.UnwrapSDKContext(c)
-
-	store := q.storeService.OpenKVStore(ctx)
+	store := q.storeService.OpenKVStore(sdkCtx)
 	prefixStore := prefix.NewStore(runtime.KVStoreAdapter(store), feegrant.FeeAllowanceKeyPrefix)
 	grants, pageRes, err := query.GenericFilteredPaginate(q.cdc, prefixStore, req.Pagination, func(key []byte, grant *feegrant.Grant) (*feegrant.Grant, error) {
 		// ParseAddressesFromFeeAllowanceKey expects the full key including the prefix.

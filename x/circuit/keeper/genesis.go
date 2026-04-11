@@ -4,15 +4,21 @@ import (
 	context "context"
 
 	"cosmossdk.io/x/circuit/types"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func (k *Keeper) ExportGenesis(ctx context.Context) (data *types.GenesisState) {
+	var err error
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "ExportGenesis")(&err)
+
 	var (
 		permissions  []*types.GenesisAccountPermissions
 		disabledMsgs []string
 	)
 
-	err := k.Permissions.Walk(ctx, nil, func(address []byte, perm types.Permissions) (stop bool, err error) {
+	err = k.Permissions.Walk(sdkCtx, nil, func(address []byte, perm types.Permissions) (stop bool, err error) {
 		add, err := k.addressCodec.BytesToString(address)
 		if err != nil {
 			return true, err
@@ -29,7 +35,7 @@ func (k *Keeper) ExportGenesis(ctx context.Context) (data *types.GenesisState) {
 		panic(err)
 	}
 
-	err = k.DisableList.Walk(ctx, nil, func(msgUrl string) (stop bool, err error) {
+	err = k.DisableList.Walk(sdkCtx, nil, func(msgUrl string) (stop bool, err error) {
 		disabledMsgs = append(disabledMsgs, msgUrl)
 		return false, nil
 	})
@@ -45,6 +51,10 @@ func (k *Keeper) ExportGenesis(ctx context.Context) (data *types.GenesisState) {
 
 // InitGenesis initializes the circuit module's state from a given genesis state.
 func (k *Keeper) InitGenesis(ctx context.Context, genState *types.GenesisState) {
+	var err error
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "InitGenesis")(&err)
+
 	for _, accounts := range genState.AccountPermissions {
 		add, err := k.addressCodec.StringToBytes(accounts.Address)
 		if err != nil {
@@ -52,13 +62,13 @@ func (k *Keeper) InitGenesis(ctx context.Context, genState *types.GenesisState) 
 		}
 
 		// Set the permissions for the account
-		if err := k.Permissions.Set(ctx, add, *accounts.Permissions); err != nil {
+		if err = k.Permissions.Set(sdkCtx, add, *accounts.Permissions); err != nil {
 			panic(err)
 		}
 	}
 	for _, url := range genState.DisabledTypeUrls {
 		// Set the disabled type urls
-		if err := k.DisableList.Set(ctx, url); err != nil {
+		if err = k.DisableList.Set(sdkCtx, url); err != nil {
 			panic(err)
 		}
 	}

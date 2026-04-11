@@ -15,7 +15,10 @@ import (
 var _ proposal.QueryServer = Keeper{}
 
 // Params returns subspace params
-func (k Keeper) Params(c context.Context, req *proposal.QueryParamsRequest) (*proposal.QueryParamsResponse, error) {
+func (k Keeper) Params(c context.Context, req *proposal.QueryParamsRequest) (meterResult *proposal.QueryParamsResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(c)
+	defer k.Meter(c).FuncTiming(&sdkCtx, "Params")(&err)
+
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
 	}
@@ -29,8 +32,7 @@ func (k Keeper) Params(c context.Context, req *proposal.QueryParamsRequest) (*pr
 		return nil, errors.Wrap(proposal.ErrUnknownSubspace, req.Subspace)
 	}
 
-	ctx := sdk.UnwrapSDKContext(c)
-	rawValue := ss.GetRaw(ctx, []byte(req.Key))
+	rawValue := ss.GetRaw(sdkCtx, []byte(req.Key))
 	param := proposal.NewParamChange(req.Subspace, req.Key, string(rawValue))
 
 	return &proposal.QueryParamsResponse{Param: param}, nil
@@ -41,7 +43,10 @@ func (k Keeper) Params(c context.Context, req *proposal.QueryParamsRequest) (*pr
 func (k Keeper) Subspaces(
 	goCtx context.Context,
 	req *proposal.QuerySubspacesRequest,
-) (*proposal.QuerySubspacesResponse, error) {
+) (meterResult *proposal.QuerySubspacesResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "Subspaces")(&err)
+
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
 	}
@@ -51,10 +56,9 @@ func (k Keeper) Subspaces(
 		Subspaces: make([]*proposal.Subspace, len(spaces)),
 	}
 
-	ctx := sdk.UnwrapSDKContext(goCtx)
 	for i, ss := range spaces {
 		var keys []string
-		ss.IterateKeys(ctx, func(key []byte) bool {
+		ss.IterateKeys(sdkCtx, func(key []byte) bool {
 			keys = append(keys, string(key))
 			return false
 		})

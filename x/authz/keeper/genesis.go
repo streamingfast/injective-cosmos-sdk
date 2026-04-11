@@ -7,6 +7,9 @@ import (
 
 // InitGenesis initializes new authz genesis
 func (k Keeper) InitGenesis(ctx sdk.Context, data *authz.GenesisState) {
+	var err error
+	defer k.Meter(ctx).FuncTiming(&ctx, "InitGenesis")(&err)
+
 	now := ctx.BlockTime()
 	for _, entry := range data.Authorization {
 		// ignore expired authorizations
@@ -37,6 +40,8 @@ func (k Keeper) InitGenesis(ctx sdk.Context, data *authz.GenesisState) {
 
 // ExportGenesis returns a GenesisState for a given context.
 func (k Keeper) ExportGenesis(ctx sdk.Context) *authz.GenesisState {
+	defer k.Meter(ctx).FuncTiming(&ctx, "ExportGenesis")()
+
 	var entries []authz.GrantAuthorization
 	k.IterateGrants(ctx, func(granter, grantee sdk.AccAddress, grant authz.Grant) bool {
 		entries = append(entries, authz.GrantAuthorization{

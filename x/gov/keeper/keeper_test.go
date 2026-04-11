@@ -74,7 +74,7 @@ func (suite *KeeperTestSuite) reset() {
 	suite.legacyQueryClient = legacyQueryClient
 	suite.msgSrvr = keeper.NewMsgServerImpl(suite.govKeeper)
 
-	suite.legacyMsgSrvr = keeper.NewLegacyMsgServerImpl(govAcct.String(), suite.msgSrvr)
+	suite.legacyMsgSrvr = keeper.NewLegacyMsgServerImpl(govAcct.String(), suite.govKeeper, suite.msgSrvr)
 	suite.addrs = simtestutil.AddTestAddrsIncremental(bankKeeper, stakingKeeper, ctx, 3, sdkmath.NewInt(30000000))
 
 	suite.acctKeeper.EXPECT().AddressCodec().Return(address.NewBech32Codec("cosmos")).AnyTimes()

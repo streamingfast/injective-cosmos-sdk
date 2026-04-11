@@ -9,7 +9,8 @@ import (
 
 // BeginBlocker sets the proposer for determining distribution during endblock
 // and distribute rewards for the previous block.
-func BeginBlocker(ctx sdk.Context, k keeper.Keeper) error {
+func BeginBlocker(ctx sdk.Context, k keeper.Keeper) (err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "BeginBlocker")(&err)
 	defer telemetry.ModuleMeasureSince(types.ModuleName, telemetry.Now(), telemetry.MetricKeyBeginBlocker)
 
 	// determine the total power signing the block
@@ -21,7 +22,7 @@ func BeginBlocker(ctx sdk.Context, k keeper.Keeper) error {
 	// TODO this is Tendermint-dependent
 	// ref https://github.com/cosmos/cosmos-sdk/issues/3095
 	if ctx.BlockHeight() > 1 {
-		if err := k.AllocateTokens(ctx, previousTotalPower, ctx.VoteInfos()); err != nil {
+		if err = k.AllocateTokens(ctx, previousTotalPower, ctx.VoteInfos()); err != nil {
 			return err
 		}
 	}

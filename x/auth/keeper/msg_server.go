@@ -21,19 +21,21 @@ func NewMsgServerImpl(ak AccountKeeper) types.MsgServer {
 	}
 }
 
-func (ms msgServer) UpdateParams(goCtx context.Context, msg *types.MsgUpdateParams) (*types.MsgUpdateParamsResponse, error) {
+func (ms msgServer) UpdateParams(goCtx context.Context, msg *types.MsgUpdateParams) (meterResult *types.MsgUpdateParamsResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer ms.ak.Meter(goCtx).FuncTiming(&sdkCtx, "UpdateParams")(&err)
+
 	if ms.ak.authority != msg.Authority {
 		return nil, fmt.Errorf(
 			"expected gov account as only signer for proposal message; invalid authority; expected %s, got %s",
 			ms.ak.authority, msg.Authority)
 	}
 
-	if err := msg.Params.Validate(); err != nil {
+	if err = msg.Params.Validate(); err != nil {
 		return nil, err
 	}
 
-	ctx := sdk.UnwrapSDKContext(goCtx)
-	if err := ms.ak.Params.Set(ctx, msg.Params); err != nil {
+	if err = ms.ak.Params.Set(sdkCtx, msg.Params); err != nil {
 		return nil, err
 	}
 

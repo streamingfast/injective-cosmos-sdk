@@ -957,7 +957,7 @@ func (app *BaseApp) runTxWithMultiStore(
 	// run validate basic if mode != recheck.
 	// as validate basic is stateless, it is guaranteed to pass recheck, given that its passed checkTx.
 	if mode != execModeReCheck {
-		if err := validateBasicTxMsgs(msgs); err != nil {
+		if err = validateBasicTxMsgs(msgs); err != nil {
 			return sdk.GasInfo{}, nil, nil, err
 		}
 	}

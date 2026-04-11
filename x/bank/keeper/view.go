@@ -10,6 +10,7 @@ import (
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/log"
 	"cosmossdk.io/math"
+	"github.com/InjectiveLabs/metrics/v2"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -68,6 +69,8 @@ type BaseViewKeeper struct {
 	SendEnabled   collections.Map[string, bool]
 	Balances      *collections.IndexedMap[collections.Pair[sdk.AccAddress, string], math.Int, BalancesIndexes]
 	Params        collections.Item[types.Params]
+
+	meter metrics.Meter
 }
 
 // NewBaseViewKeeper returns a new BaseViewKeeper.
@@ -96,7 +99,10 @@ func NewBaseViewKeeper(cdc codec.BinaryCodec, storeService store.KVStoreService,
 
 // HasBalance returns whether or not an account has at least amt balance.
 func (k BaseViewKeeper) HasBalance(ctx context.Context, addr sdk.AccAddress, amt sdk.Coin) bool {
-	return k.GetBalance(ctx, addr, amt.Denom).IsGTE(amt)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "HasBalance")()
+
+	return k.GetBalance(sdkCtx, addr, amt.Denom).IsGTE(amt)
 }
 
 // Logger returns a module-specific logger.
@@ -106,8 +112,11 @@ func (k BaseViewKeeper) Logger() log.Logger {
 
 // GetAllBalances returns all the account balances for the given account address.
 func (k BaseViewKeeper) GetAllBalances(ctx context.Context, addr sdk.AccAddress) sdk.Coins {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetAllBalances")()
+
 	balances := sdk.NewCoins()
-	k.IterateAccountBalances(ctx, addr, func(balance sdk.Coin) bool {
+	k.IterateAccountBalances(sdkCtx, addr, func(balance sdk.Coin) bool {
 		balances = balances.Add(balance)
 		return false
 	})
@@ -117,10 +126,13 @@ func (k BaseViewKeeper) GetAllBalances(ctx context.Context, addr sdk.AccAddress)
 
 // GetAccountsBalances returns all the accounts balances from the store.
 func (k BaseViewKeeper) GetAccountsBalances(ctx context.Context) []types.Balance {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetAccountsBalances")()
+
 	balances := make([]types.Balance, 0)
 	mapAddressToBalancesIdx := make(map[string]int)
 
-	k.IterateAllBalances(ctx, func(addr sdk.AccAddress, balance sdk.Coin) bool {
+	k.IterateAllBalances(sdkCtx, func(addr sdk.AccAddress, balance sdk.Coin) bool {
 		idx, ok := mapAddressToBalancesIdx[addr.String()]
 		if ok {
 			// address is already on the set of accounts balances
@@ -144,7 +156,10 @@ func (k BaseViewKeeper) GetAccountsBalances(ctx context.Context) []types.Balance
 // GetBalance returns the balance of a specific denomination for a given account
 // by address.
 func (k BaseViewKeeper) GetBalance(ctx context.Context, addr sdk.AccAddress, denom string) sdk.Coin {
-	amt, err := k.Balances.Get(ctx, collections.Join(addr, denom))
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetBalance")()
+
+	amt, err := k.Balances.Get(sdkCtx, collections.Join(addr, denom))
 	if err != nil {
 		return sdk.NewCoin(denom, math.ZeroInt())
 	}
@@ -155,7 +170,11 @@ func (k BaseViewKeeper) GetBalance(ctx context.Context, addr sdk.AccAddress, den
 // provides the token balance to a callback. If true is returned from the
 // callback, iteration is halted.
 func (k BaseViewKeeper) IterateAccountBalances(ctx context.Context, addr sdk.AccAddress, cb func(sdk.Coin) bool) {
-	err := k.Balances.Walk(ctx, collections.NewPrefixedPairRange[sdk.AccAddress, string](addr), func(key collections.Pair[sdk.AccAddress, string], value math.Int) (stop bool, err error) {
+	var err error
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IterateAccountBalances")(&err)
+
+	err = k.Balances.Walk(sdkCtx, collections.NewPrefixedPairRange[sdk.AccAddress, string](addr), func(key collections.Pair[sdk.AccAddress, string], value math.Int) (stop bool, err error) {
 		return cb(sdk.NewCoin(key.K2(), value)), nil
 	})
 	if err != nil {
@@ -167,7 +186,11 @@ func (k BaseViewKeeper) IterateAccountBalances(ctx context.Context, addr sdk.Acc
 // denominations that are provided to a callback. If true is returned from the
 // callback, iteration is halted.
 func (k BaseViewKeeper) IterateAllBalances(ctx context.Context, cb func(sdk.AccAddress, sdk.Coin) bool) {
-	err := k.Balances.Walk(ctx, nil, func(key collections.Pair[sdk.AccAddress, string], value math.Int) (stop bool, err error) {
+	var err error
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IterateAllBalances")(&err)
+
+	err = k.Balances.Walk(sdkCtx, nil, func(key collections.Pair[sdk.AccAddress, string], value math.Int) (stop bool, err error) {
 		return cb(key.K1(), sdk.NewCoin(key.K2(), value)), nil
 	})
 	if err != nil {
@@ -180,11 +203,13 @@ func (k BaseViewKeeper) IterateAllBalances(ctx context.Context, cb func(sdk.AccA
 // For vesting accounts, LockedCoins is delegated to the concrete vesting account
 // type.
 func (k BaseViewKeeper) LockedCoins(ctx context.Context, addr sdk.AccAddress) sdk.Coins {
-	acc := k.ak.GetAccount(ctx, addr)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "LockedCoins")()
+
+	acc := k.ak.GetAccount(sdkCtx, addr)
 	if acc != nil {
 		vacc, ok := acc.(types.VestingAccount)
 		if ok {
-			sdkCtx := sdk.UnwrapSDKContext(ctx)
 			return vacc.LockedCoins(sdkCtx.BlockTime())
 		}
 	}
@@ -196,7 +221,10 @@ func (k BaseViewKeeper) LockedCoins(ctx context.Context, addr sdk.AccAddress) sd
 // by address. If the account has no spendable coins, an empty Coins slice is
 // returned.
 func (k BaseViewKeeper) SpendableCoins(ctx context.Context, addr sdk.AccAddress) sdk.Coins {
-	spendable, _ := k.spendableCoins(ctx, addr)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SpendableCoins")()
+
+	spendable, _ := k.spendableCoins(sdkCtx, addr)
 	return spendable
 }
 
@@ -204,16 +232,22 @@ func (k BaseViewKeeper) SpendableCoins(ctx context.Context, addr sdk.AccAddress)
 // for an account by address. If the account has no spendable coin, a zero Coin
 // is returned.
 func (k BaseViewKeeper) SpendableCoin(ctx context.Context, addr sdk.AccAddress, denom string) sdk.Coin {
-	balance := k.GetBalance(ctx, addr, denom)
-	locked := k.LockedCoins(ctx, addr)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SpendableCoin")()
+
+	balance := k.GetBalance(sdkCtx, addr, denom)
+	locked := k.LockedCoins(sdkCtx, addr)
 	return balance.SubAmount(locked.AmountOf(denom))
 }
 
 // spendableCoins returns the coins the given address can spend alongside the total amount of coins it holds.
 // It exists for gas efficiency, in order to avoid to have to get balance multiple times.
 func (k BaseViewKeeper) spendableCoins(ctx context.Context, addr sdk.AccAddress) (spendable, total sdk.Coins) {
-	total = k.GetAllBalances(ctx, addr)
-	locked := k.LockedCoins(ctx, addr)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "spendableCoins")()
+
+	total = k.GetAllBalances(sdkCtx, addr)
+	locked := k.LockedCoins(sdkCtx, addr)
 
 	spendable, hasNeg := total.SafeSub(locked...)
 	if hasNeg {
@@ -231,13 +265,16 @@ func (k BaseViewKeeper) spendableCoins(ctx context.Context, addr sdk.AccAddress)
 // CONTRACT: ValidateBalance should only be called upon genesis state. In the
 // case of vesting accounts, balances may change in a valid manner that would
 // otherwise yield an error from this call.
-func (k BaseViewKeeper) ValidateBalance(ctx context.Context, addr sdk.AccAddress) error {
-	acc := k.ak.GetAccount(ctx, addr)
+func (k BaseViewKeeper) ValidateBalance(ctx context.Context, addr sdk.AccAddress) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "ValidateBalance")(&err)
+
+	acc := k.ak.GetAccount(sdkCtx, addr)
 	if acc == nil {
 		return errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "account %s does not exist", addr)
 	}
 
-	balances := k.GetAllBalances(ctx, addr)
+	balances := k.GetAllBalances(sdkCtx, addr)
 	if !balances.IsValid() {
 		return fmt.Errorf("account balance of %s is invalid", balances)
 	}
@@ -251,4 +288,12 @@ func (k BaseViewKeeper) ValidateBalance(ctx context.Context, addr sdk.AccAddress
 	}
 
 	return nil
+}
+
+func (k *BaseViewKeeper) Meter(ctx context.Context) metrics.Meter {
+	if k.meter == nil {
+		k.meter = sdk.UnwrapSDKContext(ctx).Meter().SubMeter(types.ModuleName, metrics.Tag("svc", types.ModuleName))
+	}
+
+	return k.meter
 }
