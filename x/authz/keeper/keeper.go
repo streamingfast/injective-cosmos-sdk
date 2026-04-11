@@ -3,6 +3,7 @@ package keeper
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"time"
@@ -271,7 +272,7 @@ func (k Keeper) DeleteGrant(ctx context.Context, grantee, granter sdk.AccAddress
 	skey := grantStoreKey(grantee, granter, msgType)
 	grant, found := k.getGrant(sdkCtx, skey)
 	if !found {
-		return errorsmod.Wrapf(authz.ErrNoAuthorizationFound, "failed to delete grant with key %s", string(skey))
+		return errorsmod.Wrapf(authz.ErrNoAuthorizationFound, "failed to delete grant with key %s", hex.EncodeToString(skey))
 	}
 
 	if grant.Expiration != nil {
