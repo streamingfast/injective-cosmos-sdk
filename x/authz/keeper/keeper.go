@@ -559,7 +559,9 @@ func (k Keeper) getGrantersOfGranteeForMsgType(c context.Context, grantee sdk.Ac
 
 // OnEnforcedRestrictionRemoveAuthorizations removes bank send authorization issued by userAddr as granter,
 // and to userAddr as a grantee. To be used in callbacks for handling blacklisting by permissions module.
-func (k Keeper) OnEnforcedRestrictionRemoveAuthorizations(ctx sdk.Context, userAddr sdk.AccAddress) error {
+func (k Keeper) OnEnforcedRestrictionRemoveAuthorizations(ctx sdk.Context, userAddr sdk.AccAddress) (err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "OnEnforcedRestrictionRemoveAuthorizations")(&err)
+
 	msgTypeURL := banktypes.SendAuthorization{}.MsgTypeURL()
 
 	// delete user as granter authorization
