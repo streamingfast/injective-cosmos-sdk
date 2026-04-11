@@ -22,6 +22,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/authz"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
 	"github.com/InjectiveLabs/metrics/v2"
 )
@@ -32,12 +33,13 @@ import (
 const gasCostPerIteration = uint64(20)
 
 type Keeper struct {
-	storeService corestoretypes.KVStoreService
-	cdc          codec.Codec
-	router       baseapp.MessageRouter
-	authKeeper   authz.AccountKeeper
-	bankKeeper   authz.BankKeeper
-	meter        metrics.Meter
+	storeService      corestoretypes.KVStoreService
+	cdc               codec.Codec
+	router            baseapp.MessageRouter
+	authKeeper        authz.AccountKeeper
+	bankKeeper        authz.BankKeeper
+	permissionsKeeper authz.PermissionsKeeper
+	meter             metrics.Meter
 }
 
 // NewKeeper constructs a message authorization Keeper
@@ -55,6 +57,10 @@ func NewKeeper(storeService corestoretypes.KVStoreService, cdc codec.Codec, rout
 func (k Keeper) SetBankKeeper(bk authz.BankKeeper) Keeper {
 	k.bankKeeper = bk
 	return k
+}
+
+func (k *Keeper) SetPermissionsKeeper(pk authz.PermissionsKeeper) {
+	k.permissionsKeeper = pk
 }
 
 // Logger returns a module-specific logger.
@@ -231,6 +237,13 @@ func (k Keeper) SaveGrant(ctx context.Context, grantee, granter sdk.AccAddress, 
 		}
 	}
 
+	// store index
+	indexKey := grantsByGranteeAndMsgTypeAndGranterKey(grantee, msgType, granter)
+	err = store.Set(indexKey, []byte{})
+	if err != nil {
+		return err
+	}
+
 	bz, err := k.cdc.Marshal(&grant)
 	if err != nil {
 		return err
@@ -268,6 +281,12 @@ func (k Keeper) DeleteGrant(ctx context.Context, grantee, granter sdk.AccAddress
 		}
 	}
 
+	// delete index
+	indexKey := grantsByGranteeAndMsgTypeAndGranterKey(grantee, msgType, granter)
+	err = store.Delete(indexKey)
+	if err != nil {
+		return err
+	}
 	err = store.Delete(skey)
 	if err != nil {
 		return err
@@ -478,6 +497,91 @@ func (k Keeper) DequeueAndDeleteExpiredGrants(ctx context.Context) (err error) {
 			if err != nil {
 				return err
 			}
+			err = store.Delete(grantsByGranteeAndMsgTypeAndGranterKey(grantee, typeURL, granter))
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// getAllGranterAuthorizations Returns list of grantees that the granter have given msgType authorizations to.
+func (k Keeper) getAllGranterAuthorizations(c context.Context, granter sdk.AccAddress, msgType string) ([]sdk.AccAddress, error) {
+	ctx := sdk.UnwrapSDKContext(c)
+	store := k.storeService.OpenKVStore(ctx)
+
+	key := grantStorePrefix(granter)
+
+	iterator, err := store.Iterator(key, storetypes.PrefixEndBytes(key))
+	if err != nil {
+		return nil, err
+	}
+	defer iterator.Close()
+
+	var grantees []sdk.AccAddress
+
+	for ; iterator.Valid(); iterator.Next() {
+		_, grantee, authMsgType := parseGrantStoreKey(iterator.Key())
+
+		if authMsgType != msgType {
+			continue
+		}
+
+		grantees = append(grantees, grantee)
+	}
+
+	return grantees, nil
+}
+
+func (k Keeper) getGrantersOfGranteeForMsgType(c context.Context, grantee sdk.AccAddress, msgType string) ([]sdk.AccAddress, error) {
+	ctx := sdk.UnwrapSDKContext(c)
+	store := k.storeService.OpenKVStore(ctx)
+
+	key := grantsByGranteeAndMsgTypePrefix(grantee, msgType)
+
+	iterator, err := store.Iterator(key, storetypes.PrefixEndBytes(key))
+	if err != nil {
+		return nil, err
+	}
+	defer iterator.Close()
+
+	var granters []sdk.AccAddress
+
+	for ; iterator.Valid(); iterator.Next() {
+		_, _, granter := parseIndexByGranteeAndMsgTypeKey(iterator.Key())
+		granters = append(granters, granter)
+	}
+
+	return granters, nil
+}
+
+// OnEnforcedRestrictionRemoveAuthorizations removes bank send authorization issued by userAddr as granter,
+// and to userAddr as a grantee. To be used in callbacks for handling blacklisting by permissions module.
+func (k Keeper) OnEnforcedRestrictionRemoveAuthorizations(ctx sdk.Context, userAddr sdk.AccAddress) error {
+	msgTypeURL := banktypes.SendAuthorization{}.MsgTypeURL()
+
+	// delete user as granter authorization
+	grantees, err := k.getAllGranterAuthorizations(ctx, userAddr, msgTypeURL)
+	if err != nil {
+		return errorsmod.Wrapf(err, "can't get grantees for granter %s to remove authorizations", userAddr)
+	}
+	for _, grantee := range grantees {
+		if err := k.DeleteGrant(ctx, grantee, userAddr, msgTypeURL); err != nil {
+			return errorsmod.Wrap(err, "can't delete grant")
+		}
+	}
+
+	// delete user as grantee authorizations
+	granters, err := k.getGrantersOfGranteeForMsgType(ctx, userAddr, msgTypeURL)
+	if err != nil {
+		return errorsmod.Wrapf(err, "can't get granters for grantee %s to remove authorizations", userAddr)
+	}
+
+	for _, granter := range granters {
+		if err := k.DeleteGrant(ctx, userAddr, granter, msgTypeURL); err != nil {
+			return errorsmod.Wrap(err, "can't delete grant")
 		}
 	}
 

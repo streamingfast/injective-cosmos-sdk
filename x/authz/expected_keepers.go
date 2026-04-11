@@ -22,3 +22,8 @@ type BankKeeper interface {
 	IsSendEnabledCoins(ctx context.Context, coins ...sdk.Coin) error
 	BlockedAddr(addr sdk.AccAddress) bool
 }
+
+type PermissionsKeeper interface {
+	SendRestrictionFn(c context.Context, fromAddr, toAddr sdk.AccAddress, amount sdk.Coin) (newToAddr sdk.AccAddress, err error)
+	IsEnforcedRestrictionsDenom(ctx sdk.Context, denom string) bool
+}
