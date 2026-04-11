@@ -68,7 +68,5 @@
   - container/**/*
 "C:Store":
   - store/**/*
-"C:orm":
-  - orm/**/*
 "C:log":
   - log/*

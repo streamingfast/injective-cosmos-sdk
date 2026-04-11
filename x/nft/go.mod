@@ -1,6 +1,6 @@
 module cosmossdk.io/x/nft
 
-go 1.23.9
+go 1.26.2
 
 require (
 	cosmossdk.io/api v0.7.6
@@ -11,7 +11,7 @@ require (
 	cosmossdk.io/math v1.4.0
 	cosmossdk.io/store v1.1.1
 	github.com/InjectiveLabs/metrics/v2 v2.0.0-beta.8
-	github.com/cometbft/cometbft v0.38.12
+	github.com/cometbft/cometbft v1.0.1
 	github.com/cometbft/cometbft/api v1.0.0
 	github.com/cosmos/cosmos-proto v1.0.0-beta.5
 	github.com/cosmos/cosmos-sdk v0.50.6
@@ -188,6 +188,6 @@ replace (
 
 replace (
 	// Use CometBFT v1.0.1 with Mempool lanes and DOG
-	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.2-0.20260406101044-d1e31b5e53f6
-	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.1-0.20260406101044-d1e31b5e53f6
+	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.7
+	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.0-inj.3
 )

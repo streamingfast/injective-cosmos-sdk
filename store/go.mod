@@ -1,12 +1,12 @@
 module cosmossdk.io/store
 
-go 1.23.9
+go 1.26.2
 
 require (
 	cosmossdk.io/errors v1.0.0
 	cosmossdk.io/log v1.4.1
 	cosmossdk.io/math v1.4.0
-	github.com/cometbft/cometbft v0.38.12
+	github.com/cometbft/cometbft v1.0.1
 	github.com/cosmos/cosmos-db v1.0.2
 	github.com/cosmos/gogoproto v1.7.0
 	github.com/cosmos/iavl v1.2.6
@@ -78,6 +78,6 @@ require (
 
 replace (
 	// Use CometBFT v1.0.1 with Mempool lanes and DOG
-	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.2-0.20260406101044-d1e31b5e53f6
-	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.1-0.20260406101044-d1e31b5e53f6
+	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.7
+	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.0-inj.3
 )

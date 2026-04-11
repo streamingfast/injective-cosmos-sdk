@@ -1,4 +1,4 @@
-go 1.23.9
+go 1.26.2
 
 module github.com/cosmos/cosmos-sdk
 
@@ -19,7 +19,7 @@ require (
 	github.com/chzyer/readline v1.5.1
 	github.com/cockroachdb/apd/v2 v2.0.2
 	github.com/cockroachdb/errors v1.11.3
-	github.com/cometbft/cometbft v0.38.12
+	github.com/cometbft/cometbft v1.0.1
 	github.com/cometbft/cometbft/api v1.0.0
 	github.com/cosmos/btcutil v1.0.5
 	github.com/cosmos/cosmos-db v1.1.1
@@ -206,8 +206,8 @@ replace (
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
 
 	// Use CometBFT v1.0.1 with Mempool lanes and DOG
-	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.2-0.20260406101044-d1e31b5e53f6
-	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.1-0.20260406101044-d1e31b5e53f6
+	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.7
+	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.0-inj.3
 
 	// dgrijalva/jwt-go is deprecated and doesn't receive security updates.
 	// TODO: remove it: https://github.com/cosmos/cosmos-sdk/issues/13134

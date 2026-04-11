@@ -1,6 +1,6 @@
 module cosmossdk.io/simapp
 
-go 1.23.9
+go 1.26.2
 
 require (
 	cosmossdk.io/api v0.7.6
@@ -239,6 +239,6 @@ replace (
 
 replace (
 	// Use CometBFT v1.0.1 with Mempool lanes and DOG
-	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.2-0.20260406101044-d1e31b5e53f6
-	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.1-0.20260406101044-d1e31b5e53f6
+	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.7
+	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.0-inj.3
 )

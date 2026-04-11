@@ -256,8 +256,8 @@ type GenesisTarget = func(field string) (io.WriteCloser, error)
 
 All genesis objects for a given module are expected to conform to the semantics of a JSON object.
 Each field in the JSON object should be read and written separately to support streaming genesis.
-The [ORM](./adr-055-orm.md) and [collections](./adr-062-collections-state-layer.md) both support
-streaming genesis and modules using these frameworks generally do not need to write any manual
+The [collections](./adr-062-collections-state-layer.md) API supports
+streaming genesis and modules using it generally do not need to write any manual
 genesis code.
 
 To support genesis, modules should implement the `HasGenesis` extension interface:
@@ -422,14 +422,14 @@ Extension interface for CLI commands will be provided via the `cosmossdk.io/clie
 
 #### Example Usage
 
-Here is an example of setting up a hypothetical `foo` v2 module which uses the [ORM](./adr-055-orm.md) for its state
+Here is an example of setting up a hypothetical `foo` v2 module which uses the SDK store service for its state
 management and genesis.
 
 ```go
 
 type Keeper struct {
-	db orm.ModuleDB
-	evtSrv event.Service
+	storeService store.KVStoreService
+	evtSrv event.EventService
 }
 
 func (k Keeper) RegisterServices(r grpc.ServiceRegistrar) {
@@ -441,8 +441,8 @@ func (k Keeper) BeginBlock(context.Context) error {
 	return nil
 }
 
-func ProvideApp(config *foomodulev2.Module, evtSvc event.EventService, db orm.ModuleDB) (Keeper, appmodule.AppModule){
-    k := &Keeper{db: db, evtSvc: evtSvc}
+func ProvideApp(config *foomodulev2.Module, evtSvc event.EventService, storeService store.KVStoreService) (Keeper, appmodule.AppModule){
+    k := &Keeper{storeService: storeService, evtSrv: evtSvc}
     return k, k
 }
 ```
@@ -558,6 +558,5 @@ as by providing service implementations by wrapping `sdk.Context`.
 
 * [ADR 033: Protobuf-based Inter-Module Communication](./adr-033-protobuf-inter-module-comm.md)
 * [ADR 057: App Wiring](./adr-057-app-wiring-1.md)
-* [ADR 055: ORM](./adr-055-orm.md)
 * [ADR 028: Public Key Addresses](./adr-028-public-key-addresses.md)
 * [Keeping Your Modules Compatible](https://go.dev/blog/module-compatibility)

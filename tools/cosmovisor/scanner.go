@@ -112,8 +112,11 @@ func (fw *fileWatcher) CheckUpdate(currentUpgrade upgradetypes.Plan) bool {
 
 	info, err := parseUpgradeInfoFile(fw.filename)
 	if err != nil {
+		// The upgrade-info file may be observed mid-write. Treat parse errors as
+		// transient so the watcher can retry on the next poll instead of aborting
+		// the process.
 		zl := fw.logger.Impl().(*zerolog.Logger)
-		zl.Fatal().Err(err).Msg("failed to parse upgrade info file")
+		zl.Warn().Err(err).Msg("failed to parse upgrade info file")
 		return false
 	}
 
