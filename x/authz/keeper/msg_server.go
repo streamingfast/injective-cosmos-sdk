@@ -6,10 +6,12 @@ import (
 	"strings"
 
 	errorsmod "cosmossdk.io/errors"
+	"cosmossdk.io/math"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/authz"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 )
 
 var _ authz.MsgServer = Keeper{}
@@ -54,6 +56,18 @@ func (k Keeper) Grant(goCtx context.Context, msg *authz.MsgGrant) (*authz.MsgGra
 	t := authorization.MsgTypeURL()
 	if k.router.HandlerByTypeURL(t) == nil {
 		return nil, sdkerrors.ErrInvalidType.Wrapf("%s doesn't exist.", t)
+	}
+
+	// check if granter or grantee are blacklisted for enforced restrictions denoms
+	if sendAuth, ok := authorization.(*banktypes.SendAuthorization); k.permissionsKeeper != nil && ok {
+		for _, denom := range sendAuth.SpendLimit.Denoms() {
+			if k.permissionsKeeper.IsEnforcedRestrictionsDenom(ctx, denom) {
+				fakeAmount := sdk.NewCoin(denom, math.ZeroInt())
+				if _, err := k.permissionsKeeper.SendRestrictionFn(ctx, granter, grantee, fakeAmount); err != nil {
+					return nil, sdkerrors.ErrUnauthorized.Wrapf("permissions check failed for enforced denom %s: %s", denom, err.Error())
+				}
+			}
+		}
 	}
 
 	err = k.SaveGrant(ctx, grantee, granter, authorization, msg.Grant.Expiration)
