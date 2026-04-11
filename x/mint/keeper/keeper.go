@@ -76,33 +76,33 @@ func (k Keeper) GetAuthority() string {
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx context.Context) log.Logger {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Logger")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Logger")()
 	return sdkCtx.Logger().With("module", "x/"+types.ModuleName)
 }
 
 // StakingTokenSupply implements an alias call to the underlying staking keeper's
 // StakingTokenSupply to be used in BeginBlocker.
-func (k Keeper) StakingTokenSupply(ctx context.Context) (math.Int, error) {
+func (k Keeper) StakingTokenSupply(ctx context.Context) (meterResult math.Int, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "StakingTokenSupply")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "StakingTokenSupply")(&err)
 
 	return k.stakingKeeper.StakingTokenSupply(sdkCtx)
 }
 
 // BondedRatio implements an alias call to the underlying staking keeper's
 // BondedRatio to be used in BeginBlocker.
-func (k Keeper) BondedRatio(ctx context.Context) (math.LegacyDec, error) {
+func (k Keeper) BondedRatio(ctx context.Context) (meterResult math.LegacyDec, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "BondedRatio")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "BondedRatio")(&err)
 
 	return k.stakingKeeper.BondedRatio(sdkCtx)
 }
 
 // MintCoins implements an alias call to the underlying supply keeper's
 // MintCoins to be used in BeginBlocker.
-func (k Keeper) MintCoins(ctx context.Context, newCoins sdk.Coins) error {
+func (k Keeper) MintCoins(ctx context.Context, newCoins sdk.Coins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "MintCoins")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "MintCoins")(&err)
 
 	if newCoins.Empty() {
 		// skip as no coins need to be minted
@@ -114,9 +114,9 @@ func (k Keeper) MintCoins(ctx context.Context, newCoins sdk.Coins) error {
 
 // AddCollectedFees implements an alias call to the underlying supply keeper's
 // AddCollectedFees to be used in BeginBlocker.
-func (k Keeper) AddCollectedFees(ctx context.Context, fees sdk.Coins) error {
+func (k Keeper) AddCollectedFees(ctx context.Context, fees sdk.Coins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AddCollectedFees")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "AddCollectedFees")(&err)
 
 	return k.bankKeeper.SendCoinsFromModuleToModule(sdkCtx, types.ModuleName, k.feeCollectorName, fees)
 }

@@ -14,9 +14,9 @@ import (
 var _ nft.MsgServer = Keeper{}
 
 // Send implements Send method of the types.MsgServer.
-func (k Keeper) Send(goCtx context.Context, msg *nft.MsgSend) (*nft.MsgSendResponse, error) {
+func (k Keeper) Send(goCtx context.Context, msg *nft.MsgSend) (meterResult *nft.MsgSendResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Send")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "Send")(&err)
 
 	if len(msg.ClassId) == 0 {
 		return nil, nft.ErrEmptyClassID
@@ -41,7 +41,7 @@ func (k Keeper) Send(goCtx context.Context, msg *nft.MsgSend) (*nft.MsgSendRespo
 		return nil, errorsmod.Wrapf(sdkerrors.ErrUnauthorized, "%s is not the owner of nft %s", msg.Sender, msg.Id)
 	}
 
-	if err := k.Transfer(sdkCtx, msg.ClassId, msg.Id, receiver); err != nil {
+	if err = k.Transfer(sdkCtx, msg.ClassId, msg.Id, receiver); err != nil {
 		return nil, err
 	}
 

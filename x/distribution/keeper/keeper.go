@@ -75,15 +75,15 @@ func (k Keeper) GetAuthority() string {
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx context.Context) log.Logger {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Logger")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Logger")()
 
 	return sdkCtx.Logger().With(log.ModuleKey, "x/"+types.ModuleName)
 }
 
 // SetWithdrawAddr sets a new address that will receive the rewards upon withdrawal
-func (k Keeper) SetWithdrawAddr(ctx context.Context, delegatorAddr, withdrawAddr sdk.AccAddress) error {
+func (k Keeper) SetWithdrawAddr(ctx context.Context, delegatorAddr, withdrawAddr sdk.AccAddress) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetWithdrawAddr")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetWithdrawAddr")(&err)
 
 	if k.bankKeeper.BlockedAddr(withdrawAddr) {
 		return errorsmod.Wrapf(sdkerrors.ErrUnauthorized, "%s is not allowed to receive external funds", withdrawAddr)
@@ -110,9 +110,9 @@ func (k Keeper) SetWithdrawAddr(ctx context.Context, delegatorAddr, withdrawAddr
 }
 
 // withdraw rewards from a delegation
-func (k Keeper) WithdrawDelegationRewards(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (sdk.Coins, error) {
+func (k Keeper) WithdrawDelegationRewards(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (meterResult sdk.Coins, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "WithdrawDelegationRewards")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "WithdrawDelegationRewards")(&err)
 
 	val, err := k.stakingKeeper.Validator(sdkCtx, valAddr)
 	if err != nil {
@@ -147,9 +147,9 @@ func (k Keeper) WithdrawDelegationRewards(ctx context.Context, delAddr sdk.AccAd
 }
 
 // withdraw validator commission
-func (k Keeper) WithdrawValidatorCommission(ctx context.Context, valAddr sdk.ValAddress) (sdk.Coins, error) {
+func (k Keeper) WithdrawValidatorCommission(ctx context.Context, valAddr sdk.ValAddress) (meterResult sdk.Coins, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "WithdrawValidatorCommission")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "WithdrawValidatorCommission")(&err)
 
 	// fetch validator accumulated commission
 	accumCommission, err := k.GetValidatorAccumulatedCommission(sdkCtx, valAddr)
@@ -201,7 +201,7 @@ func (k Keeper) WithdrawValidatorCommission(ctx context.Context, valAddr sdk.Val
 // GetTotalRewards returns the total amount of fee distribution rewards held in the store
 func (k Keeper) GetTotalRewards(ctx context.Context) (totalRewards sdk.DecCoins) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetTotalRewards")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetTotalRewards")()
 
 	k.IterateValidatorOutstandingRewards(sdkCtx,
 		func(_ sdk.ValAddress, rewards types.ValidatorOutstandingRewards) (stop bool) {
@@ -217,11 +217,11 @@ func (k Keeper) GetTotalRewards(ctx context.Context) (totalRewards sdk.DecCoins)
 // The amount is first added to the distribution module account and then directly
 // added to the pool. An error is returned if the amount cannot be sent to the
 // module account.
-func (k Keeper) FundCommunityPool(ctx context.Context, amount sdk.Coins, sender sdk.AccAddress) error {
+func (k Keeper) FundCommunityPool(ctx context.Context, amount sdk.Coins, sender sdk.AccAddress) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "FundCommunityPool")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "FundCommunityPool")(&err)
 
-	if err := k.bankKeeper.SendCoinsFromAccountToModule(sdkCtx, sender, types.ModuleName, amount); err != nil {
+	if err = k.bankKeeper.SendCoinsFromAccountToModule(sdkCtx, sender, types.ModuleName, amount); err != nil {
 		return err
 	}
 

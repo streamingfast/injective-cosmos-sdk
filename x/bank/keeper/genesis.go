@@ -13,10 +13,11 @@ import (
 
 // InitGenesis initializes the bank module's state from a given genesis state.
 func (k BaseKeeper) InitGenesis(ctx context.Context, genState *types.GenesisState) {
+	var err error
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "InitGenesis")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "InitGenesis")(&err)
 
-	if err := k.SetParams(sdkCtx, genState.Params); err != nil {
+	if err = k.SetParams(sdkCtx, genState.Params); err != nil {
 		panic(err)
 	}
 
@@ -35,7 +36,7 @@ func (k BaseKeeper) InitGenesis(ctx context.Context, genState *types.GenesisStat
 		}
 
 		for _, coin := range balance.Coins {
-			err := k.Balances.Set(sdkCtx, collections.Join(sdk.AccAddress(bz), coin.Denom), coin.Amount)
+			err = k.Balances.Set(sdkCtx, collections.Join(sdk.AccAddress(bz), coin.Denom), coin.Amount)
 			if err != nil {
 				panic(err)
 			}
@@ -46,7 +47,8 @@ func (k BaseKeeper) InitGenesis(ctx context.Context, genState *types.GenesisStat
 	totalSupply := totalSupplyMap.ToCoins()
 
 	if !genState.Supply.Empty() && !genState.Supply.Equal(totalSupply) {
-		panic(fmt.Errorf("genesis supply is incorrect, expected %v, got %v", genState.Supply, totalSupply))
+		err = fmt.Errorf("genesis supply is incorrect, expected %v, got %v", genState.Supply, totalSupply)
+		panic(err)
 	}
 
 	for _, supply := range totalSupply {
@@ -60,12 +62,14 @@ func (k BaseKeeper) InitGenesis(ctx context.Context, genState *types.GenesisStat
 
 // ExportGenesis returns the bank module's genesis state.
 func (k BaseKeeper) ExportGenesis(ctx context.Context) *types.GenesisState {
+	var err error
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "ExportGenesis")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "ExportGenesis")(&err)
 
 	totalSupply, _, err := k.GetPaginatedTotalSupply(sdkCtx, &query.PageRequest{Limit: query.PaginationMaxLimit})
 	if err != nil {
-		panic(fmt.Errorf("unable to fetch total supply %v", err))
+		err = fmt.Errorf("unable to fetch total supply %v", err)
+		panic(err)
 	}
 
 	rv := types.NewGenesisState(

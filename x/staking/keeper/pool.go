@@ -12,7 +12,7 @@ import (
 // GetBondedPool returns the bonded tokens pool's module account
 func (k Keeper) GetBondedPool(ctx context.Context) (bondedPool sdk.ModuleAccountI) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetBondedPool")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetBondedPool")()
 
 	return k.authKeeper.GetModuleAccount(sdkCtx, types.BondedPoolName)
 }
@@ -20,15 +20,15 @@ func (k Keeper) GetBondedPool(ctx context.Context) (bondedPool sdk.ModuleAccount
 // GetNotBondedPool returns the not bonded tokens pool's module account
 func (k Keeper) GetNotBondedPool(ctx context.Context) (notBondedPool sdk.ModuleAccountI) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetNotBondedPool")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetNotBondedPool")()
 
 	return k.authKeeper.GetModuleAccount(sdkCtx, types.NotBondedPoolName)
 }
 
 // bondedTokensToNotBonded transfers coins from the bonded to the not bonded pool within staking
-func (k Keeper) bondedTokensToNotBonded(ctx context.Context, tokens math.Int) error {
+func (k Keeper) bondedTokensToNotBonded(ctx context.Context, tokens math.Int) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "bondedTokensToNotBonded")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "bondedTokensToNotBonded")(&err)
 
 	bondDenom, err := k.BondDenom(sdkCtx)
 	if err != nil {
@@ -40,9 +40,9 @@ func (k Keeper) bondedTokensToNotBonded(ctx context.Context, tokens math.Int) er
 }
 
 // notBondedTokensToBonded transfers coins from the not bonded to the bonded pool within staking
-func (k Keeper) notBondedTokensToBonded(ctx context.Context, tokens math.Int) error {
+func (k Keeper) notBondedTokensToBonded(ctx context.Context, tokens math.Int) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "notBondedTokensToBonded")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "notBondedTokensToBonded")(&err)
 
 	bondDenom, err := k.BondDenom(sdkCtx)
 	if err != nil {
@@ -54,9 +54,9 @@ func (k Keeper) notBondedTokensToBonded(ctx context.Context, tokens math.Int) er
 }
 
 // burnBondedTokens burns coins from the bonded pool module account
-func (k Keeper) burnBondedTokens(ctx context.Context, amt math.Int) error {
+func (k Keeper) burnBondedTokens(ctx context.Context, amt math.Int) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "burnBondedTokens")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "burnBondedTokens")(&err)
 
 	if !amt.IsPositive() {
 		// skip as no coins need to be burned
@@ -74,9 +74,9 @@ func (k Keeper) burnBondedTokens(ctx context.Context, amt math.Int) error {
 }
 
 // burnNotBondedTokens burns coins from the not bonded pool module account
-func (k Keeper) burnNotBondedTokens(ctx context.Context, amt math.Int) error {
+func (k Keeper) burnNotBondedTokens(ctx context.Context, amt math.Int) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "burnNotBondedTokens")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "burnNotBondedTokens")(&err)
 
 	if !amt.IsPositive() {
 		// skip as no coins need to be burned
@@ -94,9 +94,9 @@ func (k Keeper) burnNotBondedTokens(ctx context.Context, amt math.Int) error {
 }
 
 // TotalBondedTokens total staking tokens supply which is bonded
-func (k Keeper) TotalBondedTokens(ctx context.Context) (math.Int, error) {
+func (k Keeper) TotalBondedTokens(ctx context.Context) (meterResult math.Int, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "TotalBondedTokens")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "TotalBondedTokens")(&err)
 
 	bondedPool := k.GetBondedPool(sdkCtx)
 	bondDenom, err := k.BondDenom(sdkCtx)
@@ -107,9 +107,9 @@ func (k Keeper) TotalBondedTokens(ctx context.Context) (math.Int, error) {
 }
 
 // StakingTokenSupply staking tokens from the total supply
-func (k Keeper) StakingTokenSupply(ctx context.Context) (math.Int, error) {
+func (k Keeper) StakingTokenSupply(ctx context.Context) (meterResult math.Int, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "StakingTokenSupply")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "StakingTokenSupply")(&err)
 
 	bondDenom, err := k.BondDenom(sdkCtx)
 	if err != nil {
@@ -119,9 +119,9 @@ func (k Keeper) StakingTokenSupply(ctx context.Context) (math.Int, error) {
 }
 
 // BondedRatio the fraction of the staking tokens which are currently bonded
-func (k Keeper) BondedRatio(ctx context.Context) (math.LegacyDec, error) {
+func (k Keeper) BondedRatio(ctx context.Context) (meterResult math.LegacyDec, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "BondedRatio")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "BondedRatio")(&err)
 
 	stakeSupply, err := k.StakingTokenSupply(sdkCtx)
 	if err != nil {

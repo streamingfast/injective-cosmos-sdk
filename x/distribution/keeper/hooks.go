@@ -23,9 +23,9 @@ func (k Keeper) Hooks() Hooks {
 }
 
 // initialize validator distribution record
-func (h Hooks) AfterValidatorCreated(ctx context.Context, valAddr sdk.ValAddress) error {
+func (h Hooks) AfterValidatorCreated(ctx context.Context, valAddr sdk.ValAddress) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer h.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AfterValidatorCreated")()
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "AfterValidatorCreated")(&err)
 
 	val, err := h.k.stakingKeeper.Validator(sdkCtx, valAddr)
 	if err != nil {
@@ -35,9 +35,9 @@ func (h Hooks) AfterValidatorCreated(ctx context.Context, valAddr sdk.ValAddress
 }
 
 // AfterValidatorRemoved performs clean up after a validator is removed
-func (h Hooks) AfterValidatorRemoved(ctx context.Context, _ sdk.ConsAddress, valAddr sdk.ValAddress) error {
+func (h Hooks) AfterValidatorRemoved(ctx context.Context, _ sdk.ConsAddress, valAddr sdk.ValAddress) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer h.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AfterValidatorRemoved")()
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "AfterValidatorRemoved")(&err)
 
 	// fetch outstanding
 	outstanding, err := h.k.GetValidatorOutstandingRewardsCoins(sdkCtx, valAddr)
@@ -80,7 +80,7 @@ func (h Hooks) AfterValidatorRemoved(ctx context.Context, _ sdk.ConsAddress, val
 				return err
 			}
 
-			if err := h.k.bankKeeper.SendCoinsFromModuleToAccount(sdkCtx, types.ModuleName, withdrawAddr, coins); err != nil {
+			if err = h.k.bankKeeper.SendCoinsFromModuleToAccount(sdkCtx, types.ModuleName, withdrawAddr, coins); err != nil {
 				return err
 			}
 		}
@@ -128,9 +128,9 @@ func (h Hooks) AfterValidatorRemoved(ctx context.Context, _ sdk.ConsAddress, val
 }
 
 // increment period
-func (h Hooks) BeforeDelegationCreated(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) error {
+func (h Hooks) BeforeDelegationCreated(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer h.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "BeforeDelegationCreated")()
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "BeforeDelegationCreated")(&err)
 
 	val, err := h.k.stakingKeeper.Validator(sdkCtx, valAddr)
 	if err != nil {
@@ -142,9 +142,9 @@ func (h Hooks) BeforeDelegationCreated(ctx context.Context, delAddr sdk.AccAddre
 }
 
 // withdraw delegation rewards (which also increments period)
-func (h Hooks) BeforeDelegationSharesModified(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) error {
+func (h Hooks) BeforeDelegationSharesModified(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer h.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "BeforeDelegationSharesModified")()
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "BeforeDelegationSharesModified")(&err)
 
 	val, err := h.k.stakingKeeper.Validator(sdkCtx, valAddr)
 	if err != nil {
@@ -164,17 +164,17 @@ func (h Hooks) BeforeDelegationSharesModified(ctx context.Context, delAddr sdk.A
 }
 
 // create new delegation period record
-func (h Hooks) AfterDelegationModified(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) error {
+func (h Hooks) AfterDelegationModified(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer h.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AfterDelegationModified")()
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "AfterDelegationModified")(&err)
 
 	return h.k.initializeDelegation(sdkCtx, valAddr, delAddr)
 }
 
 // record the slash event
-func (h Hooks) BeforeValidatorSlashed(ctx context.Context, valAddr sdk.ValAddress, fraction sdkmath.LegacyDec) error {
+func (h Hooks) BeforeValidatorSlashed(ctx context.Context, valAddr sdk.ValAddress, fraction sdkmath.LegacyDec) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer h.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "BeforeValidatorSlashed")()
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "BeforeValidatorSlashed")(&err)
 
 	return h.k.updateValidatorSlashFraction(sdkCtx, valAddr, fraction)
 }

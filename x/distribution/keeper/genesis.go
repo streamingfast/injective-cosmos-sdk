@@ -9,16 +9,17 @@ import (
 
 // InitGenesis sets distribution information for genesis
 func (k Keeper) InitGenesis(ctx sdk.Context, data types.GenesisState) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "InitGenesis")()
+	var err error
+	defer k.Meter(ctx).FuncTiming(&ctx, "InitGenesis")(&err)
 
 	var moduleHoldings sdk.DecCoins
 
-	err := k.FeePool.Set(ctx, data.FeePool)
+	err = k.FeePool.Set(ctx, data.FeePool)
 	if err != nil {
 		panic(err)
 	}
 
-	if err := k.Params.Set(ctx, data.Params); err != nil {
+	if err = k.Params.Set(ctx, data.Params); err != nil {
 		panic(err)
 	}
 
@@ -39,7 +40,6 @@ func (k Keeper) InitGenesis(ctx sdk.Context, data types.GenesisState) {
 
 	var previousProposer sdk.ConsAddress
 	if data.PreviousProposer != "" {
-		var err error
 		previousProposer, err = k.stakingKeeper.ConsensusAddressCodec().StringToBytes(data.PreviousProposer)
 		if err != nil {
 			panic(err)
@@ -137,7 +137,8 @@ func (k Keeper) InitGenesis(ctx sdk.Context, data types.GenesisState) {
 
 // ExportGenesis returns a GenesisState for a given context and keeper.
 func (k Keeper) ExportGenesis(ctx sdk.Context) *types.GenesisState {
-	defer k.Meter(ctx).FuncTiming(&ctx, "ExportGenesis")()
+	var err error
+	defer k.Meter(ctx).FuncTiming(&ctx, "ExportGenesis")(&err)
 
 	feePool, err := k.FeePool.Get(ctx)
 	if err != nil {

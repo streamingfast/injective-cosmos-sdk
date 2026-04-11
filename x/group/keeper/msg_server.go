@@ -26,25 +26,25 @@ var _ group.MsgServer = Keeper{}
 // Tracking issues https://github.com/cosmos/cosmos-sdk/issues/9054, https://github.com/cosmos/cosmos-sdk/discussions/9072
 const gasCostPerIteration = uint64(20)
 
-func (k Keeper) CreateGroup(goCtx context.Context, msg *group.MsgCreateGroup) (*group.MsgCreateGroupResponse, error) {
+func (k Keeper) CreateGroup(goCtx context.Context, msg *group.MsgCreateGroup) (meterResult *group.MsgCreateGroupResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "CreateGroup")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "CreateGroup")(&err)
 
 	if _, err := k.accKeeper.AddressCodec().StringToBytes(msg.Admin); err != nil {
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid admin address: %s", msg.Admin)
 	}
 
-	if err := k.validateMembers(msg.Members); err != nil {
+	if err = k.validateMembers(msg.Members); err != nil {
 		return nil, errorsmod.Wrap(err, "members")
 	}
 
-	if err := k.assertMetadataLength(msg.Metadata, "group metadata"); err != nil {
+	if err = k.assertMetadataLength(msg.Metadata, "group metadata"); err != nil {
 		return nil, err
 	}
 
 	totalWeight := math.NewDecFromInt64(0)
 	for _, m := range msg.Members {
-		if err := k.assertMetadataLength(m.Metadata, "member metadata"); err != nil {
+		if err = k.assertMetadataLength(m.Metadata, "member metadata"); err != nil {
 			return nil, err
 		}
 
@@ -80,7 +80,7 @@ func (k Keeper) CreateGroup(goCtx context.Context, msg *group.MsgCreateGroup) (*
 
 	// Create new group members in the groupMemberTable.
 	for i, m := range msg.Members {
-		err := k.groupMemberTable.Create(sdkCtx.KVStore(k.key), &group.GroupMember{
+		err = k.groupMemberTable.Create(sdkCtx.KVStore(k.key), &group.GroupMember{
 			GroupId: groupID,
 			Member: &group.Member{
 				Address:  m.Address,
@@ -94,16 +94,16 @@ func (k Keeper) CreateGroup(goCtx context.Context, msg *group.MsgCreateGroup) (*
 		}
 	}
 
-	if err := sdkCtx.EventManager().EmitTypedEvent(&group.EventCreateGroup{GroupId: groupID}); err != nil {
+	if err = sdkCtx.EventManager().EmitTypedEvent(&group.EventCreateGroup{GroupId: groupID}); err != nil {
 		return nil, err
 	}
 
 	return &group.MsgCreateGroupResponse{GroupId: groupID}, nil
 }
 
-func (k Keeper) UpdateGroupMembers(goCtx context.Context, msg *group.MsgUpdateGroupMembers) (*group.MsgUpdateGroupMembersResponse, error) {
+func (k Keeper) UpdateGroupMembers(goCtx context.Context, msg *group.MsgUpdateGroupMembers) (meterResult *group.MsgUpdateGroupMembersResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UpdateGroupMembers")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "UpdateGroupMembers")(&err)
 
 	if msg.GroupId == 0 {
 		return nil, errorsmod.Wrap(errors.ErrEmpty, "group id")
@@ -113,7 +113,7 @@ func (k Keeper) UpdateGroupMembers(goCtx context.Context, msg *group.MsgUpdateGr
 		return nil, errorsmod.Wrap(errors.ErrEmpty, "member updates")
 	}
 
-	if err := k.validateMembers(msg.MemberUpdates); err != nil {
+	if err = k.validateMembers(msg.MemberUpdates); err != nil {
 		return nil, errorsmod.Wrap(err, "members")
 	}
 
@@ -124,7 +124,7 @@ func (k Keeper) UpdateGroupMembers(goCtx context.Context, msg *group.MsgUpdateGr
 		}
 
 		for _, member := range msg.MemberUpdates {
-			if err := k.assertMetadataLength(member.Metadata, "group member metadata"); err != nil {
+			if err = k.assertMetadataLength(member.Metadata, "group member metadata"); err != nil {
 				return err
 			}
 			groupMember := group.GroupMember{
@@ -139,7 +139,7 @@ func (k Keeper) UpdateGroupMembers(goCtx context.Context, msg *group.MsgUpdateGr
 			// Checking if the group member is already part of the group
 			var found bool
 			var prevGroupMember group.GroupMember
-			switch err := k.groupMemberTable.GetOne(sdkCtx.KVStore(k.key), orm.PrimaryKey(&groupMember), &prevGroupMember); {
+			switch err = k.groupMemberTable.GetOne(sdkCtx.KVStore(k.key), orm.PrimaryKey(&groupMember), &prevGroupMember); {
 			case err == nil:
 				found = true
 			case sdkerrors.ErrNotFound.Is(err):
@@ -172,7 +172,7 @@ func (k Keeper) UpdateGroupMembers(goCtx context.Context, msg *group.MsgUpdateGr
 				}
 
 				// Delete group member in the groupMemberTable.
-				if err := k.groupMemberTable.Delete(sdkCtx.KVStore(k.key), &groupMember); err != nil {
+				if err = k.groupMemberTable.Delete(sdkCtx.KVStore(k.key), &groupMember); err != nil {
 					return errorsmod.Wrap(err, "delete member")
 				}
 				continue
@@ -190,12 +190,12 @@ func (k Keeper) UpdateGroupMembers(goCtx context.Context, msg *group.MsgUpdateGr
 				}
 				// Save updated group member in the groupMemberTable.
 				groupMember.Member.AddedAt = prevGroupMember.Member.AddedAt
-				if err := k.groupMemberTable.Update(sdkCtx.KVStore(k.key), &groupMember); err != nil {
+				if err = k.groupMemberTable.Update(sdkCtx.KVStore(k.key), &groupMember); err != nil {
 					return errorsmod.Wrap(err, "add member")
 				}
 			} else { // else handle create.
 				groupMember.Member.AddedAt = sdkCtx.BlockTime()
-				if err := k.groupMemberTable.Create(sdkCtx.KVStore(k.key), &groupMember); err != nil {
+				if err = k.groupMemberTable.Create(sdkCtx.KVStore(k.key), &groupMember); err != nil {
 					return errorsmod.Wrap(err, "add member")
 				}
 			}
@@ -213,23 +213,23 @@ func (k Keeper) UpdateGroupMembers(goCtx context.Context, msg *group.MsgUpdateGr
 		g.TotalWeight = totalWeight.String()
 		g.Version++
 
-		if err := k.validateDecisionPolicies(sdkCtx, *g); err != nil {
+		if err = k.validateDecisionPolicies(sdkCtx, *g); err != nil {
 			return err
 		}
 
 		return k.groupTable.Update(sdkCtx.KVStore(k.key), g.Id, g)
 	}
 
-	if err := k.doUpdateGroup(sdkCtx, msg.GetGroupID(), msg.GetAdmin(), action, "members updated"); err != nil {
+	if err = k.doUpdateGroup(sdkCtx, msg.GetGroupID(), msg.GetAdmin(), action, "members updated"); err != nil {
 		return nil, err
 	}
 
 	return &group.MsgUpdateGroupMembersResponse{}, nil
 }
 
-func (k Keeper) UpdateGroupAdmin(goCtx context.Context, msg *group.MsgUpdateGroupAdmin) (*group.MsgUpdateGroupAdminResponse, error) {
+func (k Keeper) UpdateGroupAdmin(goCtx context.Context, msg *group.MsgUpdateGroupAdmin) (meterResult *group.MsgUpdateGroupAdminResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UpdateGroupAdmin")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "UpdateGroupAdmin")(&err)
 
 	if msg.GroupId == 0 {
 		return nil, errorsmod.Wrap(errors.ErrEmpty, "group id")
@@ -254,22 +254,22 @@ func (k Keeper) UpdateGroupAdmin(goCtx context.Context, msg *group.MsgUpdateGrou
 		return k.groupTable.Update(sdkCtx.KVStore(k.key), g.Id, g)
 	}
 
-	if err := k.doUpdateGroup(sdkCtx, msg.GetGroupID(), msg.GetAdmin(), action, "admin updated"); err != nil {
+	if err = k.doUpdateGroup(sdkCtx, msg.GetGroupID(), msg.GetAdmin(), action, "admin updated"); err != nil {
 		return nil, err
 	}
 
 	return &group.MsgUpdateGroupAdminResponse{}, nil
 }
 
-func (k Keeper) UpdateGroupMetadata(goCtx context.Context, msg *group.MsgUpdateGroupMetadata) (*group.MsgUpdateGroupMetadataResponse, error) {
+func (k Keeper) UpdateGroupMetadata(goCtx context.Context, msg *group.MsgUpdateGroupMetadata) (meterResult *group.MsgUpdateGroupMetadataResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UpdateGroupMetadata")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "UpdateGroupMetadata")(&err)
 
 	if msg.GroupId == 0 {
 		return nil, errorsmod.Wrap(errors.ErrEmpty, "group id")
 	}
 
-	if err := k.assertMetadataLength(msg.Metadata, "group metadata"); err != nil {
+	if err = k.assertMetadataLength(msg.Metadata, "group metadata"); err != nil {
 		return nil, err
 	}
 
@@ -283,16 +283,16 @@ func (k Keeper) UpdateGroupMetadata(goCtx context.Context, msg *group.MsgUpdateG
 		return k.groupTable.Update(sdkCtx.KVStore(k.key), g.Id, g)
 	}
 
-	if err := k.doUpdateGroup(sdkCtx, msg.GetGroupID(), msg.GetAdmin(), action, "metadata updated"); err != nil {
+	if err = k.doUpdateGroup(sdkCtx, msg.GetGroupID(), msg.GetAdmin(), action, "metadata updated"); err != nil {
 		return nil, err
 	}
 
 	return &group.MsgUpdateGroupMetadataResponse{}, nil
 }
 
-func (k Keeper) CreateGroupWithPolicy(ctx context.Context, msg *group.MsgCreateGroupWithPolicy) (*group.MsgCreateGroupWithPolicyResponse, error) {
+func (k Keeper) CreateGroupWithPolicy(ctx context.Context, msg *group.MsgCreateGroupWithPolicy) (meterResult *group.MsgCreateGroupWithPolicyResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "CreateGroupWithPolicy")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "CreateGroupWithPolicy")(&err)
 
 	// NOTE: admin, and group message validation is performed in the CreateGroup method
 	groupRes, err := k.CreateGroup(sdkCtx, &group.MsgCreateGroup{
@@ -341,15 +341,15 @@ func (k Keeper) CreateGroupWithPolicy(ctx context.Context, msg *group.MsgCreateG
 	return &group.MsgCreateGroupWithPolicyResponse{GroupId: groupID, GroupPolicyAddress: groupPolicyRes.Address}, nil
 }
 
-func (k Keeper) CreateGroupPolicy(goCtx context.Context, msg *group.MsgCreateGroupPolicy) (*group.MsgCreateGroupPolicyResponse, error) {
+func (k Keeper) CreateGroupPolicy(goCtx context.Context, msg *group.MsgCreateGroupPolicy) (meterResult *group.MsgCreateGroupPolicyResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "CreateGroupPolicy")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "CreateGroupPolicy")(&err)
 
 	if msg.GroupId == 0 {
 		return nil, errorsmod.Wrap(errors.ErrEmpty, "group id")
 	}
 
-	if err := k.assertMetadataLength(msg.GetMetadata(), "group policy metadata"); err != nil {
+	if err = k.assertMetadataLength(msg.GetMetadata(), "group policy metadata"); err != nil {
 		return nil, err
 	}
 
@@ -358,7 +358,7 @@ func (k Keeper) CreateGroupPolicy(goCtx context.Context, msg *group.MsgCreateGro
 		return nil, errorsmod.Wrap(err, "request decision policy")
 	}
 
-	if err := policy.ValidateBasic(); err != nil {
+	if err = policy.ValidateBasic(); err != nil {
 		return nil, errorsmod.Wrap(err, "decision policy")
 	}
 
@@ -382,7 +382,7 @@ func (k Keeper) CreateGroupPolicy(goCtx context.Context, msg *group.MsgCreateGro
 		return nil, errorsmod.Wrap(sdkerrors.ErrUnauthorized, "not group admin")
 	}
 
-	if err := policy.Validate(groupInfo, k.config); err != nil {
+	if err = policy.Validate(groupInfo, k.config); err != nil {
 		return nil, err
 	}
 
@@ -431,20 +431,20 @@ func (k Keeper) CreateGroupPolicy(goCtx context.Context, msg *group.MsgCreateGro
 		return nil, err
 	}
 
-	if err := k.groupPolicyTable.Create(sdkCtx.KVStore(k.key), &groupPolicy); err != nil {
+	if err = k.groupPolicyTable.Create(sdkCtx.KVStore(k.key), &groupPolicy); err != nil {
 		return nil, errorsmod.Wrap(err, "could not create group policy")
 	}
 
-	if err := sdkCtx.EventManager().EmitTypedEvent(&group.EventCreateGroupPolicy{Address: accountAddr.String()}); err != nil {
+	if err = sdkCtx.EventManager().EmitTypedEvent(&group.EventCreateGroupPolicy{Address: accountAddr.String()}); err != nil {
 		return nil, err
 	}
 
 	return &group.MsgCreateGroupPolicyResponse{Address: accountAddr.String()}, nil
 }
 
-func (k Keeper) UpdateGroupPolicyAdmin(goCtx context.Context, msg *group.MsgUpdateGroupPolicyAdmin) (*group.MsgUpdateGroupPolicyAdminResponse, error) {
+func (k Keeper) UpdateGroupPolicyAdmin(goCtx context.Context, msg *group.MsgUpdateGroupPolicyAdmin) (meterResult *group.MsgUpdateGroupPolicyAdminResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UpdateGroupPolicyAdmin")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "UpdateGroupPolicyAdmin")(&err)
 
 	if strings.EqualFold(msg.Admin, msg.NewAdmin) {
 		return nil, errorsmod.Wrap(errors.ErrInvalid, "new and old admin are same")
@@ -460,23 +460,23 @@ func (k Keeper) UpdateGroupPolicyAdmin(goCtx context.Context, msg *group.MsgUpda
 		return k.groupPolicyTable.Update(sdkCtx.KVStore(k.key), groupPolicy)
 	}
 
-	if err := k.doUpdateGroupPolicy(sdkCtx, msg.GroupPolicyAddress, msg.Admin, action, "group policy admin updated"); err != nil {
+	if err = k.doUpdateGroupPolicy(sdkCtx, msg.GroupPolicyAddress, msg.Admin, action, "group policy admin updated"); err != nil {
 		return nil, err
 	}
 
 	return &group.MsgUpdateGroupPolicyAdminResponse{}, nil
 }
 
-func (k Keeper) UpdateGroupPolicyDecisionPolicy(goCtx context.Context, msg *group.MsgUpdateGroupPolicyDecisionPolicy) (*group.MsgUpdateGroupPolicyDecisionPolicyResponse, error) {
+func (k Keeper) UpdateGroupPolicyDecisionPolicy(goCtx context.Context, msg *group.MsgUpdateGroupPolicyDecisionPolicy) (meterResult *group.MsgUpdateGroupPolicyDecisionPolicyResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UpdateGroupPolicyDecisionPolicy")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "UpdateGroupPolicyDecisionPolicy")(&err)
 
 	policy, err := msg.GetDecisionPolicy()
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "decision policy")
 	}
 
-	if err := policy.ValidateBasic(); err != nil {
+	if err = policy.ValidateBasic(); err != nil {
 		return nil, errorsmod.Wrap(err, "decision policy")
 	}
 
@@ -507,9 +507,9 @@ func (k Keeper) UpdateGroupPolicyDecisionPolicy(goCtx context.Context, msg *grou
 	return &group.MsgUpdateGroupPolicyDecisionPolicyResponse{}, nil
 }
 
-func (k Keeper) UpdateGroupPolicyMetadata(goCtx context.Context, msg *group.MsgUpdateGroupPolicyMetadata) (*group.MsgUpdateGroupPolicyMetadataResponse, error) {
+func (k Keeper) UpdateGroupPolicyMetadata(goCtx context.Context, msg *group.MsgUpdateGroupPolicyMetadata) (meterResult *group.MsgUpdateGroupPolicyMetadataResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UpdateGroupPolicyMetadata")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "UpdateGroupPolicyMetadata")(&err)
 
 	metadata := msg.GetMetadata()
 
@@ -519,11 +519,11 @@ func (k Keeper) UpdateGroupPolicyMetadata(goCtx context.Context, msg *group.MsgU
 		return k.groupPolicyTable.Update(sdkCtx.KVStore(k.key), groupPolicy)
 	}
 
-	if err := k.assertMetadataLength(metadata, "group policy metadata"); err != nil {
+	if err = k.assertMetadataLength(metadata, "group policy metadata"); err != nil {
 		return nil, err
 	}
 
-	err := k.doUpdateGroupPolicy(sdkCtx, msg.GroupPolicyAddress, msg.Admin, action, "group policy metadata updated")
+	err = k.doUpdateGroupPolicy(sdkCtx, msg.GroupPolicyAddress, msg.Admin, action, "group policy metadata updated")
 	if err != nil {
 		return nil, err
 	}
@@ -531,15 +531,15 @@ func (k Keeper) UpdateGroupPolicyMetadata(goCtx context.Context, msg *group.MsgU
 	return &group.MsgUpdateGroupPolicyMetadataResponse{}, nil
 }
 
-func (k Keeper) SubmitProposal(goCtx context.Context, msg *group.MsgSubmitProposal) (*group.MsgSubmitProposalResponse, error) {
+func (k Keeper) SubmitProposal(goCtx context.Context, msg *group.MsgSubmitProposal) (meterResult *group.MsgSubmitProposalResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SubmitProposal")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "SubmitProposal")(&err)
 
 	if len(msg.Proposers) == 0 {
 		return nil, errorsmod.Wrap(errors.ErrEmpty, "proposers")
 	}
 
-	if err := k.validateProposers(msg.Proposers); err != nil {
+	if err = k.validateProposers(msg.Proposers); err != nil {
 		return nil, err
 	}
 
@@ -548,22 +548,22 @@ func (k Keeper) SubmitProposal(goCtx context.Context, msg *group.MsgSubmitPropos
 		return nil, errorsmod.Wrap(err, "request account address of group policy")
 	}
 
-	if err := k.assertMetadataLength(msg.Title, "proposal Title"); err != nil {
+	if err = k.assertMetadataLength(msg.Title, "proposal Title"); err != nil {
 		return nil, err
 	}
 
-	if err := k.assertSummaryLength(msg.Summary); err != nil {
+	if err = k.assertSummaryLength(msg.Summary); err != nil {
 		return nil, err
 	}
 
-	if err := k.assertMetadataLength(msg.Metadata, "metadata"); err != nil {
+	if err = k.assertMetadataLength(msg.Metadata, "metadata"); err != nil {
 		return nil, err
 	}
 
 	// verify that if present, the metadata title and summary equals the proposal title and summary
 	if len(msg.Metadata) != 0 {
 		proposalMetadata := govtypes.ProposalMetadata{}
-		if err := json.Unmarshal([]byte(msg.Metadata), &proposalMetadata); err == nil {
+		if err = json.Unmarshal([]byte(msg.Metadata), &proposalMetadata); err == nil {
 			if proposalMetadata.Title != msg.Title {
 				return nil, fmt.Errorf("metadata title '%s' must equal proposal title '%s'", proposalMetadata.Title, msg.Title)
 			}
@@ -582,7 +582,7 @@ func (k Keeper) SubmitProposal(goCtx context.Context, msg *group.MsgSubmitPropos
 		return nil, errorsmod.Wrap(err, "request msgs")
 	}
 
-	if err := validateMsgs(msgs); err != nil {
+	if err = validateMsgs(msgs); err != nil {
 		return nil, err
 	}
 
@@ -604,7 +604,7 @@ func (k Keeper) SubmitProposal(goCtx context.Context, msg *group.MsgSubmitPropos
 	}
 
 	// Check that if the messages require signers, they are all equal to the given account address of group policy.
-	if err := ensureMsgAuthZ(msgs, groupPolicyAddr, k.cdc); err != nil {
+	if err = ensureMsgAuthZ(msgs, groupPolicyAddr, k.cdc); err != nil {
 		return nil, err
 	}
 
@@ -634,7 +634,7 @@ func (k Keeper) SubmitProposal(goCtx context.Context, msg *group.MsgSubmitPropos
 		Summary:            msg.Summary,
 	}
 
-	if err := m.SetMsgs(msgs); err != nil {
+	if err = m.SetMsgs(msgs); err != nil {
 		return nil, errorsmod.Wrap(err, "create proposal")
 	}
 
@@ -643,7 +643,7 @@ func (k Keeper) SubmitProposal(goCtx context.Context, msg *group.MsgSubmitPropos
 		return nil, errorsmod.Wrap(err, "create proposal")
 	}
 
-	if err := sdkCtx.EventManager().EmitTypedEvent(&group.EventSubmitProposal{ProposalId: id}); err != nil {
+	if err = sdkCtx.EventManager().EmitTypedEvent(&group.EventSubmitProposal{ProposalId: id}); err != nil {
 		return nil, err
 	}
 
@@ -677,9 +677,9 @@ func (k Keeper) SubmitProposal(goCtx context.Context, msg *group.MsgSubmitPropos
 	return &group.MsgSubmitProposalResponse{ProposalId: id}, nil
 }
 
-func (k Keeper) WithdrawProposal(goCtx context.Context, msg *group.MsgWithdrawProposal) (*group.MsgWithdrawProposalResponse, error) {
+func (k Keeper) WithdrawProposal(goCtx context.Context, msg *group.MsgWithdrawProposal) (meterResult *group.MsgWithdrawProposalResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "WithdrawProposal")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "WithdrawProposal")(&err)
 
 	if msg.ProposalId == 0 {
 		return nil, errorsmod.Wrap(errors.ErrEmpty, "proposal id")
@@ -710,20 +710,20 @@ func (k Keeper) WithdrawProposal(goCtx context.Context, msg *group.MsgWithdrawPr
 	}
 
 	proposal.Status = group.PROPOSAL_STATUS_WITHDRAWN
-	if err := k.proposalTable.Update(sdkCtx.KVStore(k.key), msg.ProposalId, &proposal); err != nil {
+	if err = k.proposalTable.Update(sdkCtx.KVStore(k.key), msg.ProposalId, &proposal); err != nil {
 		return nil, err
 	}
 
-	if err := sdkCtx.EventManager().EmitTypedEvent(&group.EventWithdrawProposal{ProposalId: msg.ProposalId}); err != nil {
+	if err = sdkCtx.EventManager().EmitTypedEvent(&group.EventWithdrawProposal{ProposalId: msg.ProposalId}); err != nil {
 		return nil, err
 	}
 
 	return &group.MsgWithdrawProposalResponse{}, nil
 }
 
-func (k Keeper) Vote(goCtx context.Context, msg *group.MsgVote) (*group.MsgVoteResponse, error) {
+func (k Keeper) Vote(goCtx context.Context, msg *group.MsgVote) (meterResult *group.MsgVoteResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Vote")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "Vote")(&err)
 
 	if msg.ProposalId == 0 {
 		return nil, errorsmod.Wrap(errors.ErrEmpty, "proposal id")
@@ -738,7 +738,7 @@ func (k Keeper) Vote(goCtx context.Context, msg *group.MsgVote) (*group.MsgVoteR
 		return nil, errorsmod.Wrap(errors.ErrInvalid, "vote option")
 	}
 
-	if err := k.assertMetadataLength(msg.Metadata, "metadata"); err != nil {
+	if err = k.assertMetadataLength(msg.Metadata, "metadata"); err != nil {
 		return nil, err
 	}
 
@@ -772,7 +772,7 @@ func (k Keeper) Vote(goCtx context.Context, msg *group.MsgVote) (*group.MsgVoteR
 
 	// Count and store votes.
 	voter := group.GroupMember{GroupId: groupInfo.Id, Member: &group.Member{Address: msg.Voter}}
-	if err := k.groupMemberTable.GetOne(sdkCtx.KVStore(k.key), orm.PrimaryKey(&voter), &voter); err != nil {
+	if err = k.groupMemberTable.GetOne(sdkCtx.KVStore(k.key), orm.PrimaryKey(&voter), &voter); err != nil {
 		return nil, errorsmod.Wrapf(err, "voter address: %s", msg.Voter)
 	}
 	newVote := group.Vote{
@@ -785,11 +785,11 @@ func (k Keeper) Vote(goCtx context.Context, msg *group.MsgVote) (*group.MsgVoteR
 
 	// The ORM will return an error if the vote already exists,
 	// making sure than a voter hasn't already voted.
-	if err := k.voteTable.Create(sdkCtx.KVStore(k.key), &newVote); err != nil {
+	if err = k.voteTable.Create(sdkCtx.KVStore(k.key), &newVote); err != nil {
 		return nil, errorsmod.Wrap(err, "store vote")
 	}
 
-	if err := sdkCtx.EventManager().EmitTypedEvent(&group.EventVote{ProposalId: msg.ProposalId}); err != nil {
+	if err = sdkCtx.EventManager().EmitTypedEvent(&group.EventVote{ProposalId: msg.ProposalId}); err != nil {
 		return nil, err
 	}
 
@@ -807,8 +807,8 @@ func (k Keeper) Vote(goCtx context.Context, msg *group.MsgVote) (*group.MsgVoteR
 // doTallyAndUpdate performs a tally, and, if the tally result is final, then:
 // - updates the proposal's `Status` and `FinalTallyResult` fields,
 // - prune all the votes.
-func (k Keeper) doTallyAndUpdate(ctx sdk.Context, proposal *group.Proposal, groupInfo group.GroupInfo, policyInfo group.GroupPolicyInfo) error {
-	defer k.Meter(ctx).FuncTiming(&ctx, "doTallyAndUpdate")()
+func (k Keeper) doTallyAndUpdate(ctx sdk.Context, proposal *group.Proposal, groupInfo group.GroupInfo, policyInfo group.GroupPolicyInfo) (err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "doTallyAndUpdate")(&err)
 
 	policy, err := policyInfo.GetDecisionPolicy()
 	if err != nil {
@@ -821,21 +821,22 @@ func (k Keeper) doTallyAndUpdate(ctx sdk.Context, proposal *group.Proposal, grou
 		result, err = policy.Allow(tallyResult, groupInfo.TotalWeight)
 	}
 	if err != nil {
-		if err := k.pruneVotes(ctx, proposal.Id); err != nil {
+		tallyErr := err
+		if err = k.pruneVotes(ctx, proposal.Id); err != nil {
 			return err
 		}
 		proposal.Status = group.PROPOSAL_STATUS_REJECTED
 		return ctx.EventManager().EmitTypedEvents(
 			&group.EventTallyError{
 				ProposalId:   proposal.Id,
-				ErrorMessage: err.Error(),
+				ErrorMessage: tallyErr.Error(),
 			})
 	}
 
 	// If the result was final (i.e. enough votes to pass) or if the voting
 	// period ended, then we consider the proposal as final.
 	if isFinal := result.Final || ctx.BlockTime().After(proposal.VotingPeriodEnd); isFinal {
-		if err := k.pruneVotes(ctx, proposal.Id); err != nil {
+		if err = k.pruneVotes(ctx, proposal.Id); err != nil {
 			return err
 		}
 		proposal.FinalTallyResult = tallyResult
@@ -851,9 +852,9 @@ func (k Keeper) doTallyAndUpdate(ctx sdk.Context, proposal *group.Proposal, grou
 }
 
 // Exec executes the messages from a proposal.
-func (k Keeper) Exec(goCtx context.Context, msg *group.MsgExec) (*group.MsgExecResponse, error) {
+func (k Keeper) Exec(goCtx context.Context, msg *group.MsgExec) (meterResult *group.MsgExecResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Exec")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "Exec")(&err)
 
 	if msg.ProposalId == 0 {
 		return nil, errorsmod.Wrap(errors.ErrEmpty, "proposal id")
@@ -917,12 +918,12 @@ func (k Keeper) Exec(goCtx context.Context, msg *group.MsgExec) (*group.MsgExecR
 	// Update proposal in proposalTable
 	// If proposal has successfully run, delete it from state.
 	if proposal.ExecutorResult == group.PROPOSAL_EXECUTOR_RESULT_SUCCESS {
-		if err := k.pruneProposal(sdkCtx, proposal.Id); err != nil {
+		if err = k.pruneProposal(sdkCtx, proposal.Id); err != nil {
 			return nil, err
 		}
 
 		// Emit event for proposal finalized with its result
-		if err := sdkCtx.EventManager().EmitTypedEvent(
+		if err = sdkCtx.EventManager().EmitTypedEvent(
 			&group.EventProposalPruned{
 				ProposalId:  proposal.Id,
 				Status:      proposal.Status,
@@ -932,12 +933,12 @@ func (k Keeper) Exec(goCtx context.Context, msg *group.MsgExec) (*group.MsgExecR
 		}
 	} else {
 		store := sdkCtx.KVStore(k.key)
-		if err := k.proposalTable.Update(store, proposal.Id, &proposal); err != nil {
+		if err = k.proposalTable.Update(store, proposal.Id, &proposal); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := sdkCtx.EventManager().EmitTypedEvent(&group.EventExec{
+	if err = sdkCtx.EventManager().EmitTypedEvent(&group.EventExec{
 		ProposalId: proposal.Id,
 		Logs:       logs,
 		Result:     proposal.ExecutorResult,
@@ -951,15 +952,15 @@ func (k Keeper) Exec(goCtx context.Context, msg *group.MsgExec) (*group.MsgExecR
 }
 
 // LeaveGroup implements the MsgServer/LeaveGroup method.
-func (k Keeper) LeaveGroup(goCtx context.Context, msg *group.MsgLeaveGroup) (*group.MsgLeaveGroupResponse, error) {
+func (k Keeper) LeaveGroup(goCtx context.Context, msg *group.MsgLeaveGroup) (meterResult *group.MsgLeaveGroupResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "LeaveGroup")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "LeaveGroup")(&err)
 
 	if msg.GroupId == 0 {
 		return nil, errorsmod.Wrap(errors.ErrEmpty, "group-id")
 	}
 
-	_, err := k.accKeeper.AddressCodec().StringToBytes(msg.Address)
+	_, err = k.accKeeper.AddressCodec().StringToBytes(msg.Address)
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "group member")
 	}
@@ -993,7 +994,7 @@ func (k Keeper) LeaveGroup(goCtx context.Context, msg *group.MsgLeaveGroup) (*gr
 	}
 
 	// delete group member in the groupMemberTable.
-	if err := k.groupMemberTable.Delete(sdkCtx.KVStore(k.key), gm); err != nil {
+	if err = k.groupMemberTable.Delete(sdkCtx.KVStore(k.key), gm); err != nil {
 		return nil, errorsmod.Wrap(err, "group member")
 	}
 
@@ -1001,15 +1002,15 @@ func (k Keeper) LeaveGroup(goCtx context.Context, msg *group.MsgLeaveGroup) (*gr
 	groupInfo.TotalWeight = updatedWeight.String()
 	groupInfo.Version++
 
-	if err := k.validateDecisionPolicies(sdkCtx, groupInfo); err != nil {
+	if err = k.validateDecisionPolicies(sdkCtx, groupInfo); err != nil {
 		return nil, err
 	}
 
-	if err := k.groupTable.Update(sdkCtx.KVStore(k.key), groupInfo.Id, &groupInfo); err != nil {
+	if err = k.groupTable.Update(sdkCtx.KVStore(k.key), groupInfo.Id, &groupInfo); err != nil {
 		return nil, err
 	}
 
-	if err := sdkCtx.EventManager().EmitTypedEvent(&group.EventLeaveGroup{
+	if err = sdkCtx.EventManager().EmitTypedEvent(&group.EventLeaveGroup{
 		GroupId: msg.GroupId,
 		Address: msg.Address,
 	}); err != nil {
@@ -1019,11 +1020,11 @@ func (k Keeper) LeaveGroup(goCtx context.Context, msg *group.MsgLeaveGroup) (*gr
 	return &group.MsgLeaveGroupResponse{}, nil
 }
 
-func (k Keeper) getGroupMember(ctx sdk.Context, member *group.GroupMember) (*group.GroupMember, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupMember")()
+func (k Keeper) getGroupMember(ctx sdk.Context, member *group.GroupMember) (meterResult *group.GroupMember, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupMember")(&err)
 
 	var groupMember group.GroupMember
-	switch err := k.groupMemberTable.GetOne(ctx.KVStore(k.key),
+	switch err = k.groupMemberTable.GetOne(ctx.KVStore(k.key),
 		orm.PrimaryKey(member), &groupMember); {
 	case err == nil:
 		break
@@ -1043,8 +1044,8 @@ type (
 
 // doUpdateGroupPolicy first makes sure that the group policy admin initiated the group policy update,
 // before performing the group policy update and emitting an event.
-func (k Keeper) doUpdateGroupPolicy(ctx sdk.Context, reqGroupPolicy, reqAdmin string, action groupPolicyActionFn, note string) error {
-	defer k.Meter(ctx).FuncTiming(&ctx, "doUpdateGroupPolicy")()
+func (k Keeper) doUpdateGroupPolicy(ctx sdk.Context, reqGroupPolicy, reqAdmin string, action groupPolicyActionFn, note string) (err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "doUpdateGroupPolicy")(&err)
 
 	groupPolicyAddr, err := k.accKeeper.AddressCodec().StringToBytes(reqGroupPolicy)
 	if err != nil {
@@ -1066,7 +1067,7 @@ func (k Keeper) doUpdateGroupPolicy(ctx sdk.Context, reqGroupPolicy, reqAdmin st
 		return errorsmod.Wrap(sdkerrors.ErrUnauthorized, "not group policy admin")
 	}
 
-	if err := action(&groupPolicyInfo); err != nil {
+	if err = action(&groupPolicyInfo); err != nil {
 		return errorsmod.Wrap(err, note)
 	}
 
@@ -1083,8 +1084,8 @@ func (k Keeper) doUpdateGroupPolicy(ctx sdk.Context, reqGroupPolicy, reqAdmin st
 
 // doUpdateGroup first makes sure that the group admin initiated the group update,
 // before performing the group update and emitting an event.
-func (k Keeper) doUpdateGroup(ctx sdk.Context, groupID uint64, reqGroupAdmin string, action actionFn, errNote string) error {
-	defer k.Meter(ctx).FuncTiming(&ctx, "doUpdateGroup")()
+func (k Keeper) doUpdateGroup(ctx sdk.Context, groupID uint64, reqGroupAdmin string, action actionFn, errNote string) (err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "doUpdateGroup")(&err)
 
 	groupInfo, err := k.getGroupInfo(ctx, groupID)
 	if err != nil {
@@ -1095,11 +1096,11 @@ func (k Keeper) doUpdateGroup(ctx sdk.Context, groupID uint64, reqGroupAdmin str
 		return errorsmod.Wrapf(sdkerrors.ErrUnauthorized, "not group admin; got %s, expected %s", reqGroupAdmin, groupInfo.Admin)
 	}
 
-	if err := action(&groupInfo); err != nil {
+	if err = action(&groupInfo); err != nil {
 		return errorsmod.Wrap(err, errNote)
 	}
 
-	if err := ctx.EventManager().EmitTypedEvent(&group.EventUpdateGroup{GroupId: groupID}); err != nil {
+	if err = ctx.EventManager().EmitTypedEvent(&group.EventUpdateGroup{GroupId: groupID}); err != nil {
 		return err
 	}
 
@@ -1126,8 +1127,8 @@ func (k Keeper) assertSummaryLength(summary string) error {
 
 // validateDecisionPolicies loops through all decision policies from the group,
 // and calls each of their Validate() method.
-func (k Keeper) validateDecisionPolicies(ctx sdk.Context, g group.GroupInfo) error {
-	defer k.Meter(ctx).FuncTiming(&ctx, "validateDecisionPolicies")()
+func (k Keeper) validateDecisionPolicies(ctx sdk.Context, g group.GroupInfo) (err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "validateDecisionPolicies")(&err)
 
 	it, err := k.groupPolicyByGroupIndex.Get(ctx.KVStore(k.key), g.Id)
 	if err != nil {

@@ -7,16 +7,18 @@ import (
 
 // new crisis genesis
 func (k *Keeper) InitGenesis(ctx sdk.Context, data *types.GenesisState) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "InitGenesis")()
+	var err error
+	defer k.Meter(ctx).FuncTiming(&ctx, "InitGenesis")(&err)
 
-	if err := k.ConstantFee.Set(ctx, data.ConstantFee); err != nil {
+	if err = k.ConstantFee.Set(ctx, data.ConstantFee); err != nil {
 		panic(err)
 	}
 }
 
 // ExportGenesis returns a GenesisState for a given context and keeper.
 func (k *Keeper) ExportGenesis(ctx sdk.Context) *types.GenesisState {
-	defer k.Meter(ctx).FuncTiming(&ctx, "ExportGenesis")()
+	var err error
+	defer k.Meter(ctx).FuncTiming(&ctx, "ExportGenesis")(&err)
 
 	constantFee, err := k.ConstantFee.Get(ctx)
 	if err != nil {

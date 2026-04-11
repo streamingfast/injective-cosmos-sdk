@@ -15,9 +15,9 @@ import (
 // SendCoinsFromAccountToModuleVirtual sends coins from account to a virtual module account.
 func (k BaseSendKeeper) SendCoinsFromAccountToModuleVirtual(
 	ctx context.Context, senderAddr sdk.AccAddress, recipientModule string, amt sdk.Coins,
-) error {
+) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SendCoinsFromAccountToModuleVirtual")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SendCoinsFromAccountToModuleVirtual")(&err)
 
 	recipientAcc := k.ak.GetModuleAccount(sdkCtx, recipientModule)
 	if recipientAcc == nil {
@@ -30,9 +30,9 @@ func (k BaseSendKeeper) SendCoinsFromAccountToModuleVirtual(
 // SendCoinsFromModuleToAccountVirtual sends coins from virtual module to a recipient account.
 func (k BaseSendKeeper) SendCoinsFromModuleToAccountVirtual(
 	ctx context.Context, senderModule string, recipientAddr sdk.AccAddress, amt sdk.Coins,
-) error {
+) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SendCoinsFromModuleToAccountVirtual")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SendCoinsFromModuleToAccountVirtual")(&err)
 
 	senderAddr := k.ak.GetModuleAddress(senderModule)
 	if senderAddr == nil {
@@ -49,11 +49,11 @@ func (k BaseSendKeeper) SendCoinsFromModuleToAccountVirtual(
 // SendCoinsToVirtual accumulate the recipient's coins in a per-transaction transient state,
 // which are sumed up and added to the real account at the end of block.
 // Events are emitted the same as normal send.
-func (k BaseSendKeeper) SendCoinsToVirtual(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) error {
+func (k BaseSendKeeper) SendCoinsToVirtual(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SendCoinsToVirtual")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SendCoinsToVirtual")(&err)
 
-	err := k.subUnlockedCoins(sdkCtx, fromAddr, amt, false)
+	err = k.subUnlockedCoins(sdkCtx, fromAddr, amt, false)
 	if err != nil {
 		return err
 	}
@@ -72,11 +72,11 @@ func (k BaseSendKeeper) SendCoinsToVirtual(ctx context.Context, fromAddr, toAddr
 }
 
 // SendCoinsFromVirtual deduct coins from virtual from account and send to recipient account.
-func (k BaseSendKeeper) SendCoinsFromVirtual(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) error {
+func (k BaseSendKeeper) SendCoinsFromVirtual(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SendCoinsFromVirtual")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SendCoinsFromVirtual")(&err)
 
-	err := k.subVirtualCoins(sdkCtx, fromAddr, amt)
+	err = k.subVirtualCoins(sdkCtx, fromAddr, amt)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (k BaseSendKeeper) SendCoinsFromVirtual(ctx context.Context, fromAddr, toAd
 
 func (k BaseSendKeeper) addVirtualCoins(ctx context.Context, addr sdk.AccAddress, amt sdk.Coins) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "addVirtualCoins")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "addVirtualCoins")()
 
 	store := sdkCtx.ObjectStore(k.objStoreKey)
 
@@ -117,9 +117,9 @@ func (k BaseSendKeeper) addVirtualCoins(ctx context.Context, addr sdk.AccAddress
 	store.Set(key, coins)
 }
 
-func (k BaseSendKeeper) subVirtualCoins(ctx context.Context, addr sdk.AccAddress, amt sdk.Coins) error {
+func (k BaseSendKeeper) subVirtualCoins(ctx context.Context, addr sdk.AccAddress, amt sdk.Coins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "subVirtualCoins")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "subVirtualCoins")(&err)
 
 	store := sdkCtx.ObjectStore(k.objStoreKey)
 
@@ -155,9 +155,9 @@ func (k BaseSendKeeper) subVirtualCoins(ctx context.Context, addr sdk.AccAddress
 
 // CreditVirtualAccounts sum up the transient coins and add them to the real account,
 // should be called at end blocker.
-func (k BaseSendKeeper) CreditVirtualAccounts(ctx context.Context) error {
+func (k BaseSendKeeper) CreditVirtualAccounts(ctx context.Context) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "CreditVirtualAccounts")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "CreditVirtualAccounts")(&err)
 
 	store := sdkCtx.ObjectStore(k.objStoreKey)
 
@@ -169,7 +169,7 @@ func (k BaseSendKeeper) CreditVirtualAccounts(ctx context.Context) error {
 			return nil
 		}
 
-		if err := k.addCoins(sdkCtx, toAddr, sum.ToCoins()); err != nil {
+		if err = k.addCoins(sdkCtx, toAddr, sum.ToCoins()); err != nil {
 			return err
 		}
 		clear(sum)
@@ -187,7 +187,7 @@ func (k BaseSendKeeper) CreditVirtualAccounts(ctx context.Context) error {
 
 		addr := it.Key()[:len(it.Key())-8]
 		if !bytes.Equal(toAddr, addr) {
-			if err := flushCurrentAddr(); err != nil {
+			if err = flushCurrentAddr(); err != nil {
 				return err
 			}
 			toAddr = addr

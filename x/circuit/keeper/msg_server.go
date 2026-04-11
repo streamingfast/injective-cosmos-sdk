@@ -26,9 +26,9 @@ func NewMsgServerImpl(keeper Keeper) types.MsgServer {
 	return &msgServer{Keeper: keeper}
 }
 
-func (srv msgServer) AuthorizeCircuitBreaker(ctx context.Context, msg *types.MsgAuthorizeCircuitBreaker) (*types.MsgAuthorizeCircuitBreakerResponse, error) {
+func (srv msgServer) AuthorizeCircuitBreaker(ctx context.Context, msg *types.MsgAuthorizeCircuitBreaker) (meterResult *types.MsgAuthorizeCircuitBreakerResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer srv.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "AuthorizeCircuitBreaker")()
+	defer srv.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "AuthorizeCircuitBreaker")(&err)
 
 	address, err := srv.addressCodec.StringToBytes(msg.Granter)
 	if err != nil {
@@ -80,9 +80,9 @@ func (srv msgServer) AuthorizeCircuitBreaker(ctx context.Context, msg *types.Msg
 	}, nil
 }
 
-func (srv msgServer) TripCircuitBreaker(ctx context.Context, msg *types.MsgTripCircuitBreaker) (*types.MsgTripCircuitBreakerResponse, error) {
+func (srv msgServer) TripCircuitBreaker(ctx context.Context, msg *types.MsgTripCircuitBreaker) (meterResult *types.MsgTripCircuitBreakerResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer srv.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "TripCircuitBreaker")()
+	defer srv.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "TripCircuitBreaker")(&err)
 
 	address, err := srv.addressCodec.StringToBytes(msg.Authority)
 	if err != nil {
@@ -141,9 +141,9 @@ func (srv msgServer) TripCircuitBreaker(ctx context.Context, msg *types.MsgTripC
 
 // ResetCircuitBreaker resumes processing of Msg's in the state machine that
 // have been been paused using TripCircuitBreaker.
-func (srv msgServer) ResetCircuitBreaker(ctx context.Context, msg *types.MsgResetCircuitBreaker) (*types.MsgResetCircuitBreakerResponse, error) {
+func (srv msgServer) ResetCircuitBreaker(ctx context.Context, msg *types.MsgResetCircuitBreaker) (meterResult *types.MsgResetCircuitBreakerResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer srv.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "ResetCircuitBreaker")()
+	defer srv.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "ResetCircuitBreaker")(&err)
 
 	keeper := srv.Keeper
 	address, err := srv.addressCodec.StringToBytes(msg.Authority)

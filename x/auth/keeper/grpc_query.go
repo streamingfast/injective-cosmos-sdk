@@ -23,9 +23,9 @@ func NewQueryServer(k AccountKeeper) types.QueryServer {
 
 type queryServer struct{ k AccountKeeper }
 
-func (s queryServer) AccountAddressByID(ctx context.Context, req *types.QueryAccountAddressByIDRequest) (*types.QueryAccountAddressByIDResponse, error) {
+func (s queryServer) AccountAddressByID(ctx context.Context, req *types.QueryAccountAddressByIDRequest) (meterResult *types.QueryAccountAddressByIDResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer s.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AccountAddressByID")()
+	defer s.k.Meter(ctx).FuncTiming(&sdkCtx, "AccountAddressByID")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -45,9 +45,9 @@ func (s queryServer) AccountAddressByID(ctx context.Context, req *types.QueryAcc
 	return &types.QueryAccountAddressByIDResponse{AccountAddress: address.String()}, nil
 }
 
-func (s queryServer) Accounts(ctx context.Context, req *types.QueryAccountsRequest) (*types.QueryAccountsResponse, error) {
+func (s queryServer) Accounts(ctx context.Context, req *types.QueryAccountsRequest) (meterResult *types.QueryAccountsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer s.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Accounts")()
+	defer s.k.Meter(ctx).FuncTiming(&sdkCtx, "Accounts")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -66,9 +66,9 @@ func (s queryServer) Accounts(ctx context.Context, req *types.QueryAccountsReque
 }
 
 // Account returns account details based on address
-func (s queryServer) Account(ctx context.Context, req *types.QueryAccountRequest) (*types.QueryAccountResponse, error) {
+func (s queryServer) Account(ctx context.Context, req *types.QueryAccountRequest) (meterResult *types.QueryAccountResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer s.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Account")()
+	defer s.k.Meter(ctx).FuncTiming(&sdkCtx, "Account")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -96,9 +96,9 @@ func (s queryServer) Account(ctx context.Context, req *types.QueryAccountRequest
 }
 
 // Params returns parameters of auth module
-func (s queryServer) Params(c context.Context, req *types.QueryParamsRequest) (*types.QueryParamsResponse, error) {
+func (s queryServer) Params(c context.Context, req *types.QueryParamsRequest) (meterResult *types.QueryParamsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(c)
-	defer s.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Params")()
+	defer s.k.Meter(c).FuncTiming(&sdkCtx, "Params")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -110,9 +110,9 @@ func (s queryServer) Params(c context.Context, req *types.QueryParamsRequest) (*
 }
 
 // ModuleAccounts returns all the existing Module Accounts
-func (s queryServer) ModuleAccounts(c context.Context, req *types.QueryModuleAccountsRequest) (*types.QueryModuleAccountsResponse, error) {
+func (s queryServer) ModuleAccounts(c context.Context, req *types.QueryModuleAccountsRequest) (meterResult *types.QueryModuleAccountsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(c)
-	defer s.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "ModuleAccounts")()
+	defer s.k.Meter(c).FuncTiming(&sdkCtx, "ModuleAccounts")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -143,9 +143,9 @@ func (s queryServer) ModuleAccounts(c context.Context, req *types.QueryModuleAcc
 }
 
 // ModuleAccountByName returns module account by module name
-func (s queryServer) ModuleAccountByName(c context.Context, req *types.QueryModuleAccountByNameRequest) (*types.QueryModuleAccountByNameResponse, error) {
+func (s queryServer) ModuleAccountByName(c context.Context, req *types.QueryModuleAccountByNameRequest) (meterResult *types.QueryModuleAccountByNameResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(c)
-	defer s.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "ModuleAccountByName")()
+	defer s.k.Meter(c).FuncTiming(&sdkCtx, "ModuleAccountByName")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -170,9 +170,9 @@ func (s queryServer) ModuleAccountByName(c context.Context, req *types.QueryModu
 }
 
 // Bech32Prefix returns the keeper internally stored bech32 prefix.
-func (s queryServer) Bech32Prefix(ctx context.Context, req *types.Bech32PrefixRequest) (*types.Bech32PrefixResponse, error) {
+func (s queryServer) Bech32Prefix(ctx context.Context, req *types.Bech32PrefixRequest) (meterResult *types.Bech32PrefixResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer s.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Bech32Prefix")()
+	defer s.k.Meter(ctx).FuncTiming(&sdkCtx, "Bech32Prefix")(&err)
 
 	bech32Prefix, err := s.k.getBech32Prefix()
 	if err != nil {
@@ -188,9 +188,9 @@ func (s queryServer) Bech32Prefix(ctx context.Context, req *types.Bech32PrefixRe
 
 // AddressBytesToString converts an address from bytes to string, using the
 // keeper's bech32 prefix.
-func (s queryServer) AddressBytesToString(ctx context.Context, req *types.AddressBytesToStringRequest) (*types.AddressBytesToStringResponse, error) {
+func (s queryServer) AddressBytesToString(ctx context.Context, req *types.AddressBytesToStringRequest) (meterResult *types.AddressBytesToStringResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer s.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AddressBytesToString")()
+	defer s.k.Meter(ctx).FuncTiming(&sdkCtx, "AddressBytesToString")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -210,9 +210,9 @@ func (s queryServer) AddressBytesToString(ctx context.Context, req *types.Addres
 
 // AddressStringToBytes converts an address from string to bytes, using the
 // keeper's bech32 prefix.
-func (s queryServer) AddressStringToBytes(ctx context.Context, req *types.AddressStringToBytesRequest) (*types.AddressStringToBytesResponse, error) {
+func (s queryServer) AddressStringToBytes(ctx context.Context, req *types.AddressStringToBytesRequest) (meterResult *types.AddressStringToBytesResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer s.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AddressStringToBytes")()
+	defer s.k.Meter(ctx).FuncTiming(&sdkCtx, "AddressStringToBytes")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -231,9 +231,9 @@ func (s queryServer) AddressStringToBytes(ctx context.Context, req *types.Addres
 }
 
 // AccountInfo implements the AccountInfo query.
-func (s queryServer) AccountInfo(ctx context.Context, req *types.QueryAccountInfoRequest) (*types.QueryAccountInfoResponse, error) {
+func (s queryServer) AccountInfo(ctx context.Context, req *types.QueryAccountInfoRequest) (meterResult *types.QueryAccountInfoResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer s.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AccountInfo")()
+	defer s.k.Meter(ctx).FuncTiming(&sdkCtx, "AccountInfo")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")

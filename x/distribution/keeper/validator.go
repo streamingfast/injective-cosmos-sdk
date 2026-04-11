@@ -12,9 +12,9 @@ import (
 )
 
 // initialize rewards for a new validator
-func (k Keeper) initializeValidator(ctx context.Context, val stakingtypes.ValidatorI) error {
+func (k Keeper) initializeValidator(ctx context.Context, val stakingtypes.ValidatorI) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "initializeValidator")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "initializeValidator")(&err)
 
 	valBz, err := k.stakingKeeper.ValidatorAddressCodec().StringToBytes(val.GetOperator())
 	if err != nil {
@@ -44,9 +44,9 @@ func (k Keeper) initializeValidator(ctx context.Context, val stakingtypes.Valida
 }
 
 // increment validator period, returning the period just ended
-func (k Keeper) IncrementValidatorPeriod(ctx context.Context, val stakingtypes.ValidatorI) (uint64, error) {
+func (k Keeper) IncrementValidatorPeriod(ctx context.Context, val stakingtypes.ValidatorI) (meterResult uint64, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IncrementValidatorPeriod")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IncrementValidatorPeriod")(&err)
 
 	valBz, err := k.stakingKeeper.ValidatorAddressCodec().StringToBytes(val.GetOperator())
 	if err != nil {
@@ -123,9 +123,9 @@ func (k Keeper) IncrementValidatorPeriod(ctx context.Context, val stakingtypes.V
 }
 
 // increment the reference count for a historical rewards value
-func (k Keeper) incrementReferenceCount(ctx context.Context, valAddr sdk.ValAddress, period uint64) error {
+func (k Keeper) incrementReferenceCount(ctx context.Context, valAddr sdk.ValAddress, period uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "incrementReferenceCount")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "incrementReferenceCount")(&err)
 
 	historical, err := k.GetValidatorHistoricalRewards(sdkCtx, valAddr, period)
 	if err != nil {
@@ -139,9 +139,9 @@ func (k Keeper) incrementReferenceCount(ctx context.Context, valAddr sdk.ValAddr
 }
 
 // decrement the reference count for a historical rewards value, and delete if zero references remain
-func (k Keeper) decrementReferenceCount(ctx context.Context, valAddr sdk.ValAddress, period uint64) error {
+func (k Keeper) decrementReferenceCount(ctx context.Context, valAddr sdk.ValAddress, period uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "decrementReferenceCount")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "decrementReferenceCount")(&err)
 
 	historical, err := k.GetValidatorHistoricalRewards(sdkCtx, valAddr, period)
 	if err != nil {
@@ -159,9 +159,9 @@ func (k Keeper) decrementReferenceCount(ctx context.Context, valAddr sdk.ValAddr
 	return k.SetValidatorHistoricalRewards(sdkCtx, valAddr, period, historical)
 }
 
-func (k Keeper) updateValidatorSlashFraction(ctx context.Context, valAddr sdk.ValAddress, fraction math.LegacyDec) error {
+func (k Keeper) updateValidatorSlashFraction(ctx context.Context, valAddr sdk.ValAddress, fraction math.LegacyDec) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "updateValidatorSlashFraction")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "updateValidatorSlashFraction")(&err)
 
 	if fraction.GT(math.LegacyOneDec()) || fraction.IsNegative() {
 		panic(fmt.Sprintf("fraction must be >=0 and <=1, current fraction: %v", fraction))

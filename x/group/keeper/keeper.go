@@ -242,7 +242,7 @@ func (k Keeper) GetGroupPolicySeq(ctx sdk.Context) uint64 {
 
 // proposalsByVPEnd returns all proposals whose voting_period_end is after the `endTime` time argument.
 func (k Keeper) proposalsByVPEnd(ctx sdk.Context, endTime time.Time) (proposals []group.Proposal, err error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "proposalsByVPEnd")()
+	defer k.Meter(ctx).FuncTiming(&ctx, "proposalsByVPEnd")(&err)
 
 	timeBytes := sdk.FormatTimeBytes(endTime)
 	it, err := k.proposalsByVotingPeriodEnd.PrefixScan(ctx.KVStore(k.key), nil, timeBytes)
@@ -276,12 +276,12 @@ func (k Keeper) proposalsByVPEnd(ctx sdk.Context, endTime time.Time) (proposals 
 }
 
 // pruneProposal deletes a proposal from state.
-func (k Keeper) pruneProposal(ctx sdk.Context, proposalID uint64) error {
-	defer k.Meter(ctx).FuncTiming(&ctx, "pruneProposal")()
+func (k Keeper) pruneProposal(ctx sdk.Context, proposalID uint64) (err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "pruneProposal")(&err)
 
 	store := ctx.KVStore(k.key)
 
-	err := k.proposalTable.Delete(store, proposalID)
+	err = k.proposalTable.Delete(store, proposalID)
 	if err != nil {
 		return err
 	}
@@ -292,8 +292,8 @@ func (k Keeper) pruneProposal(ctx sdk.Context, proposalID uint64) error {
 
 // abortProposals iterates through all proposals by group policy index
 // and marks submitted proposals as aborted.
-func (k Keeper) abortProposals(ctx sdk.Context, groupPolicyAddr sdk.AccAddress) error {
-	defer k.Meter(ctx).FuncTiming(&ctx, "abortProposals")()
+func (k Keeper) abortProposals(ctx sdk.Context, groupPolicyAddr sdk.AccAddress) (err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "abortProposals")(&err)
 
 	proposals, err := k.proposalsByGroupPolicy(ctx, groupPolicyAddr)
 	if err != nil {
@@ -306,7 +306,7 @@ func (k Keeper) abortProposals(ctx sdk.Context, groupPolicyAddr sdk.AccAddress) 
 		if proposalInfo.Status == group.PROPOSAL_STATUS_SUBMITTED {
 			proposalInfo.Status = group.PROPOSAL_STATUS_ABORTED
 
-			if err := k.proposalTable.Update(ctx.KVStore(k.key), proposalInfo.Id, &proposalInfo); err != nil {
+			if err = k.proposalTable.Update(ctx.KVStore(k.key), proposalInfo.Id, &proposalInfo); err != nil {
 				return err
 			}
 		}
@@ -315,8 +315,8 @@ func (k Keeper) abortProposals(ctx sdk.Context, groupPolicyAddr sdk.AccAddress) 
 }
 
 // proposalsByGroupPolicy returns all proposals for a given group policy.
-func (k Keeper) proposalsByGroupPolicy(ctx sdk.Context, groupPolicyAddr sdk.AccAddress) ([]group.Proposal, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "proposalsByGroupPolicy")()
+func (k Keeper) proposalsByGroupPolicy(ctx sdk.Context, groupPolicyAddr sdk.AccAddress) (meterResult []group.Proposal, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "proposalsByGroupPolicy")(&err)
 
 	proposalIt, err := k.proposalByGroupPolicyIndex.Get(ctx.KVStore(k.key), groupPolicyAddr.Bytes())
 	if err != nil {
@@ -341,8 +341,8 @@ func (k Keeper) proposalsByGroupPolicy(ctx sdk.Context, groupPolicyAddr sdk.AccA
 }
 
 // pruneVotes prunes all votes for a proposal from state.
-func (k Keeper) pruneVotes(ctx sdk.Context, proposalID uint64) error {
-	defer k.Meter(ctx).FuncTiming(&ctx, "pruneVotes")()
+func (k Keeper) pruneVotes(ctx sdk.Context, proposalID uint64) (err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "pruneVotes")(&err)
 
 	votes, err := k.votesByProposal(ctx, proposalID)
 	if err != nil {
@@ -361,8 +361,8 @@ func (k Keeper) pruneVotes(ctx sdk.Context, proposalID uint64) error {
 }
 
 // votesByProposal returns all votes for a given proposal.
-func (k Keeper) votesByProposal(ctx sdk.Context, proposalID uint64) ([]group.Vote, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "votesByProposal")()
+func (k Keeper) votesByProposal(ctx sdk.Context, proposalID uint64) (meterResult []group.Vote, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "votesByProposal")(&err)
 
 	it, err := k.voteByProposalIndex.Get(ctx.KVStore(k.key), proposalID)
 	if err != nil {
@@ -388,20 +388,20 @@ func (k Keeper) votesByProposal(ctx sdk.Context, proposalID uint64) ([]group.Vot
 // PruneProposals prunes all proposals that are expired, i.e. whose
 // `voting_period + max_execution_period` is greater than the current block
 // time.
-func (k Keeper) PruneProposals(ctx sdk.Context) error {
-	defer k.Meter(ctx).FuncTiming(&ctx, "PruneProposals")()
+func (k Keeper) PruneProposals(ctx sdk.Context) (err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "PruneProposals")(&err)
 
 	proposals, err := k.proposalsByVPEnd(ctx, ctx.BlockTime().Add(-k.config.MaxExecutionPeriod))
 	if err != nil {
 		return nil
 	}
 	for _, proposal := range proposals {
-		err := k.pruneProposal(ctx, proposal.Id)
+		err = k.pruneProposal(ctx, proposal.Id)
 		if err != nil {
 			return err
 		}
 		// Emit event for proposal finalized with its result
-		if err := ctx.EventManager().EmitTypedEvent(
+		if err = ctx.EventManager().EmitTypedEvent(
 			&group.EventProposalPruned{
 				ProposalId:  proposal.Id,
 				Status:      proposal.Status,
@@ -417,8 +417,8 @@ func (k Keeper) PruneProposals(ctx sdk.Context) error {
 // TallyProposalsAtVPEnd iterates over all proposals whose voting period
 // has ended, tallies their votes, prunes them, and updates the proposal's
 // `FinalTallyResult` field.
-func (k Keeper) TallyProposalsAtVPEnd(ctx sdk.Context) error {
-	defer k.Meter(ctx).FuncTiming(&ctx, "TallyProposalsAtVPEnd")()
+func (k Keeper) TallyProposalsAtVPEnd(ctx sdk.Context) (err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "TallyProposalsAtVPEnd")(&err)
 
 	proposals, err := k.proposalsByVPEnd(ctx, ctx.BlockTime())
 	if err != nil {
@@ -438,14 +438,14 @@ func (k Keeper) TallyProposalsAtVPEnd(ctx sdk.Context) error {
 
 		proposalID := proposal.Id
 		if proposal.Status == group.PROPOSAL_STATUS_ABORTED || proposal.Status == group.PROPOSAL_STATUS_WITHDRAWN {
-			if err := k.pruneProposal(ctx, proposalID); err != nil {
+			if err = k.pruneProposal(ctx, proposalID); err != nil {
 				return err
 			}
-			if err := k.pruneVotes(ctx, proposalID); err != nil {
+			if err = k.pruneVotes(ctx, proposalID); err != nil {
 				return err
 			}
 			// Emit event for proposal finalized with its result
-			if err := ctx.EventManager().EmitTypedEvent(
+			if err = ctx.EventManager().EmitTypedEvent(
 				&group.EventProposalPruned{
 					ProposalId: proposal.Id,
 					Status:     proposal.Status,
@@ -453,11 +453,11 @@ func (k Keeper) TallyProposalsAtVPEnd(ctx sdk.Context) error {
 				return err
 			}
 		} else if proposal.Status == group.PROPOSAL_STATUS_SUBMITTED {
-			if err := k.doTallyAndUpdate(ctx, &proposal, electorate, policyInfo); err != nil {
+			if err = k.doTallyAndUpdate(ctx, &proposal, electorate, policyInfo); err != nil {
 				return errorsmod.Wrap(err, "doTallyAndUpdate")
 			}
 
-			if err := k.proposalTable.Update(ctx.KVStore(k.key), proposal.Id, &proposal); err != nil {
+			if err = k.proposalTable.Update(ctx.KVStore(k.key), proposal.Id, &proposal); err != nil {
 				return errorsmod.Wrap(err, "proposal update")
 			}
 		}

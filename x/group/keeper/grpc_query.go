@@ -19,9 +19,9 @@ import (
 var _ group.QueryServer = Keeper{}
 
 // GroupInfo queries info about a group.
-func (k Keeper) GroupInfo(goCtx context.Context, request *group.QueryGroupInfoRequest) (*group.QueryGroupInfoResponse, error) {
+func (k Keeper) GroupInfo(goCtx context.Context, request *group.QueryGroupInfoRequest) (meterResult *group.QueryGroupInfoResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GroupInfo")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "GroupInfo")(&err)
 
 	groupID := request.GroupId
 	groupInfo, err := k.getGroupInfo(sdkCtx, groupID)
@@ -33,20 +33,20 @@ func (k Keeper) GroupInfo(goCtx context.Context, request *group.QueryGroupInfoRe
 }
 
 // getGroupInfo gets the group info of the given group id.
-func (k Keeper) getGroupInfo(ctx sdk.Context, id uint64) (group.GroupInfo, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupInfo")()
+func (k Keeper) getGroupInfo(ctx sdk.Context, id uint64) (meterResult group.GroupInfo, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupInfo")(&err)
 
 	var obj group.GroupInfo
-	_, err := k.groupTable.GetOne(ctx.KVStore(k.key), id, &obj)
+	_, err = k.groupTable.GetOne(ctx.KVStore(k.key), id, &obj)
 	return obj, err
 }
 
 // GroupPolicyInfo queries info about a group policy.
-func (k Keeper) GroupPolicyInfo(goCtx context.Context, request *group.QueryGroupPolicyInfoRequest) (*group.QueryGroupPolicyInfoResponse, error) {
+func (k Keeper) GroupPolicyInfo(goCtx context.Context, request *group.QueryGroupPolicyInfoRequest) (meterResult *group.QueryGroupPolicyInfoResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GroupPolicyInfo")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "GroupPolicyInfo")(&err)
 
-	_, err := k.accKeeper.AddressCodec().StringToBytes(request.Address)
+	_, err = k.accKeeper.AddressCodec().StringToBytes(request.Address)
 	if err != nil {
 		return nil, err
 	}
@@ -60,17 +60,17 @@ func (k Keeper) GroupPolicyInfo(goCtx context.Context, request *group.QueryGroup
 }
 
 // getGroupPolicyInfo gets the group policy info of the given account address.
-func (k Keeper) getGroupPolicyInfo(ctx sdk.Context, accountAddress string) (group.GroupPolicyInfo, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupPolicyInfo")()
+func (k Keeper) getGroupPolicyInfo(ctx sdk.Context, accountAddress string) (meterResult group.GroupPolicyInfo, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupPolicyInfo")(&err)
 
 	var obj group.GroupPolicyInfo
 	return obj, k.groupPolicyTable.GetOne(ctx.KVStore(k.key), orm.PrimaryKey(&group.GroupPolicyInfo{Address: accountAddress}), &obj)
 }
 
 // GroupMembers queries all members of a group.
-func (k Keeper) GroupMembers(goCtx context.Context, request *group.QueryGroupMembersRequest) (*group.QueryGroupMembersResponse, error) {
+func (k Keeper) GroupMembers(goCtx context.Context, request *group.QueryGroupMembersRequest) (meterResult *group.QueryGroupMembersResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GroupMembers")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "GroupMembers")(&err)
 
 	groupID := request.GroupId
 	it, err := k.getGroupMembers(sdkCtx, groupID, request.Pagination)
@@ -91,16 +91,16 @@ func (k Keeper) GroupMembers(goCtx context.Context, request *group.QueryGroupMem
 }
 
 // getGroupMembers returns an iterator for the given group id and page request.
-func (k Keeper) getGroupMembers(ctx sdk.Context, id uint64, pageRequest *query.PageRequest) (orm.Iterator, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupMembers")()
+func (k Keeper) getGroupMembers(ctx sdk.Context, id uint64, pageRequest *query.PageRequest) (meterResult orm.Iterator, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupMembers")(&err)
 
 	return k.groupMemberByGroupIndex.GetPaginated(ctx.KVStore(k.key), id, pageRequest)
 }
 
 // GroupsByAdmin queries all groups where a given address is admin.
-func (k Keeper) GroupsByAdmin(goCtx context.Context, request *group.QueryGroupsByAdminRequest) (*group.QueryGroupsByAdminResponse, error) {
+func (k Keeper) GroupsByAdmin(goCtx context.Context, request *group.QueryGroupsByAdminRequest) (meterResult *group.QueryGroupsByAdminResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GroupsByAdmin")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "GroupsByAdmin")(&err)
 
 	addr, err := k.accKeeper.AddressCodec().StringToBytes(request.Admin)
 	if err != nil {
@@ -124,16 +124,16 @@ func (k Keeper) GroupsByAdmin(goCtx context.Context, request *group.QueryGroupsB
 }
 
 // getGroupsByAdmin returns an iterator for the given admin account address and page request.
-func (k Keeper) getGroupsByAdmin(ctx sdk.Context, admin sdk.AccAddress, pageRequest *query.PageRequest) (orm.Iterator, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupsByAdmin")()
+func (k Keeper) getGroupsByAdmin(ctx sdk.Context, admin sdk.AccAddress, pageRequest *query.PageRequest) (meterResult orm.Iterator, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupsByAdmin")(&err)
 
 	return k.groupByAdminIndex.GetPaginated(ctx.KVStore(k.key), admin.Bytes(), pageRequest)
 }
 
 // GroupPoliciesByGroup queries all groups policies of a given group.
-func (k Keeper) GroupPoliciesByGroup(goCtx context.Context, request *group.QueryGroupPoliciesByGroupRequest) (*group.QueryGroupPoliciesByGroupResponse, error) {
+func (k Keeper) GroupPoliciesByGroup(goCtx context.Context, request *group.QueryGroupPoliciesByGroupRequest) (meterResult *group.QueryGroupPoliciesByGroupResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GroupPoliciesByGroup")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "GroupPoliciesByGroup")(&err)
 
 	groupID := request.GroupId
 	it, err := k.getGroupPoliciesByGroup(sdkCtx, groupID, request.Pagination)
@@ -154,17 +154,17 @@ func (k Keeper) GroupPoliciesByGroup(goCtx context.Context, request *group.Query
 }
 
 // getGroupPoliciesByGroup returns an iterator for the given group id and page request.
-func (k Keeper) getGroupPoliciesByGroup(ctx sdk.Context, id uint64, pageRequest *query.PageRequest) (orm.Iterator, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupPoliciesByGroup")()
+func (k Keeper) getGroupPoliciesByGroup(ctx sdk.Context, id uint64, pageRequest *query.PageRequest) (meterResult orm.Iterator, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupPoliciesByGroup")(&err)
 
 	return k.groupPolicyByGroupIndex.GetPaginated(ctx.KVStore(k.key), id, pageRequest)
 }
 
 // GroupPoliciesByAdmin queries all groups policies where a given address is
 // admin.
-func (k Keeper) GroupPoliciesByAdmin(goCtx context.Context, request *group.QueryGroupPoliciesByAdminRequest) (*group.QueryGroupPoliciesByAdminResponse, error) {
+func (k Keeper) GroupPoliciesByAdmin(goCtx context.Context, request *group.QueryGroupPoliciesByAdminRequest) (meterResult *group.QueryGroupPoliciesByAdminResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GroupPoliciesByAdmin")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "GroupPoliciesByAdmin")(&err)
 
 	addr, err := k.accKeeper.AddressCodec().StringToBytes(request.Admin)
 	if err != nil {
@@ -188,16 +188,16 @@ func (k Keeper) GroupPoliciesByAdmin(goCtx context.Context, request *group.Query
 }
 
 // getGroupPoliciesByAdmin returns an iterator for the given admin account address and page request.
-func (k Keeper) getGroupPoliciesByAdmin(ctx sdk.Context, admin sdk.AccAddress, pageRequest *query.PageRequest) (orm.Iterator, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupPoliciesByAdmin")()
+func (k Keeper) getGroupPoliciesByAdmin(ctx sdk.Context, admin sdk.AccAddress, pageRequest *query.PageRequest) (meterResult orm.Iterator, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "getGroupPoliciesByAdmin")(&err)
 
 	return k.groupPolicyByAdminIndex.GetPaginated(ctx.KVStore(k.key), admin.Bytes(), pageRequest)
 }
 
 // Proposal queries a proposal.
-func (k Keeper) Proposal(goCtx context.Context, request *group.QueryProposalRequest) (*group.QueryProposalResponse, error) {
+func (k Keeper) Proposal(goCtx context.Context, request *group.QueryProposalRequest) (meterResult *group.QueryProposalResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Proposal")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "Proposal")(&err)
 
 	proposalID := request.ProposalId
 	proposal, err := k.getProposal(sdkCtx, proposalID)
@@ -209,9 +209,9 @@ func (k Keeper) Proposal(goCtx context.Context, request *group.QueryProposalRequ
 }
 
 // ProposalsByGroupPolicy queries all proposals of a group policy.
-func (k Keeper) ProposalsByGroupPolicy(goCtx context.Context, request *group.QueryProposalsByGroupPolicyRequest) (*group.QueryProposalsByGroupPolicyResponse, error) {
+func (k Keeper) ProposalsByGroupPolicy(goCtx context.Context, request *group.QueryProposalsByGroupPolicyRequest) (meterResult *group.QueryProposalsByGroupPolicyResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "ProposalsByGroupPolicy")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "ProposalsByGroupPolicy")(&err)
 
 	addr, err := k.accKeeper.AddressCodec().StringToBytes(request.Address)
 	if err != nil {
@@ -235,15 +235,15 @@ func (k Keeper) ProposalsByGroupPolicy(goCtx context.Context, request *group.Que
 }
 
 // getProposalsByGroupPolicy returns an iterator for the given account address and page request.
-func (k Keeper) getProposalsByGroupPolicy(ctx sdk.Context, account sdk.AccAddress, pageRequest *query.PageRequest) (orm.Iterator, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "getProposalsByGroupPolicy")()
+func (k Keeper) getProposalsByGroupPolicy(ctx sdk.Context, account sdk.AccAddress, pageRequest *query.PageRequest) (meterResult orm.Iterator, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "getProposalsByGroupPolicy")(&err)
 
 	return k.proposalByGroupPolicyIndex.GetPaginated(ctx.KVStore(k.key), account.Bytes(), pageRequest)
 }
 
 // getProposal gets the proposal info of the given proposal id.
-func (k Keeper) getProposal(ctx sdk.Context, proposalID uint64) (group.Proposal, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "getProposal")()
+func (k Keeper) getProposal(ctx sdk.Context, proposalID uint64) (meterResult group.Proposal, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "getProposal")(&err)
 
 	var p group.Proposal
 	if _, err := k.proposalTable.GetOne(ctx.KVStore(k.key), proposalID, &p); err != nil {
@@ -253,9 +253,9 @@ func (k Keeper) getProposal(ctx sdk.Context, proposalID uint64) (group.Proposal,
 }
 
 // VoteByProposalVoter queries a vote given a voter and a proposal ID.
-func (k Keeper) VoteByProposalVoter(goCtx context.Context, request *group.QueryVoteByProposalVoterRequest) (*group.QueryVoteByProposalVoterResponse, error) {
+func (k Keeper) VoteByProposalVoter(goCtx context.Context, request *group.QueryVoteByProposalVoterRequest) (meterResult *group.QueryVoteByProposalVoterResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "VoteByProposalVoter")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "VoteByProposalVoter")(&err)
 
 	addr, err := k.accKeeper.AddressCodec().StringToBytes(request.Voter)
 	if err != nil {
@@ -272,9 +272,9 @@ func (k Keeper) VoteByProposalVoter(goCtx context.Context, request *group.QueryV
 }
 
 // VotesByProposal queries all votes on a proposal.
-func (k Keeper) VotesByProposal(goCtx context.Context, request *group.QueryVotesByProposalRequest) (*group.QueryVotesByProposalResponse, error) {
+func (k Keeper) VotesByProposal(goCtx context.Context, request *group.QueryVotesByProposalRequest) (meterResult *group.QueryVotesByProposalResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "VotesByProposal")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "VotesByProposal")(&err)
 
 	proposalID := request.ProposalId
 	it, err := k.getVotesByProposal(sdkCtx, proposalID, request.Pagination)
@@ -295,9 +295,9 @@ func (k Keeper) VotesByProposal(goCtx context.Context, request *group.QueryVotes
 }
 
 // VotesByVoter queries all votes of a voter.
-func (k Keeper) VotesByVoter(goCtx context.Context, request *group.QueryVotesByVoterRequest) (*group.QueryVotesByVoterResponse, error) {
+func (k Keeper) VotesByVoter(goCtx context.Context, request *group.QueryVotesByVoterRequest) (meterResult *group.QueryVotesByVoterResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "VotesByVoter")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "VotesByVoter")(&err)
 
 	addr, err := k.accKeeper.AddressCodec().StringToBytes(request.Voter)
 	if err != nil {
@@ -321,9 +321,9 @@ func (k Keeper) VotesByVoter(goCtx context.Context, request *group.QueryVotesByV
 }
 
 // GroupsByMember queries all groups where the given address is a member of.
-func (k Keeper) GroupsByMember(goCtx context.Context, request *group.QueryGroupsByMemberRequest) (*group.QueryGroupsByMemberResponse, error) {
+func (k Keeper) GroupsByMember(goCtx context.Context, request *group.QueryGroupsByMemberRequest) (meterResult *group.QueryGroupsByMemberResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GroupsByMember")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "GroupsByMember")(&err)
 
 	if request == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -361,31 +361,31 @@ func (k Keeper) GroupsByMember(goCtx context.Context, request *group.QueryGroups
 }
 
 // getVote gets the vote info for the given proposal id and voter address.
-func (k Keeper) getVote(ctx sdk.Context, proposalID uint64, voter sdk.AccAddress) (group.Vote, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "getVote")()
+func (k Keeper) getVote(ctx sdk.Context, proposalID uint64, voter sdk.AccAddress) (meterResult group.Vote, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "getVote")(&err)
 
 	var v group.Vote
 	return v, k.voteTable.GetOne(ctx.KVStore(k.key), orm.PrimaryKey(&group.Vote{ProposalId: proposalID, Voter: voter.String()}), &v)
 }
 
 // getVotesByProposal returns an iterator for the given proposal id and page request.
-func (k Keeper) getVotesByProposal(ctx sdk.Context, proposalID uint64, pageRequest *query.PageRequest) (orm.Iterator, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "getVotesByProposal")()
+func (k Keeper) getVotesByProposal(ctx sdk.Context, proposalID uint64, pageRequest *query.PageRequest) (meterResult orm.Iterator, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "getVotesByProposal")(&err)
 
 	return k.voteByProposalIndex.GetPaginated(ctx.KVStore(k.key), proposalID, pageRequest)
 }
 
 // getVotesByVoter returns an iterator for the given voter address and page request.
-func (k Keeper) getVotesByVoter(ctx sdk.Context, voter sdk.AccAddress, pageRequest *query.PageRequest) (orm.Iterator, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "getVotesByVoter")()
+func (k Keeper) getVotesByVoter(ctx sdk.Context, voter sdk.AccAddress, pageRequest *query.PageRequest) (meterResult orm.Iterator, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "getVotesByVoter")(&err)
 
 	return k.voteByVoterIndex.GetPaginated(ctx.KVStore(k.key), voter.Bytes(), pageRequest)
 }
 
 // TallyResult computes the live tally result of a proposal.
-func (k Keeper) TallyResult(goCtx context.Context, request *group.QueryTallyResultRequest) (*group.QueryTallyResultResponse, error) {
+func (k Keeper) TallyResult(goCtx context.Context, request *group.QueryTallyResultRequest) (meterResult *group.QueryTallyResultResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "TallyResult")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "TallyResult")(&err)
 
 	proposalID := request.ProposalId
 
@@ -414,9 +414,9 @@ func (k Keeper) TallyResult(goCtx context.Context, request *group.QueryTallyResu
 }
 
 // Groups returns all the groups present in the state.
-func (k Keeper) Groups(goCtx context.Context, request *group.QueryGroupsRequest) (*group.QueryGroupsResponse, error) {
+func (k Keeper) Groups(goCtx context.Context, request *group.QueryGroupsRequest) (meterResult *group.QueryGroupsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Groups")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "Groups")(&err)
 
 	it, err := k.groupTable.PrefixScan(sdkCtx.KVStore(k.key), 1, math.MaxUint64)
 	if err != nil {

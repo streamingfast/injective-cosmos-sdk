@@ -79,7 +79,7 @@ func NewKeeper(
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx context.Context) log.Logger {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Logger")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Logger")()
 	return sdkCtx.Logger().With("module", "x/"+types.ModuleName)
 }
 
@@ -104,9 +104,9 @@ func (k *Keeper) SetHooks(sh types.StakingHooks) {
 }
 
 // GetLastTotalPower loads the last total validator power.
-func (k Keeper) GetLastTotalPower(ctx context.Context) (math.Int, error) {
+func (k Keeper) GetLastTotalPower(ctx context.Context) (meterResult math.Int, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetLastTotalPower")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetLastTotalPower")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := store.Get(types.LastTotalPowerKey)
@@ -128,9 +128,9 @@ func (k Keeper) GetLastTotalPower(ctx context.Context) (math.Int, error) {
 }
 
 // SetLastTotalPower sets the last total validator power.
-func (k Keeper) SetLastTotalPower(ctx context.Context, power math.Int) error {
+func (k Keeper) SetLastTotalPower(ctx context.Context, power math.Int) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetLastTotalPower")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetLastTotalPower")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := k.cdc.Marshal(&sdk.IntProto{Int: power})
@@ -156,9 +156,9 @@ func (k Keeper) ConsensusAddressCodec() addresscodec.Codec {
 }
 
 // SetValidatorUpdates sets the ABCI validator power updates for the current block.
-func (k Keeper) SetValidatorUpdates(ctx context.Context, valUpdates []abci.ValidatorUpdate) error {
+func (k Keeper) SetValidatorUpdates(ctx context.Context, valUpdates []abci.ValidatorUpdate) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetValidatorUpdates")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetValidatorUpdates")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := k.cdc.Marshal(&types.ValidatorUpdates{Updates: valUpdates})
@@ -169,9 +169,9 @@ func (k Keeper) SetValidatorUpdates(ctx context.Context, valUpdates []abci.Valid
 }
 
 // GetValidatorUpdates returns the ABCI validator power updates within the current block.
-func (k Keeper) GetValidatorUpdates(ctx context.Context) ([]abci.ValidatorUpdate, error) {
+func (k Keeper) GetValidatorUpdates(ctx context.Context) (meterResult []abci.ValidatorUpdate, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetValidatorUpdates")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetValidatorUpdates")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := store.Get(types.ValidatorUpdatesKey)

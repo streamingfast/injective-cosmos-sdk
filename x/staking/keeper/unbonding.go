@@ -13,7 +13,7 @@ import (
 // IncrementUnbondingID increments and returns a unique ID for an unbonding operation
 func (k Keeper) IncrementUnbondingID(ctx context.Context) (unbondingID uint64, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IncrementUnbondingID")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IncrementUnbondingID")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := store.Get(types.UnbondingIDKey)
@@ -39,9 +39,9 @@ func (k Keeper) IncrementUnbondingID(ctx context.Context) (unbondingID uint64, e
 }
 
 // DeleteUnbondingIndex removes a mapping from UnbondingId to unbonding operation
-func (k Keeper) DeleteUnbondingIndex(ctx context.Context, id uint64) error {
+func (k Keeper) DeleteUnbondingIndex(ctx context.Context, id uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "DeleteUnbondingIndex")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "DeleteUnbondingIndex")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	return store.Delete(types.GetUnbondingIndexKey(id))
@@ -51,7 +51,7 @@ func (k Keeper) DeleteUnbondingIndex(ctx context.Context, id uint64) error {
 // {UnbondingDelegation | Redelegation | ValidatorUnbonding}
 func (k Keeper) GetUnbondingType(ctx context.Context, id uint64) (unbondingType types.UnbondingType, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetUnbondingType")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetUnbondingType")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 
@@ -69,9 +69,9 @@ func (k Keeper) GetUnbondingType(ctx context.Context, id uint64) (unbondingType 
 
 // SetUnbondingType sets the enum type of unbonding which is any of
 // {UnbondingDelegation | Redelegation | ValidatorUnbonding}
-func (k Keeper) SetUnbondingType(ctx context.Context, id uint64, unbondingType types.UnbondingType) error {
+func (k Keeper) SetUnbondingType(ctx context.Context, id uint64, unbondingType types.UnbondingType) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetUnbondingType")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetUnbondingType")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 
@@ -85,7 +85,7 @@ func (k Keeper) SetUnbondingType(ctx context.Context, id uint64, unbondingType t
 // GetUnbondingDelegationByUnbondingID returns a unbonding delegation that has an unbonding delegation entry with a certain ID
 func (k Keeper) GetUnbondingDelegationByUnbondingID(ctx context.Context, id uint64) (ubd types.UnbondingDelegation, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetUnbondingDelegationByUnbondingID")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetUnbondingDelegationByUnbondingID")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 
@@ -119,7 +119,7 @@ func (k Keeper) GetUnbondingDelegationByUnbondingID(ctx context.Context, id uint
 // GetRedelegationByUnbondingID returns a unbonding delegation that has an unbonding delegation entry with a certain ID
 func (k Keeper) GetRedelegationByUnbondingID(ctx context.Context, id uint64) (red types.Redelegation, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetRedelegationByUnbondingID")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetRedelegationByUnbondingID")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 
@@ -153,7 +153,7 @@ func (k Keeper) GetRedelegationByUnbondingID(ctx context.Context, id uint64) (re
 // GetValidatorByUnbondingID returns the validator that is unbonding with a certain unbonding op ID
 func (k Keeper) GetValidatorByUnbondingID(ctx context.Context, id uint64) (val types.Validator, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetValidatorByUnbondingID")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetValidatorByUnbondingID")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 
@@ -187,9 +187,9 @@ func (k Keeper) GetValidatorByUnbondingID(ctx context.Context, id uint64) (val t
 // SetUnbondingDelegationByUnbondingID sets an index to look up an UnbondingDelegation
 // by the unbondingID of an UnbondingDelegationEntry that it contains Note, it does not
 // set the unbonding delegation itself, use SetUnbondingDelegation(ctx, ubd) for that
-func (k Keeper) SetUnbondingDelegationByUnbondingID(ctx context.Context, ubd types.UnbondingDelegation, id uint64) error {
+func (k Keeper) SetUnbondingDelegationByUnbondingID(ctx context.Context, ubd types.UnbondingDelegation, id uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetUnbondingDelegationByUnbondingID")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetUnbondingDelegationByUnbondingID")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	delAddr, err := k.authKeeper.AddressCodec().StringToBytes(ubd.DelegatorAddress)
@@ -212,9 +212,9 @@ func (k Keeper) SetUnbondingDelegationByUnbondingID(ctx context.Context, ubd typ
 
 // SetRedelegationByUnbondingID sets an index to look up an Redelegation by the unbondingID of an RedelegationEntry that it contains
 // Note, it does not set the redelegation itself, use SetRedelegation(ctx, red) for that
-func (k Keeper) SetRedelegationByUnbondingID(ctx context.Context, red types.Redelegation, id uint64) error {
+func (k Keeper) SetRedelegationByUnbondingID(ctx context.Context, red types.Redelegation, id uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetRedelegationByUnbondingID")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetRedelegationByUnbondingID")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 
@@ -244,9 +244,9 @@ func (k Keeper) SetRedelegationByUnbondingID(ctx context.Context, red types.Rede
 
 // SetValidatorByUnbondingID sets an index to look up a Validator by the unbondingID corresponding to its current unbonding
 // Note, it does not set the validator itself, use SetValidator(ctx, val) for that
-func (k Keeper) SetValidatorByUnbondingID(ctx context.Context, val types.Validator, id uint64) error {
+func (k Keeper) SetValidatorByUnbondingID(ctx context.Context, val types.Validator, id uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetValidatorByUnbondingID")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetValidatorByUnbondingID")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 
@@ -292,9 +292,9 @@ func redelegationEntryArrayIndex(red types.Redelegation, id uint64) (index int, 
 // unbonding delegation, a redelegation, or a validator unbonding to complete.
 // In order for the unbonding operation with `id` to eventually complete, every call
 // to PutUnbondingOnHold(id) must be matched by a call to UnbondingCanComplete(id).
-func (k Keeper) UnbondingCanComplete(ctx context.Context, id uint64) error {
+func (k Keeper) UnbondingCanComplete(ctx context.Context, id uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UnbondingCanComplete")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "UnbondingCanComplete")(&err)
 
 	unbondingType, err := k.GetUnbondingType(sdkCtx, id)
 	if err != nil {
@@ -303,15 +303,15 @@ func (k Keeper) UnbondingCanComplete(ctx context.Context, id uint64) error {
 
 	switch unbondingType {
 	case types.UnbondingType_UnbondingDelegation:
-		if err := k.unbondingDelegationEntryCanComplete(sdkCtx, id); err != nil {
+		if err = k.unbondingDelegationEntryCanComplete(sdkCtx, id); err != nil {
 			return err
 		}
 	case types.UnbondingType_Redelegation:
-		if err := k.redelegationEntryCanComplete(sdkCtx, id); err != nil {
+		if err = k.redelegationEntryCanComplete(sdkCtx, id); err != nil {
 			return err
 		}
 	case types.UnbondingType_ValidatorUnbonding:
-		if err := k.validatorUnbondingCanComplete(sdkCtx, id); err != nil {
+		if err = k.validatorUnbondingCanComplete(sdkCtx, id); err != nil {
 			return err
 		}
 	default:
@@ -321,9 +321,9 @@ func (k Keeper) UnbondingCanComplete(ctx context.Context, id uint64) error {
 	return nil
 }
 
-func (k Keeper) unbondingDelegationEntryCanComplete(ctx context.Context, id uint64) error {
+func (k Keeper) unbondingDelegationEntryCanComplete(ctx context.Context, id uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "unbondingDelegationEntryCanComplete")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "unbondingDelegationEntryCanComplete")(&err)
 
 	ubd, err := k.GetUnbondingDelegationByUnbondingID(sdkCtx, id)
 	if err != nil {
@@ -360,7 +360,7 @@ func (k Keeper) unbondingDelegationEntryCanComplete(ctx context.Context, id uint
 		// track undelegation only when remaining or truncated shares are non-zero
 		if !ubd.Entries[i].Balance.IsZero() {
 			amt := sdk.NewCoin(bondDenom, ubd.Entries[i].Balance)
-			if err := k.bankKeeper.UndelegateCoinsFromModuleToAccount(
+			if err = k.bankKeeper.UndelegateCoinsFromModuleToAccount(
 				sdkCtx, types.NotBondedPoolName, delegatorAddress, sdk.NewCoins(amt),
 			); err != nil {
 				return err
@@ -385,9 +385,9 @@ func (k Keeper) unbondingDelegationEntryCanComplete(ctx context.Context, id uint
 	return k.SetUnbondingDelegation(sdkCtx, ubd)
 }
 
-func (k Keeper) redelegationEntryCanComplete(ctx context.Context, id uint64) error {
+func (k Keeper) redelegationEntryCanComplete(ctx context.Context, id uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "redelegationEntryCanComplete")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "redelegationEntryCanComplete")(&err)
 
 	red, err := k.GetRedelegationByUnbondingID(sdkCtx, id)
 	if err != nil {
@@ -426,9 +426,9 @@ func (k Keeper) redelegationEntryCanComplete(ctx context.Context, id uint64) err
 	return k.SetRedelegation(sdkCtx, red)
 }
 
-func (k Keeper) validatorUnbondingCanComplete(ctx context.Context, id uint64) error {
+func (k Keeper) validatorUnbondingCanComplete(ctx context.Context, id uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "validatorUnbondingCanComplete")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "validatorUnbondingCanComplete")(&err)
 
 	val, err := k.GetValidatorByUnbondingID(sdkCtx, id)
 	if err != nil {
@@ -450,9 +450,9 @@ func (k Keeper) validatorUnbondingCanComplete(ctx context.Context, id uint64) er
 // such as an unbonding delegation, a redelegation, or a validator unbonding.
 // In order for the unbonding operation with `id` to eventually complete, every call
 // to PutUnbondingOnHold(id) must be matched by a call to UnbondingCanComplete(id).
-func (k Keeper) PutUnbondingOnHold(ctx context.Context, id uint64) error {
+func (k Keeper) PutUnbondingOnHold(ctx context.Context, id uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "PutUnbondingOnHold")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "PutUnbondingOnHold")(&err)
 
 	unbondingType, err := k.GetUnbondingType(sdkCtx, id)
 	if err != nil {
@@ -460,15 +460,15 @@ func (k Keeper) PutUnbondingOnHold(ctx context.Context, id uint64) error {
 	}
 	switch unbondingType {
 	case types.UnbondingType_UnbondingDelegation:
-		if err := k.putUnbondingDelegationEntryOnHold(sdkCtx, id); err != nil {
+		if err = k.putUnbondingDelegationEntryOnHold(sdkCtx, id); err != nil {
 			return err
 		}
 	case types.UnbondingType_Redelegation:
-		if err := k.putRedelegationEntryOnHold(sdkCtx, id); err != nil {
+		if err = k.putRedelegationEntryOnHold(sdkCtx, id); err != nil {
 			return err
 		}
 	case types.UnbondingType_ValidatorUnbonding:
-		if err := k.putValidatorOnHold(sdkCtx, id); err != nil {
+		if err = k.putValidatorOnHold(sdkCtx, id); err != nil {
 			return err
 		}
 	default:
@@ -478,9 +478,9 @@ func (k Keeper) PutUnbondingOnHold(ctx context.Context, id uint64) error {
 	return nil
 }
 
-func (k Keeper) putUnbondingDelegationEntryOnHold(ctx context.Context, id uint64) error {
+func (k Keeper) putUnbondingDelegationEntryOnHold(ctx context.Context, id uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "putUnbondingDelegationEntryOnHold")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "putUnbondingDelegationEntryOnHold")(&err)
 
 	ubd, err := k.GetUnbondingDelegationByUnbondingID(sdkCtx, id)
 	if err != nil {
@@ -496,9 +496,9 @@ func (k Keeper) putUnbondingDelegationEntryOnHold(ctx context.Context, id uint64
 	return k.SetUnbondingDelegation(sdkCtx, ubd)
 }
 
-func (k Keeper) putRedelegationEntryOnHold(ctx context.Context, id uint64) error {
+func (k Keeper) putRedelegationEntryOnHold(ctx context.Context, id uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "putRedelegationEntryOnHold")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "putRedelegationEntryOnHold")(&err)
 
 	red, err := k.GetRedelegationByUnbondingID(sdkCtx, id)
 	if err != nil {
@@ -514,9 +514,9 @@ func (k Keeper) putRedelegationEntryOnHold(ctx context.Context, id uint64) error
 	return k.SetRedelegation(sdkCtx, red)
 }
 
-func (k Keeper) putValidatorOnHold(ctx context.Context, id uint64) error {
+func (k Keeper) putValidatorOnHold(ctx context.Context, id uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "putValidatorOnHold")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "putValidatorOnHold")(&err)
 
 	val, err := k.GetValidatorByUnbondingID(sdkCtx, id)
 	if err != nil {

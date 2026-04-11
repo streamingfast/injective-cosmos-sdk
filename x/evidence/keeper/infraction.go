@@ -24,9 +24,9 @@ import (
 //
 // TODO: Some of the invalid constraints listed above may need to be reconsidered
 // in the case of a lunatic attack.
-func (k Keeper) handleEquivocationEvidence(ctx context.Context, evidence *types.Equivocation) error {
+func (k Keeper) handleEquivocationEvidence(ctx context.Context, evidence *types.Equivocation) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "handleEquivocationEvidence")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "handleEquivocationEvidence")(&err)
 	logger := k.Logger(sdkCtx)
 	consAddr := evidence.GetConsensusAddress(k.stakingKeeper.ConsensusAddressCodec())
 

@@ -17,7 +17,7 @@ import (
 // voters
 func (keeper Keeper) Tally(ctx context.Context, proposal v1.Proposal) (passes, burnDeposits bool, tallyResults v1.TallyResult, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Tally")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "Tally")(&err)
 
 	results := make(map[v1.VoteOption]math.LegacyDec)
 	results[v1.OptionYes] = math.LegacyZeroDec()

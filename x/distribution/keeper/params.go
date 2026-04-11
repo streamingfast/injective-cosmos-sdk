@@ -9,9 +9,9 @@ import (
 )
 
 // GetCommunityTax returns the current distribution community tax.
-func (k Keeper) GetCommunityTax(ctx context.Context) (math.LegacyDec, error) {
+func (k Keeper) GetCommunityTax(ctx context.Context) (meterResult math.LegacyDec, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetCommunityTax")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetCommunityTax")(&err)
 
 	params, err := k.Params.Get(sdkCtx)
 	if err != nil {
@@ -25,7 +25,7 @@ func (k Keeper) GetCommunityTax(ctx context.Context) (math.LegacyDec, error) {
 // enabled parameter.
 func (k Keeper) GetWithdrawAddrEnabled(ctx context.Context) (enabled bool, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetWithdrawAddrEnabled")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetWithdrawAddrEnabled")(&err)
 
 	params, err := k.Params.Get(sdkCtx)
 	if err != nil {

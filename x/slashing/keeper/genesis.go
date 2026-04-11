@@ -9,7 +9,8 @@ import (
 // InitGenesis initializes default parameters and the keeper's address to
 // pubkey map.
 func (keeper Keeper) InitGenesis(ctx sdk.Context, stakingKeeper types.StakingKeeper, data *types.GenesisState) {
-	defer keeper.Meter(ctx).FuncTiming(&ctx, "InitGenesis")()
+	var err error
+	defer keeper.Meter(ctx).FuncTiming(&ctx, "InitGenesis")(&err)
 
 	stakingKeeper.IterateValidators(ctx,
 		func(index int64, validator stakingtypes.ValidatorI) bool {
@@ -38,13 +39,13 @@ func (keeper Keeper) InitGenesis(ctx sdk.Context, stakingKeeper types.StakingKee
 		}
 
 		for _, missed := range array.MissedBlocks {
-			if err := keeper.SetMissedBlockBitmapValue(ctx, address, missed.Index, missed.Missed); err != nil {
+			if err = keeper.SetMissedBlockBitmapValue(ctx, address, missed.Index, missed.Missed); err != nil {
 				panic(err)
 			}
 		}
 	}
 
-	if err := keeper.SetParams(ctx, data.Params); err != nil {
+	if err = keeper.SetParams(ctx, data.Params); err != nil {
 		panic(err)
 	}
 }
@@ -53,7 +54,8 @@ func (keeper Keeper) InitGenesis(ctx sdk.Context, stakingKeeper types.StakingKee
 // to a genesis file, which can be imported again
 // with InitGenesis
 func (keeper Keeper) ExportGenesis(ctx sdk.Context) (data *types.GenesisState) {
-	defer keeper.Meter(ctx).FuncTiming(&ctx, "ExportGenesis")()
+	var err error
+	defer keeper.Meter(ctx).FuncTiming(&ctx, "ExportGenesis")(&err)
 
 	params, err := keeper.GetParams(ctx)
 	if err != nil {

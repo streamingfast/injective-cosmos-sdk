@@ -97,9 +97,9 @@ func (k Keeper) SetUpgradeHandler(name string, upgradeHandler types.UpgradeHandl
 }
 
 // setProtocolVersion sets the protocol version to state
-func (k Keeper) setProtocolVersion(ctx context.Context, v uint64) error {
+func (k Keeper) setProtocolVersion(ctx context.Context, v uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "setProtocolVersion")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "setProtocolVersion")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	versionBytes := make([]byte, 8)
@@ -108,9 +108,9 @@ func (k Keeper) setProtocolVersion(ctx context.Context, v uint64) error {
 }
 
 // getProtocolVersion gets the protocol version from state
-func (k Keeper) getProtocolVersion(ctx context.Context) (uint64, error) {
+func (k Keeper) getProtocolVersion(ctx context.Context) (meterResult uint64, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "getProtocolVersion")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "getProtocolVersion")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	ok, err := store.Has([]byte{types.ProtocolVersionByte})
@@ -132,9 +132,9 @@ func (k Keeper) getProtocolVersion(ctx context.Context) (uint64, error) {
 }
 
 // SetModuleVersionMap saves a given version map to state
-func (k Keeper) SetModuleVersionMap(ctx context.Context, vm module.VersionMap) error {
+func (k Keeper) SetModuleVersionMap(ctx context.Context, vm module.VersionMap) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetModuleVersionMap")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetModuleVersionMap")(&err)
 
 	if len(vm) > 0 {
 		store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(sdkCtx))
@@ -163,9 +163,9 @@ func (k Keeper) SetModuleVersionMap(ctx context.Context, vm module.VersionMap) e
 
 // GetModuleVersionMap returns a map of key module name and value module consensus version
 // as defined in ADR-041.
-func (k Keeper) GetModuleVersionMap(ctx context.Context) (module.VersionMap, error) {
+func (k Keeper) GetModuleVersionMap(ctx context.Context) (meterResult module.VersionMap, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetModuleVersionMap")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetModuleVersionMap")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	prefix := []byte{types.VersionMapByte}
@@ -188,9 +188,9 @@ func (k Keeper) GetModuleVersionMap(ctx context.Context) (module.VersionMap, err
 }
 
 // GetModuleVersions gets a slice of module consensus versions
-func (k Keeper) GetModuleVersions(ctx context.Context) ([]*types.ModuleVersion, error) {
+func (k Keeper) GetModuleVersions(ctx context.Context) (meterResult []*types.ModuleVersion, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetModuleVersions")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetModuleVersions")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	prefix := []byte{types.VersionMapByte}
@@ -216,9 +216,9 @@ func (k Keeper) GetModuleVersions(ctx context.Context) ([]*types.ModuleVersion, 
 
 // getModuleVersion gets the version for a given module. If it doesn't exist it returns ErrNoModuleVersionFound, other
 // errors may be returned if there is an error reading from the store.
-func (k Keeper) getModuleVersion(ctx context.Context, name string) (uint64, error) {
+func (k Keeper) getModuleVersion(ctx context.Context, name string) (meterResult uint64, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "getModuleVersion")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "getModuleVersion")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	prefix := []byte{types.VersionMapByte}
@@ -243,11 +243,11 @@ func (k Keeper) getModuleVersion(ctx context.Context, name string) (uint64, erro
 // If there is another Plan already scheduled, it will cancel and overwrite it.
 // ScheduleUpgrade will also write the upgraded IBC ClientState to the upgraded client
 // path if it is specified in the plan.
-func (k Keeper) ScheduleUpgrade(ctx context.Context, plan types.Plan) error {
+func (k Keeper) ScheduleUpgrade(ctx context.Context, plan types.Plan) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "ScheduleUpgrade")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "ScheduleUpgrade")(&err)
 
-	if err := plan.ValidateBasic(); err != nil {
+	if err = plan.ValidateBasic(); err != nil {
 		return err
 	}
 
@@ -298,9 +298,9 @@ func (k Keeper) ScheduleUpgrade(ctx context.Context, plan types.Plan) error {
 }
 
 // SetUpgradedClient sets the expected upgraded client for the next version of this chain at the last height the current chain will commit.
-func (k Keeper) SetUpgradedClient(ctx context.Context, planHeight int64, bz []byte) error {
+func (k Keeper) SetUpgradedClient(ctx context.Context, planHeight int64, bz []byte) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetUpgradedClient")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetUpgradedClient")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	return store.Set(types.UpgradedClientKey(planHeight), bz)
@@ -308,9 +308,9 @@ func (k Keeper) SetUpgradedClient(ctx context.Context, planHeight int64, bz []by
 
 // GetUpgradedClient gets the expected upgraded client for the next version of this chain. If not found it returns
 // ErrNoUpgradedClientFound, but other errors may be returned if there is an error reading from the store.
-func (k Keeper) GetUpgradedClient(ctx context.Context, height int64) ([]byte, error) {
+func (k Keeper) GetUpgradedClient(ctx context.Context, height int64) (meterResult []byte, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetUpgradedClient")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetUpgradedClient")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := store.Get(types.UpgradedClientKey(height))
@@ -327,9 +327,9 @@ func (k Keeper) GetUpgradedClient(ctx context.Context, height int64) ([]byte, er
 
 // SetUpgradedConsensusState sets the expected upgraded consensus state for the next version of this chain
 // using the last height committed on this chain.
-func (k Keeper) SetUpgradedConsensusState(ctx context.Context, planHeight int64, bz []byte) error {
+func (k Keeper) SetUpgradedConsensusState(ctx context.Context, planHeight int64, bz []byte) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetUpgradedConsensusState")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetUpgradedConsensusState")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	return store.Set(types.UpgradedConsStateKey(planHeight), bz)
@@ -337,9 +337,9 @@ func (k Keeper) SetUpgradedConsensusState(ctx context.Context, planHeight int64,
 
 // GetUpgradedConsensusState gets the expected upgraded consensus state for the next version of this chain. If not found
 // it returns ErrNoUpgradedConsensusStateFound, but other errors may be returned if there is an error reading from the store.
-func (k Keeper) GetUpgradedConsensusState(ctx context.Context, lastHeight int64) ([]byte, error) {
+func (k Keeper) GetUpgradedConsensusState(ctx context.Context, lastHeight int64) (meterResult []byte, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetUpgradedConsensusState")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetUpgradedConsensusState")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := store.Get(types.UpgradedConsStateKey(lastHeight))
@@ -355,9 +355,9 @@ func (k Keeper) GetUpgradedConsensusState(ctx context.Context, lastHeight int64)
 }
 
 // GetLastCompletedUpgrade returns the last applied upgrade name and height.
-func (k Keeper) GetLastCompletedUpgrade(ctx context.Context) (string, int64, error) {
+func (k Keeper) GetLastCompletedUpgrade(ctx context.Context) (meterResult string, meterResult1 int64, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetLastCompletedUpgrade")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetLastCompletedUpgrade")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	prefix := []byte{types.DoneByte}
@@ -393,9 +393,9 @@ func encodeDoneKey(name string, height int64) []byte {
 }
 
 // GetDoneHeight returns the height at which the given upgrade was executed
-func (k Keeper) GetDoneHeight(ctx context.Context, name string) (int64, error) {
+func (k Keeper) GetDoneHeight(ctx context.Context, name string) (meterResult int64, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetDoneHeight")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetDoneHeight")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	prefix := []byte{types.DoneByte}
@@ -416,13 +416,13 @@ func (k Keeper) GetDoneHeight(ctx context.Context, name string) (int64, error) {
 }
 
 // ClearIBCState clears any planned IBC state
-func (k Keeper) ClearIBCState(ctx context.Context, lastHeight int64) error {
+func (k Keeper) ClearIBCState(ctx context.Context, lastHeight int64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "ClearIBCState")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "ClearIBCState")(&err)
 
 	// delete IBC client and consensus state from store if this is IBC plan
 	store := k.storeService.OpenKVStore(sdkCtx)
-	err := store.Delete(types.UpgradedClientKey(lastHeight))
+	err = store.Delete(types.UpgradedClientKey(lastHeight))
 	if err != nil {
 		return err
 	}
@@ -431,9 +431,9 @@ func (k Keeper) ClearIBCState(ctx context.Context, lastHeight int64) error {
 }
 
 // ClearUpgradePlan clears any schedule upgrade and associated IBC states.
-func (k Keeper) ClearUpgradePlan(ctx context.Context) error {
+func (k Keeper) ClearUpgradePlan(ctx context.Context) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "ClearUpgradePlan")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "ClearUpgradePlan")(&err)
 
 	// clear IBC states every time upgrade plan is removed
 	oldPlan, err := k.GetUpgradePlan(sdkCtx)
@@ -457,7 +457,7 @@ func (k Keeper) ClearUpgradePlan(ctx context.Context) error {
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx context.Context) log.Logger {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Logger")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Logger")()
 	return sdkCtx.Logger().With("module", "x/"+types.ModuleName)
 }
 
@@ -465,7 +465,7 @@ func (k Keeper) Logger(ctx context.Context) log.Logger {
 // ErrNoUpgradePlanFound, but other errors may be returned if there is an error reading from the store.
 func (k Keeper) GetUpgradePlan(ctx context.Context) (plan types.Plan, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetUpgradePlan")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetUpgradePlan")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := store.Get(types.PlanKey())
@@ -486,9 +486,9 @@ func (k Keeper) GetUpgradePlan(ctx context.Context) (plan types.Plan, err error)
 }
 
 // setDone marks this upgrade name as being done so the name can't be reused accidentally
-func (k Keeper) setDone(ctx context.Context, name string) error {
+func (k Keeper) setDone(ctx context.Context, name string) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "setDone")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "setDone")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	return store.Set(encodeDoneKey(name, sdkCtx.HeaderInfo().Height), []byte{1})
@@ -501,9 +501,9 @@ func (k Keeper) HasHandler(name string) bool {
 }
 
 // ApplyUpgrade will execute the handler associated with the Plan and mark the plan as done.
-func (k Keeper) ApplyUpgrade(ctx context.Context, plan types.Plan) error {
+func (k Keeper) ApplyUpgrade(ctx context.Context, plan types.Plan) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "ApplyUpgrade")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "ApplyUpgrade")(&err)
 
 	handler := k.upgradeHandlers[plan.Name]
 	if handler == nil {

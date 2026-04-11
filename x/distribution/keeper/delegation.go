@@ -12,9 +12,9 @@ import (
 )
 
 // initialize starting info for a new delegation
-func (k Keeper) initializeDelegation(ctx context.Context, val sdk.ValAddress, del sdk.AccAddress) error {
+func (k Keeper) initializeDelegation(ctx context.Context, val sdk.ValAddress, del sdk.AccAddress) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "initializeDelegation")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "initializeDelegation")(&err)
 
 	// period has already been incremented - we want to store the period ended by this delegation action
 	valCurrentRewards, err := k.GetValidatorCurrentRewards(sdkCtx, val)
@@ -49,9 +49,9 @@ func (k Keeper) initializeDelegation(ctx context.Context, val sdk.ValAddress, de
 // calculate the rewards accrued by a delegation between two periods
 func (k Keeper) calculateDelegationRewardsBetween(ctx context.Context, val stakingtypes.ValidatorI,
 	startingPeriod, endingPeriod uint64, stake math.LegacyDec,
-) (sdk.DecCoins, error) {
+) (meterResult sdk.DecCoins, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "calculateDelegationRewardsBetween")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "calculateDelegationRewardsBetween")(&err)
 
 	// sanity check
 	if startingPeriod > endingPeriod {
@@ -91,7 +91,7 @@ func (k Keeper) calculateDelegationRewardsBetween(ctx context.Context, val staki
 // calculate the total rewards accrued by a delegation
 func (k Keeper) CalculateDelegationRewards(ctx context.Context, val stakingtypes.ValidatorI, del stakingtypes.DelegationI, endingPeriod uint64) (rewards sdk.DecCoins, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "CalculateDelegationRewards")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "CalculateDelegationRewards")(&err)
 
 	addrCodec := k.authKeeper.AddressCodec()
 	delAddr, err := addrCodec.StringToBytes(del.GetDelegatorAddr())
@@ -198,9 +198,9 @@ func (k Keeper) CalculateDelegationRewards(ctx context.Context, val stakingtypes
 	return rewards, nil
 }
 
-func (k Keeper) withdrawDelegationRewards(ctx context.Context, val stakingtypes.ValidatorI, del stakingtypes.DelegationI) (sdk.Coins, error) {
+func (k Keeper) withdrawDelegationRewards(ctx context.Context, val stakingtypes.ValidatorI, del stakingtypes.DelegationI) (meterResult sdk.Coins, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "withdrawDelegationRewards")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "withdrawDelegationRewards")(&err)
 
 	addrCodec := k.authKeeper.AddressCodec()
 	delAddr, err := addrCodec.StringToBytes(del.GetDelegatorAddr())

@@ -163,9 +163,9 @@ func (ak AccountKeeper) Logger(ctx context.Context) log.Logger {
 }
 
 // GetPubKey Returns the PubKey of the account at address
-func (ak AccountKeeper) GetPubKey(ctx context.Context, addr sdk.AccAddress) (cryptotypes.PubKey, error) {
+func (ak AccountKeeper) GetPubKey(ctx context.Context, addr sdk.AccAddress) (meterResult cryptotypes.PubKey, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetPubKey")()
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "GetPubKey")(&err)
 
 	acc := ak.GetAccount(sdkCtx, addr)
 	if acc == nil {
@@ -176,9 +176,9 @@ func (ak AccountKeeper) GetPubKey(ctx context.Context, addr sdk.AccAddress) (cry
 }
 
 // GetSequence Returns the Sequence of the account at address
-func (ak AccountKeeper) GetSequence(ctx context.Context, addr sdk.AccAddress) (uint64, error) {
+func (ak AccountKeeper) GetSequence(ctx context.Context, addr sdk.AccAddress) (meterResult uint64, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetSequence")()
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "GetSequence")(&err)
 
 	acc := ak.GetAccount(sdkCtx, addr)
 	if acc == nil {
@@ -191,8 +191,9 @@ func (ak AccountKeeper) GetSequence(ctx context.Context, addr sdk.AccAddress) (u
 // NextAccountNumber returns and increments the global account number counter.
 // If the global account number is not set, it initializes it with value 0.
 func (ak AccountKeeper) NextAccountNumber(ctx context.Context) uint64 {
+	var err error
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "NextAccountNumber")()
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "NextAccountNumber")(&err)
 
 	n, err := ak.AccountNumber.Next(sdkCtx)
 	if err != nil {
@@ -242,8 +243,9 @@ func (ak AccountKeeper) GetModuleAddressAndPermissions(moduleName string) (addr 
 // GetModuleAccountAndPermissions gets the module account from the auth account store and its
 // registered permissions
 func (ak AccountKeeper) GetModuleAccountAndPermissions(ctx context.Context, moduleName string) (sdk.ModuleAccountI, []string) {
+	var err error
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetModuleAccountAndPermissions")()
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "GetModuleAccountAndPermissions")(&err)
 
 	addr, perms := ak.GetModuleAddressAndPermissions(moduleName)
 	if addr == nil {
@@ -271,7 +273,7 @@ func (ak AccountKeeper) GetModuleAccountAndPermissions(ctx context.Context, modu
 // exist in the AccountKeeper, then it is created.
 func (ak AccountKeeper) GetModuleAccount(ctx context.Context, moduleName string) sdk.ModuleAccountI {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetModuleAccount")()
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "GetModuleAccount")()
 
 	acc, _ := ak.GetModuleAccountAndPermissions(sdkCtx, moduleName)
 	return acc
@@ -280,7 +282,7 @@ func (ak AccountKeeper) GetModuleAccount(ctx context.Context, moduleName string)
 // SetModuleAccount sets the module account to the auth account store
 func (ak AccountKeeper) SetModuleAccount(ctx context.Context, macc sdk.ModuleAccountI) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetModuleAccount")()
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "SetModuleAccount")()
 
 	ak.SetAccount(sdkCtx, macc)
 }
@@ -292,10 +294,11 @@ func (ak AccountKeeper) getBech32Prefix() (string, error) {
 
 // GetParams gets the auth module's parameters.
 func (ak AccountKeeper) GetParams(ctx context.Context) (params types.Params) {
+	var err error
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer ak.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetParams")()
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "GetParams")(&err)
 
-	params, err := ak.Params.Get(sdkCtx)
+	params, err = ak.Params.Get(sdkCtx)
 	if err != nil && !errors.Is(err, collections.ErrNotFound) {
 		panic(err)
 	}

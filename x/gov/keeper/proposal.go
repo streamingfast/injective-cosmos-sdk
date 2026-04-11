@@ -16,10 +16,10 @@ import (
 )
 
 // SubmitProposal creates a new proposal given an array of messages
-func (keeper Keeper) SubmitProposal(ctx context.Context, messages []sdk.Msg, metadata, title, summary string, proposer sdk.AccAddress, expedited bool) (v1.Proposal, error) {
+func (keeper Keeper) SubmitProposal(ctx context.Context, messages []sdk.Msg, metadata, title, summary string, proposer sdk.AccAddress, expedited bool) (meterResult v1.Proposal, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "SubmitProposal")()
-	err := keeper.assertMetadataLength(metadata)
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "SubmitProposal")(&err)
+	err = keeper.assertMetadataLength(metadata)
 	if err != nil {
 		return v1.Proposal{}, err
 	}
@@ -46,7 +46,7 @@ func (keeper Keeper) SubmitProposal(ctx context.Context, messages []sdk.Msg, met
 
 		// perform a basic validation of the message
 		if m, ok := msg.(sdk.HasValidateBasic); ok {
-			if err := m.ValidateBasic(); err != nil {
+			if err = m.ValidateBasic(); err != nil {
 				return v1.Proposal{}, errorsmod.Wrap(types.ErrInvalidProposalMsg, err.Error())
 			}
 		}
@@ -133,9 +133,9 @@ func (keeper Keeper) SubmitProposal(ctx context.Context, messages []sdk.Msg, met
 }
 
 // CancelProposal will cancel proposal before the voting period ends
-func (keeper Keeper) CancelProposal(ctx context.Context, proposalID uint64, proposer string) error {
+func (keeper Keeper) CancelProposal(ctx context.Context, proposalID uint64, proposer string) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "CancelProposal")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "CancelProposal")(&err)
 	proposal, err := keeper.Proposals.Get(sdkCtx, proposalID)
 	if err != nil {
 		return err
@@ -196,17 +196,17 @@ func (keeper Keeper) CancelProposal(ctx context.Context, proposalID uint64, prop
 }
 
 // SetProposal sets a proposal to store.
-func (keeper Keeper) SetProposal(ctx context.Context, proposal v1.Proposal) error {
+func (keeper Keeper) SetProposal(ctx context.Context, proposal v1.Proposal) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetProposal")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "SetProposal")(&err)
 
 	if proposal.Status == v1.StatusVotingPeriod {
-		err := keeper.VotingPeriodProposals.Set(sdkCtx, proposal.Id, []byte{1})
+		err = keeper.VotingPeriodProposals.Set(sdkCtx, proposal.Id, []byte{1})
 		if err != nil {
 			return err
 		}
 	} else {
-		err := keeper.VotingPeriodProposals.Remove(sdkCtx, proposal.Id)
+		err = keeper.VotingPeriodProposals.Remove(sdkCtx, proposal.Id)
 		if err != nil {
 			return err
 		}
@@ -216,9 +216,9 @@ func (keeper Keeper) SetProposal(ctx context.Context, proposal v1.Proposal) erro
 }
 
 // DeleteProposal deletes a proposal from store.
-func (keeper Keeper) DeleteProposal(ctx context.Context, proposalID uint64) error {
+func (keeper Keeper) DeleteProposal(ctx context.Context, proposalID uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DeleteProposal")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "DeleteProposal")(&err)
 
 	proposal, err := keeper.Proposals.Get(sdkCtx, proposalID)
 	if err != nil {
@@ -226,13 +226,13 @@ func (keeper Keeper) DeleteProposal(ctx context.Context, proposalID uint64) erro
 	}
 
 	if proposal.DepositEndTime != nil {
-		err := keeper.InactiveProposalsQueue.Remove(sdkCtx, collections.Join(*proposal.DepositEndTime, proposalID))
+		err = keeper.InactiveProposalsQueue.Remove(sdkCtx, collections.Join(*proposal.DepositEndTime, proposalID))
 		if err != nil {
 			return err
 		}
 	}
 	if proposal.VotingEndTime != nil {
-		err := keeper.ActiveProposalsQueue.Remove(sdkCtx, collections.Join(*proposal.VotingEndTime, proposalID))
+		err = keeper.ActiveProposalsQueue.Remove(sdkCtx, collections.Join(*proposal.VotingEndTime, proposalID))
 		if err != nil {
 			return err
 		}
@@ -247,9 +247,9 @@ func (keeper Keeper) DeleteProposal(ctx context.Context, proposalID uint64) erro
 }
 
 // ActivateVotingPeriod activates the voting period of a proposal
-func (keeper Keeper) ActivateVotingPeriod(ctx context.Context, proposal v1.Proposal) error {
+func (keeper Keeper) ActivateVotingPeriod(ctx context.Context, proposal v1.Proposal) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "ActivateVotingPeriod")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "ActivateVotingPeriod")(&err)
 	startTime := sdkCtx.BlockHeader().Time
 	proposal.VotingStartTime = &startTime
 	var votingPeriod *time.Duration

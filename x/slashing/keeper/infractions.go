@@ -15,9 +15,9 @@ import (
 )
 
 // HandleValidatorSignature handles a validator signature, must be called once per validator per block.
-func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.Address, power int64, signed comet.BlockIDFlag) error {
+func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.Address, power int64, signed comet.BlockIDFlag) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "HandleValidatorSignature")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "HandleValidatorSignature")(&err)
 	logger := k.Logger(sdkCtx)
 	height := sdkCtx.BlockHeight()
 
@@ -64,7 +64,7 @@ func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.A
 	case !previous && missed:
 		// Bitmap value has changed from not missed to missed, so we flip the bit
 		// and increment the counter.
-		if err := k.SetMissedBlockBitmapValue(sdkCtx, consAddr, index, true); err != nil {
+		if err = k.SetMissedBlockBitmapValue(sdkCtx, consAddr, index, true); err != nil {
 			return err
 		}
 
@@ -73,7 +73,7 @@ func (k Keeper) HandleValidatorSignature(ctx context.Context, addr cryptotypes.A
 	case previous && !missed:
 		// Bitmap value has changed from missed to not missed, so we flip the bit
 		// and decrement the counter.
-		if err := k.SetMissedBlockBitmapValue(sdkCtx, consAddr, index, false); err != nil {
+		if err = k.SetMissedBlockBitmapValue(sdkCtx, consAddr, index, false); err != nil {
 			return err
 		}
 

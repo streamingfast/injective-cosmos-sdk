@@ -10,9 +10,9 @@ import (
 )
 
 // BeginBlocker mints new tokens for the previous block.
-func BeginBlocker(ctx context.Context, k keeper.Keeper, ic types.InflationCalculationFn) error {
+func BeginBlocker(ctx context.Context, k keeper.Keeper, ic types.InflationCalculationFn) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "BeginBlocker")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "BeginBlocker")(&err)
 	defer telemetry.ModuleMeasureSince(types.ModuleName, telemetry.Now(), telemetry.MetricKeyBeginBlocker)
 
 	// fetch stored minter & params

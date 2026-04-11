@@ -7,7 +7,8 @@ import (
 
 // InitGenesis initializes new authz genesis
 func (k Keeper) InitGenesis(ctx sdk.Context, data *authz.GenesisState) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "InitGenesis")()
+	var err error
+	defer k.Meter(ctx).FuncTiming(&ctx, "InitGenesis")(&err)
 
 	now := ctx.BlockTime()
 	for _, entry := range data.Authorization {

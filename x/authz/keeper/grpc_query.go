@@ -21,9 +21,9 @@ var _ authz.QueryServer = Keeper{}
 
 // Grants implements the Query/Grants gRPC method.
 // It returns grants for a granter-grantee pair. If msg type URL is set, it returns grants only for that msg type.
-func (k Keeper) Grants(ctx context.Context, req *authz.QueryGrantsRequest) (*authz.QueryGrantsResponse, error) {
+func (k Keeper) Grants(ctx context.Context, req *authz.QueryGrantsRequest) (meterResult *authz.QueryGrantsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Grants")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Grants")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -94,9 +94,9 @@ func (k Keeper) Grants(ctx context.Context, req *authz.QueryGrantsRequest) (*aut
 }
 
 // GranterGrants implements the Query/GranterGrants gRPC method.
-func (k Keeper) GranterGrants(ctx context.Context, req *authz.QueryGranterGrantsRequest) (*authz.QueryGranterGrantsResponse, error) {
+func (k Keeper) GranterGrants(ctx context.Context, req *authz.QueryGranterGrantsRequest) (meterResult *authz.QueryGranterGrantsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GranterGrants")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GranterGrants")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -142,9 +142,9 @@ func (k Keeper) GranterGrants(ctx context.Context, req *authz.QueryGranterGrants
 }
 
 // GranteeGrants implements the Query/GranteeGrants gRPC method.
-func (k Keeper) GranteeGrants(ctx context.Context, req *authz.QueryGranteeGrantsRequest) (*authz.QueryGranteeGrantsResponse, error) {
+func (k Keeper) GranteeGrants(ctx context.Context, req *authz.QueryGranteeGrantsRequest) (meterResult *authz.QueryGranteeGrantsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GranteeGrants")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GranteeGrants")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")

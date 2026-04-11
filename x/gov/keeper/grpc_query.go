@@ -25,9 +25,9 @@ func NewQueryServer(k *Keeper) v1.QueryServer {
 	return queryServer{k: k}
 }
 
-func (q queryServer) Constitution(ctx context.Context, _ *v1.QueryConstitutionRequest) (*v1.QueryConstitutionResponse, error) {
+func (q queryServer) Constitution(ctx context.Context, _ *v1.QueryConstitutionRequest) (meterResult *v1.QueryConstitutionResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Constitution")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Constitution")(&err)
 
 	constitution, err := q.k.Constitution.Get(sdkCtx)
 	if err != nil {
@@ -37,9 +37,9 @@ func (q queryServer) Constitution(ctx context.Context, _ *v1.QueryConstitutionRe
 }
 
 // Proposal returns proposal details based on ProposalID
-func (q queryServer) Proposal(ctx context.Context, req *v1.QueryProposalRequest) (*v1.QueryProposalResponse, error) {
+func (q queryServer) Proposal(ctx context.Context, req *v1.QueryProposalRequest) (meterResult *v1.QueryProposalResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Proposal")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Proposal")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -61,9 +61,9 @@ func (q queryServer) Proposal(ctx context.Context, req *v1.QueryProposalRequest)
 }
 
 // Proposals implements the Query/Proposals gRPC method
-func (q queryServer) Proposals(ctx context.Context, req *v1.QueryProposalsRequest) (*v1.QueryProposalsResponse, error) {
+func (q queryServer) Proposals(ctx context.Context, req *v1.QueryProposalsRequest) (meterResult *v1.QueryProposalsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Proposals")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Proposals")(&err)
 
 	filteredProposals, pageRes, err := query.CollectionFilteredPaginate(sdkCtx, q.k.Proposals, req.Pagination, func(key uint64, p v1.Proposal) (include bool, err error) {
 		matchVoter, matchDepositor, matchStatus := true, true, true
@@ -114,9 +114,9 @@ func (q queryServer) Proposals(ctx context.Context, req *v1.QueryProposalsReques
 }
 
 // Vote returns Voted information based on proposalID, voterAddr
-func (q queryServer) Vote(ctx context.Context, req *v1.QueryVoteRequest) (*v1.QueryVoteResponse, error) {
+func (q queryServer) Vote(ctx context.Context, req *v1.QueryVoteRequest) (meterResult *v1.QueryVoteResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Vote")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Vote")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -147,9 +147,9 @@ func (q queryServer) Vote(ctx context.Context, req *v1.QueryVoteRequest) (*v1.Qu
 }
 
 // Votes returns single proposal's votes
-func (q queryServer) Votes(ctx context.Context, req *v1.QueryVotesRequest) (*v1.QueryVotesResponse, error) {
+func (q queryServer) Votes(ctx context.Context, req *v1.QueryVotesRequest) (meterResult *v1.QueryVotesResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Votes")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Votes")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -170,9 +170,9 @@ func (q queryServer) Votes(ctx context.Context, req *v1.QueryVotesRequest) (*v1.
 }
 
 // Params queries all params
-func (q queryServer) Params(ctx context.Context, req *v1.QueryParamsRequest) (*v1.QueryParamsResponse, error) {
+func (q queryServer) Params(ctx context.Context, req *v1.QueryParamsRequest) (meterResult *v1.QueryParamsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Params")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Params")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -208,9 +208,9 @@ func (q queryServer) Params(ctx context.Context, req *v1.QueryParamsRequest) (*v
 }
 
 // Deposit queries single deposit information based on proposalID, depositAddr.
-func (q queryServer) Deposit(ctx context.Context, req *v1.QueryDepositRequest) (*v1.QueryDepositResponse, error) {
+func (q queryServer) Deposit(ctx context.Context, req *v1.QueryDepositRequest) (meterResult *v1.QueryDepositResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Deposit")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Deposit")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -237,9 +237,9 @@ func (q queryServer) Deposit(ctx context.Context, req *v1.QueryDepositRequest) (
 }
 
 // Deposits returns single proposal's all deposits
-func (q queryServer) Deposits(ctx context.Context, req *v1.QueryDepositsRequest) (*v1.QueryDepositsResponse, error) {
+func (q queryServer) Deposits(ctx context.Context, req *v1.QueryDepositsRequest) (meterResult *v1.QueryDepositsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Deposits")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Deposits")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -261,9 +261,9 @@ func (q queryServer) Deposits(ctx context.Context, req *v1.QueryDepositsRequest)
 }
 
 // TallyResult queries the tally of a proposal vote
-func (q queryServer) TallyResult(ctx context.Context, req *v1.QueryTallyResultRequest) (*v1.QueryTallyResultResponse, error) {
+func (q queryServer) TallyResult(ctx context.Context, req *v1.QueryTallyResultRequest) (meterResult *v1.QueryTallyResultResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "TallyResult")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "TallyResult")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -314,9 +314,9 @@ func NewLegacyQueryServer(k *Keeper) v1beta1.QueryServer {
 	return &legacyQueryServer{k: k, qs: NewQueryServer(k)}
 }
 
-func (q legacyQueryServer) Proposal(ctx context.Context, req *v1beta1.QueryProposalRequest) (*v1beta1.QueryProposalResponse, error) {
+func (q legacyQueryServer) Proposal(ctx context.Context, req *v1beta1.QueryProposalRequest) (meterResult *v1beta1.QueryProposalResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Proposal")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Proposal")(&err)
 
 	resp, err := q.qs.Proposal(sdkCtx, &v1.QueryProposalRequest{
 		ProposalId: req.ProposalId,
@@ -333,9 +333,9 @@ func (q legacyQueryServer) Proposal(ctx context.Context, req *v1beta1.QueryPropo
 	return &v1beta1.QueryProposalResponse{Proposal: proposal}, nil
 }
 
-func (q legacyQueryServer) Proposals(ctx context.Context, req *v1beta1.QueryProposalsRequest) (*v1beta1.QueryProposalsResponse, error) {
+func (q legacyQueryServer) Proposals(ctx context.Context, req *v1beta1.QueryProposalsRequest) (meterResult *v1beta1.QueryProposalsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Proposals")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Proposals")(&err)
 
 	resp, err := q.qs.Proposals(sdkCtx, &v1.QueryProposalsRequest{
 		ProposalStatus: v1.ProposalStatus(req.ProposalStatus),
@@ -361,9 +361,9 @@ func (q legacyQueryServer) Proposals(ctx context.Context, req *v1beta1.QueryProp
 	}, nil
 }
 
-func (q legacyQueryServer) Vote(ctx context.Context, req *v1beta1.QueryVoteRequest) (*v1beta1.QueryVoteResponse, error) {
+func (q legacyQueryServer) Vote(ctx context.Context, req *v1beta1.QueryVoteRequest) (meterResult *v1beta1.QueryVoteResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Vote")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Vote")(&err)
 
 	resp, err := q.qs.Vote(sdkCtx, &v1.QueryVoteRequest{
 		ProposalId: req.ProposalId,
@@ -381,9 +381,9 @@ func (q legacyQueryServer) Vote(ctx context.Context, req *v1beta1.QueryVoteReque
 	return &v1beta1.QueryVoteResponse{Vote: vote}, nil
 }
 
-func (q legacyQueryServer) Votes(ctx context.Context, req *v1beta1.QueryVotesRequest) (*v1beta1.QueryVotesResponse, error) {
+func (q legacyQueryServer) Votes(ctx context.Context, req *v1beta1.QueryVotesRequest) (meterResult *v1beta1.QueryVotesResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Votes")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Votes")(&err)
 
 	resp, err := q.qs.Votes(sdkCtx, &v1.QueryVotesRequest{
 		ProposalId: req.ProposalId,
@@ -408,9 +408,9 @@ func (q legacyQueryServer) Votes(ctx context.Context, req *v1beta1.QueryVotesReq
 }
 
 //nolint:staticcheck // this is needed for legacy param support
-func (q legacyQueryServer) Params(ctx context.Context, req *v1beta1.QueryParamsRequest) (*v1beta1.QueryParamsResponse, error) {
+func (q legacyQueryServer) Params(ctx context.Context, req *v1beta1.QueryParamsRequest) (meterResult *v1beta1.QueryParamsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Params")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Params")(&err)
 
 	resp, err := q.qs.Params(sdkCtx, &v1.QueryParamsRequest{
 		ParamsType: req.ParamsType,
@@ -454,9 +454,9 @@ func (q legacyQueryServer) Params(ctx context.Context, req *v1beta1.QueryParamsR
 	return response, nil
 }
 
-func (q legacyQueryServer) Deposit(ctx context.Context, req *v1beta1.QueryDepositRequest) (*v1beta1.QueryDepositResponse, error) {
+func (q legacyQueryServer) Deposit(ctx context.Context, req *v1beta1.QueryDepositRequest) (meterResult *v1beta1.QueryDepositResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Deposit")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Deposit")(&err)
 
 	resp, err := q.qs.Deposit(sdkCtx, &v1.QueryDepositRequest{
 		ProposalId: req.ProposalId,
@@ -470,9 +470,9 @@ func (q legacyQueryServer) Deposit(ctx context.Context, req *v1beta1.QueryDeposi
 	return &v1beta1.QueryDepositResponse{Deposit: deposit}, nil
 }
 
-func (q legacyQueryServer) Deposits(ctx context.Context, req *v1beta1.QueryDepositsRequest) (*v1beta1.QueryDepositsResponse, error) {
+func (q legacyQueryServer) Deposits(ctx context.Context, req *v1beta1.QueryDepositsRequest) (meterResult *v1beta1.QueryDepositsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Deposits")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "Deposits")(&err)
 
 	resp, err := q.qs.Deposits(sdkCtx, &v1.QueryDepositsRequest{
 		ProposalId: req.ProposalId,
@@ -489,9 +489,9 @@ func (q legacyQueryServer) Deposits(ctx context.Context, req *v1beta1.QueryDepos
 	return &v1beta1.QueryDepositsResponse{Deposits: deposits, Pagination: resp.Pagination}, nil
 }
 
-func (q legacyQueryServer) TallyResult(ctx context.Context, req *v1beta1.QueryTallyResultRequest) (*v1beta1.QueryTallyResultResponse, error) {
+func (q legacyQueryServer) TallyResult(ctx context.Context, req *v1beta1.QueryTallyResultRequest) (meterResult *v1beta1.QueryTallyResultResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer q.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "TallyResult")()
+	defer q.k.Meter(ctx).FuncTiming(&sdkCtx, "TallyResult")(&err)
 
 	resp, err := q.qs.TallyResult(sdkCtx, &v1.QueryTallyResultRequest{
 		ProposalId: req.ProposalId,

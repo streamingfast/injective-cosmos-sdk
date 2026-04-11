@@ -25,9 +25,9 @@ func (k Keeper) Hooks() Hooks {
 }
 
 // AfterValidatorBonded updates the signing info start height or create a new signing info
-func (h Hooks) AfterValidatorBonded(ctx context.Context, consAddr sdk.ConsAddress, valAddr sdk.ValAddress) error {
+func (h Hooks) AfterValidatorBonded(ctx context.Context, consAddr sdk.ConsAddress, valAddr sdk.ValAddress) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer h.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AfterValidatorBonded")()
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "AfterValidatorBonded")(&err)
 	signingInfo, err := h.k.GetValidatorSigningInfo(sdkCtx, consAddr)
 	if err == nil {
 		signingInfo.StartHeight = sdkCtx.BlockHeight()
@@ -46,17 +46,17 @@ func (h Hooks) AfterValidatorBonded(ctx context.Context, consAddr sdk.ConsAddres
 }
 
 // AfterValidatorRemoved deletes the address-pubkey relation when a validator is removed,
-func (h Hooks) AfterValidatorRemoved(ctx context.Context, consAddr sdk.ConsAddress, _ sdk.ValAddress) error {
+func (h Hooks) AfterValidatorRemoved(ctx context.Context, consAddr sdk.ConsAddress, _ sdk.ValAddress) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer h.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AfterValidatorRemoved")()
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "AfterValidatorRemoved")(&err)
 
 	return h.k.deleteAddrPubkeyRelation(sdkCtx, crypto.Address(consAddr))
 }
 
 // AfterValidatorCreated adds the address-pubkey relation when a validator is created.
-func (h Hooks) AfterValidatorCreated(ctx context.Context, valAddr sdk.ValAddress) error {
+func (h Hooks) AfterValidatorCreated(ctx context.Context, valAddr sdk.ValAddress) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer h.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AfterValidatorCreated")()
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "AfterValidatorCreated")(&err)
 	validator, err := h.k.sk.Validator(sdkCtx, valAddr)
 	if err != nil {
 		return err

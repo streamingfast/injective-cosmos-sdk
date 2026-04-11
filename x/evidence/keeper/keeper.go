@@ -64,7 +64,7 @@ func NewKeeper(
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx context.Context) log.Logger {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Logger")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Logger")()
 	return sdkCtx.Logger().With("module", "x/"+types.ModuleName)
 }
 
@@ -100,9 +100,9 @@ func (k Keeper) GetEvidenceHandler(evidenceRoute string) (types.Handler, error) 
 // the corresponding registered Evidence Handler. An error is returned if no
 // registered Handler exists or if the Handler fails. Otherwise, the evidence is
 // persisted.
-func (k Keeper) SubmitEvidence(ctx context.Context, evidence exported.Evidence) error {
+func (k Keeper) SubmitEvidence(ctx context.Context, evidence exported.Evidence) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SubmitEvidence")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SubmitEvidence")(&err)
 
 	if _, err := k.Evidences.Get(sdkCtx, evidence.Hash()); err == nil {
 		return errors.Wrap(types.ErrEvidenceExists, strings.ToUpper(hex.EncodeToString(evidence.Hash())))
@@ -112,7 +112,7 @@ func (k Keeper) SubmitEvidence(ctx context.Context, evidence exported.Evidence) 
 	}
 
 	handler := k.router.GetRoute(evidence.Route())
-	if err := handler(sdkCtx, evidence); err != nil {
+	if err = handler(sdkCtx, evidence); err != nil {
 		return errors.Wrap(types.ErrInvalidEvidence, err.Error())
 	}
 	sdkCtx.EventManager().EmitEvent(

@@ -72,7 +72,7 @@ func (k *Keeper) GetAuthority() string {
 // Logger returns a module-specific logger.
 func (k *Keeper) Logger(ctx context.Context) log.Logger {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Logger")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Logger")()
 
 	return sdkCtx.Logger().With("module", "x/"+types.ModuleName)
 }
@@ -100,7 +100,8 @@ func (k *Keeper) Invariants() []sdk.Invariant {
 // AssertInvariants asserts all registered invariants. If any invariant fails,
 // the method panics.
 func (k *Keeper) AssertInvariants(ctx sdk.Context) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "AssertInvariants")()
+	var err error
+	defer k.Meter(ctx).FuncTiming(&ctx, "AssertInvariants")(&err)
 
 	logger := k.Logger(ctx)
 
@@ -128,9 +129,9 @@ func (k *Keeper) AssertInvariants(ctx sdk.Context) {
 func (k *Keeper) InvCheckPeriod() uint { return k.invCheckPeriod }
 
 // SendCoinsFromAccountToFeeCollector transfers amt to the fee collector account.
-func (k *Keeper) SendCoinsFromAccountToFeeCollector(ctx context.Context, senderAddr sdk.AccAddress, amt sdk.Coins) error {
+func (k *Keeper) SendCoinsFromAccountToFeeCollector(ctx context.Context, senderAddr sdk.AccAddress, amt sdk.Coins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SendCoinsFromAccountToFeeCollector")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SendCoinsFromAccountToFeeCollector")(&err)
 
 	return k.supplyKeeper.SendCoinsFromAccountToModule(sdkCtx, senderAddr, k.feeCollectorName, amt)
 }

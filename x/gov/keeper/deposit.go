@@ -17,9 +17,9 @@ import (
 )
 
 // SetDeposit sets a Deposit to the gov store
-func (keeper Keeper) SetDeposit(ctx context.Context, deposit v1.Deposit) error {
+func (keeper Keeper) SetDeposit(ctx context.Context, deposit v1.Deposit) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetDeposit")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "SetDeposit")(&err)
 
 	depositor, err := keeper.authKeeper.AddressCodec().StringToBytes(deposit.Depositor)
 	if err != nil {
@@ -31,7 +31,7 @@ func (keeper Keeper) SetDeposit(ctx context.Context, deposit v1.Deposit) error {
 // GetDeposits returns all the deposits of a proposal
 func (keeper Keeper) GetDeposits(ctx context.Context, proposalID uint64) (deposits v1.Deposits, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetDeposits")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "GetDeposits")(&err)
 
 	err = keeper.IterateDeposits(sdkCtx, proposalID, func(_ collections.Pair[uint64, sdk.AccAddress], deposit v1.Deposit) (bool, error) {
 		deposits = append(deposits, &deposit)
@@ -41,12 +41,12 @@ func (keeper Keeper) GetDeposits(ctx context.Context, proposalID uint64) (deposi
 }
 
 // DeleteAndBurnDeposits deletes and burns all the deposits on a specific proposal.
-func (keeper Keeper) DeleteAndBurnDeposits(ctx context.Context, proposalID uint64) error {
+func (keeper Keeper) DeleteAndBurnDeposits(ctx context.Context, proposalID uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DeleteAndBurnDeposits")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "DeleteAndBurnDeposits")(&err)
 
 	coinsToBurn := sdk.NewCoins()
-	err := keeper.IterateDeposits(sdkCtx, proposalID, func(key collections.Pair[uint64, sdk.AccAddress], deposit v1.Deposit) (stop bool, err error) {
+	err = keeper.IterateDeposits(sdkCtx, proposalID, func(key collections.Pair[uint64, sdk.AccAddress], deposit v1.Deposit) (stop bool, err error) {
 		coinsToBurn = coinsToBurn.Add(deposit.Amount...)
 		return false, keeper.Deposits.Remove(sdkCtx, key)
 	})
@@ -58,12 +58,12 @@ func (keeper Keeper) DeleteAndBurnDeposits(ctx context.Context, proposalID uint6
 }
 
 // IterateDeposits iterates over all the proposals deposits and performs a callback function
-func (keeper Keeper) IterateDeposits(ctx context.Context, proposalID uint64, cb func(key collections.Pair[uint64, sdk.AccAddress], value v1.Deposit) (bool, error)) error {
+func (keeper Keeper) IterateDeposits(ctx context.Context, proposalID uint64, cb func(key collections.Pair[uint64, sdk.AccAddress], value v1.Deposit) (bool, error)) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "IterateDeposits")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "IterateDeposits")(&err)
 
 	rng := collections.NewPrefixedPairRange[uint64, sdk.AccAddress](proposalID)
-	err := keeper.Deposits.Walk(sdkCtx, rng, cb)
+	err = keeper.Deposits.Walk(sdkCtx, rng, cb)
 	if err != nil {
 		return err
 	}
@@ -72,9 +72,9 @@ func (keeper Keeper) IterateDeposits(ctx context.Context, proposalID uint64, cb 
 
 // AddDeposit adds or updates a deposit of a specific depositor on a specific proposal.
 // Activates voting period when appropriate and returns true in that case, else returns false.
-func (keeper Keeper) AddDeposit(ctx context.Context, proposalID uint64, depositorAddr sdk.AccAddress, depositAmount sdk.Coins) (bool, error) {
+func (keeper Keeper) AddDeposit(ctx context.Context, proposalID uint64, depositorAddr sdk.AccAddress, depositAmount sdk.Coins) (meterResult bool, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "AddDeposit")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "AddDeposit")(&err)
 
 	// Checks to see if proposal exists
 	proposal, err := keeper.Proposals.Get(sdkCtx, proposalID)
@@ -100,7 +100,7 @@ func (keeper Keeper) AddDeposit(ctx context.Context, proposalID uint64, deposito
 	}
 
 	// the deposit must only contain valid denoms (listed in the min deposit param)
-	if err := keeper.validateDepositDenom(sdkCtx, params, depositAmount); err != nil {
+	if err = keeper.validateDepositDenom(sdkCtx, params, depositAmount); err != nil {
 		return false, err
 	}
 
@@ -198,9 +198,9 @@ func (keeper Keeper) AddDeposit(ctx context.Context, proposalID uint64, deposito
 // ChargeDeposit will charge proposal cancellation fee (deposits * proposal_cancel_burn_rate)  and
 // send to a destAddress if defined or burn otherwise.
 // Remaining funds are send back to the depositor.
-func (keeper Keeper) ChargeDeposit(ctx context.Context, proposalID uint64, destAddress, proposalCancelRate string) error {
+func (keeper Keeper) ChargeDeposit(ctx context.Context, proposalID uint64, destAddress, proposalCancelRate string) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "ChargeDeposit")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "ChargeDeposit")(&err)
 
 	rate := sdkmath.LegacyMustNewDecFromStr(proposalCancelRate)
 	var cancellationCharges sdk.Coins
@@ -236,7 +236,7 @@ func (keeper Keeper) ChargeDeposit(ctx context.Context, proposalID uint64, destA
 		}
 
 		if !remainingAmount.IsZero() {
-			err := keeper.bankKeeper.SendCoinsFromModuleToAccount(
+			err = keeper.bankKeeper.SendCoinsFromModuleToAccount(
 				sdkCtx, types.ModuleName, depositerAddress, remainingAmount,
 			)
 			if err != nil {
@@ -256,12 +256,12 @@ func (keeper Keeper) ChargeDeposit(ctx context.Context, proposalID uint64, destA
 		switch {
 		case destAddress == "":
 			// burn the cancellation charges from deposits
-			err := keeper.bankKeeper.BurnCoins(sdkCtx, types.ModuleName, cancellationCharges)
+			err = keeper.bankKeeper.BurnCoins(sdkCtx, types.ModuleName, cancellationCharges)
 			if err != nil {
 				return err
 			}
 		case distributionAddress.String() == destAddress:
-			err := keeper.distrKeeper.FundCommunityPool(sdkCtx, cancellationCharges, keeper.ModuleAccountAddress())
+			err = keeper.distrKeeper.FundCommunityPool(sdkCtx, cancellationCharges, keeper.ModuleAccountAddress())
 			if err != nil {
 				return err
 			}
@@ -283,13 +283,13 @@ func (keeper Keeper) ChargeDeposit(ctx context.Context, proposalID uint64, destA
 }
 
 // RefundAndDeleteDeposits refunds and deletes all the deposits on a specific proposal.
-func (keeper Keeper) RefundAndDeleteDeposits(ctx context.Context, proposalID uint64) error {
+func (keeper Keeper) RefundAndDeleteDeposits(ctx context.Context, proposalID uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "RefundAndDeleteDeposits")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "RefundAndDeleteDeposits")(&err)
 
 	return keeper.IterateDeposits(sdkCtx, proposalID, func(key collections.Pair[uint64, sdk.AccAddress], deposit v1.Deposit) (bool, error) {
 		depositor := key.K2()
-		err := keeper.bankKeeper.SendCoinsFromModuleToAccount(sdkCtx, types.ModuleName, depositor, deposit.Amount)
+		err = keeper.bankKeeper.SendCoinsFromModuleToAccount(sdkCtx, types.ModuleName, depositor, deposit.Amount)
 		if err != nil {
 			return false, err
 		}
@@ -301,9 +301,9 @@ func (keeper Keeper) RefundAndDeleteDeposits(ctx context.Context, proposalID uin
 // validateInitialDeposit validates if initial deposit is greater than or equal to the minimum
 // required at the time of proposal submission. This threshold amount is determined by
 // the deposit parameters. Returns nil on success, error otherwise.
-func (keeper Keeper) validateInitialDeposit(ctx context.Context, params v1.Params, initialDeposit sdk.Coins, expedited bool) error {
+func (keeper Keeper) validateInitialDeposit(ctx context.Context, params v1.Params, initialDeposit sdk.Coins, expedited bool) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "validateInitialDeposit")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "validateInitialDeposit")(&err)
 
 	if !initialDeposit.IsValid() || initialDeposit.IsAnyNegative() {
 		return errors.Wrap(sdkerrors.ErrInvalidCoins, initialDeposit.String())
@@ -334,9 +334,9 @@ func (keeper Keeper) validateInitialDeposit(ctx context.Context, params v1.Param
 }
 
 // validateDepositDenom validates if the deposit denom is accepted by the governance module.
-func (keeper Keeper) validateDepositDenom(ctx context.Context, params v1.Params, depositAmount sdk.Coins) error {
+func (keeper Keeper) validateDepositDenom(ctx context.Context, params v1.Params, depositAmount sdk.Coins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "validateDepositDenom")()
+	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "validateDepositDenom")(&err)
 
 	denoms := []string{}
 	acceptedDenoms := make(map[string]bool, len(params.MinDeposit))

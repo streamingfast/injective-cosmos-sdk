@@ -14,32 +14,33 @@ import (
 
 // InitGenesis initializes the group module's genesis state.
 func (k Keeper) InitGenesis(ctx types.Context, cdc codec.JSONCodec, data json.RawMessage) []abci.ValidatorUpdate {
-	defer k.Meter(ctx).FuncTiming(&ctx, "InitGenesis")()
+	var err error
+	defer k.Meter(ctx).FuncTiming(&ctx, "InitGenesis")(&err)
 
 	var genesisState group.GenesisState
 	cdc.MustUnmarshalJSON(data, &genesisState)
 
-	if err := k.groupTable.Import(ctx.KVStore(k.key), genesisState.Groups, genesisState.GroupSeq); err != nil {
+	if err = k.groupTable.Import(ctx.KVStore(k.key), genesisState.Groups, genesisState.GroupSeq); err != nil {
 		panic(errors.Wrap(err, "groups"))
 	}
 
-	if err := k.groupMemberTable.Import(ctx.KVStore(k.key), genesisState.GroupMembers, 0); err != nil {
+	if err = k.groupMemberTable.Import(ctx.KVStore(k.key), genesisState.GroupMembers, 0); err != nil {
 		panic(errors.Wrap(err, "group members"))
 	}
 
-	if err := k.groupPolicyTable.Import(ctx.KVStore(k.key), genesisState.GroupPolicies, 0); err != nil {
+	if err = k.groupPolicyTable.Import(ctx.KVStore(k.key), genesisState.GroupPolicies, 0); err != nil {
 		panic(errors.Wrap(err, "group policies"))
 	}
 
-	if err := k.groupPolicySeq.InitVal(ctx.KVStore(k.key), genesisState.GroupPolicySeq); err != nil {
+	if err = k.groupPolicySeq.InitVal(ctx.KVStore(k.key), genesisState.GroupPolicySeq); err != nil {
 		panic(errors.Wrap(err, "group policy account seq"))
 	}
 
-	if err := k.proposalTable.Import(ctx.KVStore(k.key), genesisState.Proposals, genesisState.ProposalSeq); err != nil {
+	if err = k.proposalTable.Import(ctx.KVStore(k.key), genesisState.Proposals, genesisState.ProposalSeq); err != nil {
 		panic(errors.Wrap(err, "proposals"))
 	}
 
-	if err := k.voteTable.Import(ctx.KVStore(k.key), genesisState.Votes, 0); err != nil {
+	if err = k.voteTable.Import(ctx.KVStore(k.key), genesisState.Votes, 0); err != nil {
 		panic(errors.Wrap(err, "votes"))
 	}
 
@@ -48,7 +49,8 @@ func (k Keeper) InitGenesis(ctx types.Context, cdc codec.JSONCodec, data json.Ra
 
 // ExportGenesis returns the group module's exported genesis.
 func (k Keeper) ExportGenesis(ctx types.Context, _ codec.JSONCodec) *group.GenesisState {
-	defer k.Meter(ctx).FuncTiming(&ctx, "ExportGenesis")()
+	var err error
+	defer k.Meter(ctx).FuncTiming(&ctx, "ExportGenesis")(&err)
 
 	genesisState := group.NewGenesisState()
 

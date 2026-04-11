@@ -15,9 +15,9 @@ var _ types.MsgServer = &Keeper{}
 
 // VerifyInvariant implements MsgServer.VerifyInvariant method.
 // It defines a method to verify a particular invariant.
-func (k *Keeper) VerifyInvariant(goCtx context.Context, msg *types.MsgVerifyInvariant) (*types.MsgVerifyInvariantResponse, error) {
+func (k *Keeper) VerifyInvariant(goCtx context.Context, msg *types.MsgVerifyInvariant) (meterResult *types.MsgVerifyInvariantResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "VerifyInvariant")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "VerifyInvariant")(&err)
 
 	if msg.Sender == "" {
 		return nil, sdkerrors.ErrInvalidAddress.Wrap("empty address string is not allowed")
@@ -33,7 +33,7 @@ func (k *Keeper) VerifyInvariant(goCtx context.Context, msg *types.MsgVerifyInva
 	}
 	constantFee := sdk.NewCoins(params)
 
-	if err := k.SendCoinsFromAccountToFeeCollector(sdkCtx, sender, constantFee); err != nil {
+	if err = k.SendCoinsFromAccountToFeeCollector(sdkCtx, sender, constantFee); err != nil {
 		return nil, err
 	}
 
@@ -78,9 +78,9 @@ func (k *Keeper) VerifyInvariant(goCtx context.Context, msg *types.MsgVerifyInva
 
 // UpdateParams implements MsgServer.UpdateParams method.
 // It defines a method to update the x/crisis module parameters.
-func (k *Keeper) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (*types.MsgUpdateParamsResponse, error) {
+func (k *Keeper) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (meterResult *types.MsgUpdateParamsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UpdateParams")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "UpdateParams")(&err)
 
 	if k.authority != msg.Authority {
 		return nil, errors.Wrapf(govtypes.ErrInvalidSigner, "invalid authority; expected %s, got %s", k.authority, msg.Authority)
@@ -94,7 +94,7 @@ func (k *Keeper) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (
 		return nil, errors.Wrap(sdkerrors.ErrInvalidCoins, "negative constant fee")
 	}
 
-	if err := k.ConstantFee.Set(sdkCtx, msg.ConstantFee); err != nil {
+	if err = k.ConstantFee.Set(sdkCtx, msg.ConstantFee); err != nil {
 		return nil, err
 	}
 

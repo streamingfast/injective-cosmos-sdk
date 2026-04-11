@@ -27,9 +27,9 @@ func NewQuerier(keeper Keeper) Querier {
 }
 
 // Params queries params of distribution module
-func (k Querier) Params(ctx context.Context, req *types.QueryParamsRequest) (*types.QueryParamsResponse, error) {
+func (k Querier) Params(ctx context.Context, req *types.QueryParamsRequest) (meterResult *types.QueryParamsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Params")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "Params")(&err)
 
 	params, err := k.Keeper.Params.Get(sdkCtx)
 	if err != nil {
@@ -40,9 +40,9 @@ func (k Querier) Params(ctx context.Context, req *types.QueryParamsRequest) (*ty
 }
 
 // ValidatorDistributionInfo query validator's commission and self-delegation rewards
-func (k Querier) ValidatorDistributionInfo(ctx context.Context, req *types.QueryValidatorDistributionInfoRequest) (*types.QueryValidatorDistributionInfoResponse, error) {
+func (k Querier) ValidatorDistributionInfo(ctx context.Context, req *types.QueryValidatorDistributionInfoRequest) (meterResult *types.QueryValidatorDistributionInfoResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "ValidatorDistributionInfo")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "ValidatorDistributionInfo")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -102,9 +102,9 @@ func (k Querier) ValidatorDistributionInfo(ctx context.Context, req *types.Query
 }
 
 // ValidatorOutstandingRewards queries rewards of a validator address
-func (k Querier) ValidatorOutstandingRewards(ctx context.Context, req *types.QueryValidatorOutstandingRewardsRequest) (*types.QueryValidatorOutstandingRewardsResponse, error) {
+func (k Querier) ValidatorOutstandingRewards(ctx context.Context, req *types.QueryValidatorOutstandingRewardsRequest) (meterResult *types.QueryValidatorOutstandingRewardsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "ValidatorOutstandingRewards")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "ValidatorOutstandingRewards")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -137,9 +137,9 @@ func (k Querier) ValidatorOutstandingRewards(ctx context.Context, req *types.Que
 }
 
 // ValidatorCommission queries accumulated commission for a validator
-func (k Querier) ValidatorCommission(ctx context.Context, req *types.QueryValidatorCommissionRequest) (*types.QueryValidatorCommissionResponse, error) {
+func (k Querier) ValidatorCommission(ctx context.Context, req *types.QueryValidatorCommissionRequest) (meterResult *types.QueryValidatorCommissionResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "ValidatorCommission")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "ValidatorCommission")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -171,9 +171,9 @@ func (k Querier) ValidatorCommission(ctx context.Context, req *types.QueryValida
 }
 
 // ValidatorSlashes queries slash events of a validator
-func (k Querier) ValidatorSlashes(ctx context.Context, req *types.QueryValidatorSlashesRequest) (*types.QueryValidatorSlashesResponse, error) {
+func (k Querier) ValidatorSlashes(ctx context.Context, req *types.QueryValidatorSlashesRequest) (meterResult *types.QueryValidatorSlashesResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "ValidatorSlashes")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "ValidatorSlashes")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -217,9 +217,9 @@ func (k Querier) ValidatorSlashes(ctx context.Context, req *types.QueryValidator
 }
 
 // DelegationRewards the total rewards accrued by a delegation
-func (k Querier) DelegationRewards(ctx context.Context, req *types.QueryDelegationRewardsRequest) (*types.QueryDelegationRewardsResponse, error) {
+func (k Querier) DelegationRewards(ctx context.Context, req *types.QueryDelegationRewardsRequest) (meterResult *types.QueryDelegationRewardsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegationRewards")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "DelegationRewards")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -274,9 +274,9 @@ func (k Querier) DelegationRewards(ctx context.Context, req *types.QueryDelegati
 }
 
 // DelegationTotalRewards the total rewards accrued by a each validator
-func (k Querier) DelegationTotalRewards(ctx context.Context, req *types.QueryDelegationTotalRewardsRequest) (*types.QueryDelegationTotalRewardsResponse, error) {
+func (k Querier) DelegationTotalRewards(ctx context.Context, req *types.QueryDelegationTotalRewardsRequest) (meterResult *types.QueryDelegationTotalRewardsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegationTotalRewards")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "DelegationTotalRewards")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -330,9 +330,9 @@ func (k Querier) DelegationTotalRewards(ctx context.Context, req *types.QueryDel
 }
 
 // DelegatorValidators queries the validators list of a delegator
-func (k Querier) DelegatorValidators(ctx context.Context, req *types.QueryDelegatorValidatorsRequest) (*types.QueryDelegatorValidatorsResponse, error) {
+func (k Querier) DelegatorValidators(ctx context.Context, req *types.QueryDelegatorValidatorsRequest) (meterResult *types.QueryDelegatorValidatorsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegatorValidators")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "DelegatorValidators")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -364,9 +364,9 @@ func (k Querier) DelegatorValidators(ctx context.Context, req *types.QueryDelega
 }
 
 // DelegatorWithdrawAddress queries Query/delegatorWithdrawAddress
-func (k Querier) DelegatorWithdrawAddress(ctx context.Context, req *types.QueryDelegatorWithdrawAddressRequest) (*types.QueryDelegatorWithdrawAddressResponse, error) {
+func (k Querier) DelegatorWithdrawAddress(ctx context.Context, req *types.QueryDelegatorWithdrawAddressRequest) (meterResult *types.QueryDelegatorWithdrawAddressResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegatorWithdrawAddress")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "DelegatorWithdrawAddress")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -389,9 +389,9 @@ func (k Querier) DelegatorWithdrawAddress(ctx context.Context, req *types.QueryD
 }
 
 // CommunityPool queries the community pool coins
-func (k Querier) CommunityPool(ctx context.Context, req *types.QueryCommunityPoolRequest) (*types.QueryCommunityPoolResponse, error) {
+func (k Querier) CommunityPool(ctx context.Context, req *types.QueryCommunityPoolRequest) (meterResult *types.QueryCommunityPoolResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "CommunityPool")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "CommunityPool")(&err)
 
 	pool, err := k.FeePool.Get(sdkCtx)
 	if err != nil {

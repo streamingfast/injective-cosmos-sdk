@@ -27,15 +27,15 @@ var (
 )
 
 // SoftwareUpgrade implements the Msg/SoftwareUpgrade Msg service.
-func (k msgServer) SoftwareUpgrade(goCtx context.Context, msg *types.MsgSoftwareUpgrade) (*types.MsgSoftwareUpgradeResponse, error) {
+func (k msgServer) SoftwareUpgrade(goCtx context.Context, msg *types.MsgSoftwareUpgrade) (meterResult *types.MsgSoftwareUpgradeResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "SoftwareUpgrade")()
+	defer k.Keeper.Meter(goCtx).FuncTiming(&sdkCtx, "SoftwareUpgrade")(&err)
 
 	if k.authority != msg.Authority {
 		return nil, errors.Wrapf(types.ErrInvalidSigner, "expected %s got %s", k.authority, msg.Authority)
 	}
 
-	err := k.ScheduleUpgrade(sdkCtx, msg.Plan)
+	err = k.ScheduleUpgrade(sdkCtx, msg.Plan)
 	if err != nil {
 		return nil, err
 	}
@@ -44,15 +44,15 @@ func (k msgServer) SoftwareUpgrade(goCtx context.Context, msg *types.MsgSoftware
 }
 
 // CancelUpgrade implements the Msg/CancelUpgrade Msg service.
-func (k msgServer) CancelUpgrade(ctx context.Context, msg *types.MsgCancelUpgrade) (*types.MsgCancelUpgradeResponse, error) {
+func (k msgServer) CancelUpgrade(ctx context.Context, msg *types.MsgCancelUpgrade) (meterResult *types.MsgCancelUpgradeResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "CancelUpgrade")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "CancelUpgrade")(&err)
 
 	if k.authority != msg.Authority {
 		return nil, errors.Wrapf(types.ErrInvalidSigner, "expected %s got %s", k.authority, msg.Authority)
 	}
 
-	err := k.ClearUpgradePlan(sdkCtx)
+	err = k.ClearUpgradePlan(sdkCtx)
 	if err != nil {
 		return nil, err
 	}

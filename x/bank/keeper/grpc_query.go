@@ -27,15 +27,15 @@ func NewQuerier(keeper *BaseKeeper) Querier {
 }
 
 // Balance implements the Query/Balance gRPC method
-func (k BaseKeeper) Balance(ctx context.Context, req *types.QueryBalanceRequest) (*types.QueryBalanceResponse, error) {
+func (k BaseKeeper) Balance(ctx context.Context, req *types.QueryBalanceRequest) (meterResult *types.QueryBalanceResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Balance")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Balance")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
 
-	if err := sdk.ValidateDenom(req.Denom); err != nil {
+	if err = sdk.ValidateDenom(req.Denom); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
@@ -50,9 +50,9 @@ func (k BaseKeeper) Balance(ctx context.Context, req *types.QueryBalanceRequest)
 }
 
 // AllBalances implements the Query/AllBalances gRPC method
-func (k BaseKeeper) AllBalances(ctx context.Context, req *types.QueryAllBalancesRequest) (*types.QueryAllBalancesResponse, error) {
+func (k BaseKeeper) AllBalances(ctx context.Context, req *types.QueryAllBalancesRequest) (meterResult *types.QueryAllBalancesResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AllBalances")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "AllBalances")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -86,9 +86,9 @@ func (k BaseKeeper) AllBalances(ctx context.Context, req *types.QueryAllBalances
 
 // SpendableBalances implements a gRPC query handler for retrieving an account's
 // spendable balances.
-func (k BaseKeeper) SpendableBalances(ctx context.Context, req *types.QuerySpendableBalancesRequest) (*types.QuerySpendableBalancesResponse, error) {
+func (k BaseKeeper) SpendableBalances(ctx context.Context, req *types.QuerySpendableBalancesRequest) (meterResult *types.QuerySpendableBalancesResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SpendableBalances")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SpendableBalances")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -120,9 +120,9 @@ func (k BaseKeeper) SpendableBalances(ctx context.Context, req *types.QuerySpend
 
 // SpendableBalanceByDenom implements a gRPC query handler for retrieving an account's
 // spendable balance for a specific denom.
-func (k BaseKeeper) SpendableBalanceByDenom(ctx context.Context, req *types.QuerySpendableBalanceByDenomRequest) (*types.QuerySpendableBalanceByDenomResponse, error) {
+func (k BaseKeeper) SpendableBalanceByDenom(ctx context.Context, req *types.QuerySpendableBalanceByDenomRequest) (meterResult *types.QuerySpendableBalanceByDenomResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SpendableBalanceByDenom")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SpendableBalanceByDenom")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -133,7 +133,7 @@ func (k BaseKeeper) SpendableBalanceByDenom(ctx context.Context, req *types.Quer
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %s", err.Error())
 	}
 
-	if err := sdk.ValidateDenom(req.Denom); err != nil {
+	if err = sdk.ValidateDenom(req.Denom); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
@@ -143,9 +143,9 @@ func (k BaseKeeper) SpendableBalanceByDenom(ctx context.Context, req *types.Quer
 }
 
 // TotalSupply implements the Query/TotalSupply gRPC method
-func (k BaseKeeper) TotalSupply(ctx context.Context, req *types.QueryTotalSupplyRequest) (*types.QueryTotalSupplyResponse, error) {
+func (k BaseKeeper) TotalSupply(ctx context.Context, req *types.QueryTotalSupplyRequest) (meterResult *types.QueryTotalSupplyResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "TotalSupply")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "TotalSupply")(&err)
 
 	totalSupply, pageRes, err := k.GetPaginatedTotalSupply(sdkCtx, req.Pagination)
 	if err != nil {
@@ -156,15 +156,15 @@ func (k BaseKeeper) TotalSupply(ctx context.Context, req *types.QueryTotalSupply
 }
 
 // SupplyOf implements the Query/SupplyOf gRPC method
-func (k BaseKeeper) SupplyOf(c context.Context, req *types.QuerySupplyOfRequest) (*types.QuerySupplyOfResponse, error) {
+func (k BaseKeeper) SupplyOf(c context.Context, req *types.QuerySupplyOfRequest) (meterResult *types.QuerySupplyOfResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(c)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SupplyOf")()
+	defer k.Meter(c).FuncTiming(&sdkCtx, "SupplyOf")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
 
-	if err := sdk.ValidateDenom(req.Denom); err != nil {
+	if err = sdk.ValidateDenom(req.Denom); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
@@ -174,9 +174,9 @@ func (k BaseKeeper) SupplyOf(c context.Context, req *types.QuerySupplyOfRequest)
 }
 
 // Params implements the gRPC service handler for querying x/bank parameters.
-func (k BaseKeeper) Params(ctx context.Context, req *types.QueryParamsRequest) (*types.QueryParamsResponse, error) {
+func (k BaseKeeper) Params(ctx context.Context, req *types.QueryParamsRequest) (meterResult *types.QueryParamsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Params")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Params")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -188,9 +188,9 @@ func (k BaseKeeper) Params(ctx context.Context, req *types.QueryParamsRequest) (
 }
 
 // DenomsMetadata implements Query/DenomsMetadata gRPC method.
-func (k BaseKeeper) DenomsMetadata(c context.Context, req *types.QueryDenomsMetadataRequest) (*types.QueryDenomsMetadataResponse, error) {
+func (k BaseKeeper) DenomsMetadata(c context.Context, req *types.QueryDenomsMetadataRequest) (meterResult *types.QueryDenomsMetadataResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(c)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "DenomsMetadata")()
+	defer k.Meter(c).FuncTiming(&sdkCtx, "DenomsMetadata")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -217,15 +217,15 @@ func (k BaseKeeper) DenomsMetadata(c context.Context, req *types.QueryDenomsMeta
 }
 
 // DenomMetadata implements Query/DenomMetadata gRPC method.
-func (k BaseKeeper) DenomMetadata(c context.Context, req *types.QueryDenomMetadataRequest) (*types.QueryDenomMetadataResponse, error) {
+func (k BaseKeeper) DenomMetadata(c context.Context, req *types.QueryDenomMetadataRequest) (meterResult *types.QueryDenomMetadataResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(c)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "DenomMetadata")()
+	defer k.Meter(c).FuncTiming(&sdkCtx, "DenomMetadata")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
 	}
 
-	if err := sdk.ValidateDenom(req.Denom); err != nil {
+	if err = sdk.ValidateDenom(req.Denom); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
@@ -240,9 +240,9 @@ func (k BaseKeeper) DenomMetadata(c context.Context, req *types.QueryDenomMetada
 }
 
 // DenomMetadataByQueryString is identical to DenomMetadata query, but receives request via query string.
-func (k BaseKeeper) DenomMetadataByQueryString(c context.Context, req *types.QueryDenomMetadataByQueryStringRequest) (*types.QueryDenomMetadataByQueryStringResponse, error) {
+func (k BaseKeeper) DenomMetadataByQueryString(c context.Context, req *types.QueryDenomMetadataByQueryStringRequest) (meterResult *types.QueryDenomMetadataByQueryStringResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(c)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "DenomMetadataByQueryString")()
+	defer k.Meter(c).FuncTiming(&sdkCtx, "DenomMetadataByQueryString")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -261,15 +261,15 @@ func (k BaseKeeper) DenomMetadataByQueryString(c context.Context, req *types.Que
 func (k BaseKeeper) DenomOwners(
 	ctx context.Context,
 	req *types.QueryDenomOwnersRequest,
-) (*types.QueryDenomOwnersResponse, error) {
+) (meterResult *types.QueryDenomOwnersResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "DenomOwners")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "DenomOwners")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
 	}
 
-	if err := sdk.ValidateDenom(req.Denom); err != nil {
+	if err = sdk.ValidateDenom(req.Denom); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
@@ -293,9 +293,9 @@ func (k BaseKeeper) DenomOwners(
 	return &types.QueryDenomOwnersResponse{DenomOwners: denomOwners, Pagination: pageRes}, nil
 }
 
-func (k BaseKeeper) SendEnabled(goCtx context.Context, req *types.QuerySendEnabledRequest) (*types.QuerySendEnabledResponse, error) {
+func (k BaseKeeper) SendEnabled(goCtx context.Context, req *types.QuerySendEnabledRequest) (meterResult *types.QuerySendEnabledResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SendEnabled")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "SendEnabled")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -327,9 +327,9 @@ func (k BaseKeeper) SendEnabled(goCtx context.Context, req *types.QuerySendEnabl
 }
 
 // DenomOwnersByQuery is identical to DenomOwner query, but receives denom values via query string.
-func (k BaseKeeper) DenomOwnersByQuery(ctx context.Context, req *types.QueryDenomOwnersByQueryRequest) (*types.QueryDenomOwnersByQueryResponse, error) {
+func (k BaseKeeper) DenomOwnersByQuery(ctx context.Context, req *types.QueryDenomOwnersByQueryRequest) (meterResult *types.QueryDenomOwnersByQueryResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "DenomOwnersByQuery")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "DenomOwnersByQuery")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")

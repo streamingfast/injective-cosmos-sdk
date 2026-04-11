@@ -17,15 +17,15 @@ import (
 )
 
 // EndBlocker called every block, process inflation, update validator set.
-func EndBlocker(ctx sdk.Context, keeper *keeper.Keeper) error {
-	defer keeper.Meter(ctx).FuncTiming(&ctx, "EndBlocker")()
+func EndBlocker(ctx sdk.Context, keeper *keeper.Keeper) (err error) {
+	defer keeper.Meter(ctx).FuncTiming(&ctx, "EndBlocker")(&err)
 	defer telemetry.ModuleMeasureSince(types.ModuleName, telemetry.Now(), telemetry.MetricKeyEndBlocker)
 
 	logger := ctx.Logger().With("module", "x/"+types.ModuleName)
 	// delete dead proposals from store and returns theirs deposits.
 	// A proposal is dead when it's inactive and didn't get enough deposit on time to get into voting phase.
 	rng := collections.NewPrefixUntilPairRange[time.Time, uint64](ctx.BlockTime())
-	err := keeper.InactiveProposalsQueue.Walk(ctx, rng, func(key collections.Pair[time.Time, uint64], _ uint64) (bool, error) {
+	err = keeper.InactiveProposalsQueue.Walk(ctx, rng, func(key collections.Pair[time.Time, uint64], _ uint64) (bool, error) {
 		proposal, err := keeper.Proposals.Get(ctx, key.K2())
 		if err != nil {
 			// if the proposal has an encoding error, this means it cannot be processed by x/gov
@@ -33,7 +33,7 @@ func EndBlocker(ctx sdk.Context, keeper *keeper.Keeper) error {
 			// instead of returning an error (i.e, halting the chain), we fail the proposal
 			if errors.Is(err, collections.ErrEncoding) {
 				proposal.Id = key.K2()
-				if err := failUnsupportedProposal(logger, ctx, keeper, proposal, err.Error(), false); err != nil {
+				if err = failUnsupportedProposal(logger, ctx, keeper, proposal, err.Error(), false); err != nil {
 					return false, err
 				}
 
@@ -107,7 +107,7 @@ func EndBlocker(ctx sdk.Context, keeper *keeper.Keeper) error {
 			// instead of returning an error (i.e, halting the chain), we fail the proposal
 			if errors.Is(err, collections.ErrEncoding) {
 				proposal.Id = key.K2()
-				if err := failUnsupportedProposal(logger, ctx, keeper, proposal, err.Error(), true); err != nil {
+				if err = failUnsupportedProposal(logger, ctx, keeper, proposal, err.Error(), true); err != nil {
 					return false, err
 				}
 

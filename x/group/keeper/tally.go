@@ -12,8 +12,8 @@ import (
 
 // Tally is a function that tallies a proposal by iterating through its votes,
 // and returns the tally result without modifying the proposal or any state.
-func (k Keeper) Tally(ctx sdk.Context, p group.Proposal, groupID uint64) (group.TallyResult, error) {
-	defer k.Meter(ctx).FuncTiming(&ctx, "Tally")()
+func (k Keeper) Tally(ctx sdk.Context, p group.Proposal, groupID uint64) (meterResult group.TallyResult, err error) {
+	defer k.Meter(ctx).FuncTiming(&ctx, "Tally")(&err)
 
 	// If proposal has already been tallied and updated, then its status is
 	// accepted/rejected, in which case we just return the previously stored result.
@@ -43,7 +43,7 @@ func (k Keeper) Tally(ctx sdk.Context, p group.Proposal, groupID uint64) (group.
 		}
 
 		var member group.GroupMember
-		err := k.groupMemberTable.GetOne(ctx.KVStore(k.key), orm.PrimaryKey(&group.GroupMember{
+		err = k.groupMemberTable.GetOne(ctx.KVStore(k.key), orm.PrimaryKey(&group.GroupMember{
 			GroupId: groupID,
 			Member:  &group.Member{Address: vote.Voter},
 		}), &member)
@@ -58,7 +58,7 @@ func (k Keeper) Tally(ctx sdk.Context, p group.Proposal, groupID uint64) (group.
 			return group.TallyResult{}, err
 		}
 
-		if err := tallyResult.Add(vote, member.Member.Weight); err != nil {
+		if err = tallyResult.Add(vote, member.Member.Weight); err != nil {
 			return group.TallyResult{}, errorsmod.Wrap(err, "add new vote")
 		}
 	}

@@ -23,9 +23,9 @@ func NewMsgServerImpl(keeper Keeper) types.MsgServer {
 var _ types.MsgServer = msgServer{}
 
 // SubmitEvidence implements the MsgServer.SubmitEvidence method.
-func (ms msgServer) SubmitEvidence(goCtx context.Context, msg *types.MsgSubmitEvidence) (*types.MsgSubmitEvidenceResponse, error) {
+func (ms msgServer) SubmitEvidence(goCtx context.Context, msg *types.MsgSubmitEvidence) (meterResult *types.MsgSubmitEvidenceResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer ms.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "SubmitEvidence")()
+	defer ms.Keeper.Meter(goCtx).FuncTiming(&sdkCtx, "SubmitEvidence")(&err)
 
 	if _, err := ms.addressCodec.StringToBytes(msg.Submitter); err != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid submitter address: %s", err)
@@ -36,11 +36,11 @@ func (ms msgServer) SubmitEvidence(goCtx context.Context, msg *types.MsgSubmitEv
 		return nil, errors.Wrap(types.ErrInvalidEvidence, "missing evidence")
 	}
 
-	if err := evidence.ValidateBasic(); err != nil {
+	if err = evidence.ValidateBasic(); err != nil {
 		return nil, errors.Wrapf(types.ErrInvalidEvidence, "failed basic validation: %s", err)
 	}
 
-	if err := ms.Keeper.SubmitEvidence(sdkCtx, evidence); err != nil {
+	if err = ms.Keeper.SubmitEvidence(sdkCtx, evidence); err != nil {
 		return nil, err
 	}
 

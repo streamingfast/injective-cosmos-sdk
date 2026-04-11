@@ -13,9 +13,9 @@ import (
 var _ types.QueryServer = Keeper{}
 
 // CurrentPlan implements the Query/CurrentPlan gRPC method
-func (k Keeper) CurrentPlan(c context.Context, req *types.QueryCurrentPlanRequest) (*types.QueryCurrentPlanResponse, error) {
+func (k Keeper) CurrentPlan(c context.Context, req *types.QueryCurrentPlanRequest) (meterResult *types.QueryCurrentPlanResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(c)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "CurrentPlan")()
+	defer k.Meter(c).FuncTiming(&sdkCtx, "CurrentPlan")(&err)
 
 	plan, err := k.GetUpgradePlan(sdkCtx)
 	if err != nil {
@@ -30,9 +30,9 @@ func (k Keeper) CurrentPlan(c context.Context, req *types.QueryCurrentPlanReques
 }
 
 // AppliedPlan implements the Query/AppliedPlan gRPC method
-func (k Keeper) AppliedPlan(c context.Context, req *types.QueryAppliedPlanRequest) (*types.QueryAppliedPlanResponse, error) {
+func (k Keeper) AppliedPlan(c context.Context, req *types.QueryAppliedPlanRequest) (meterResult *types.QueryAppliedPlanResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(c)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AppliedPlan")()
+	defer k.Meter(c).FuncTiming(&sdkCtx, "AppliedPlan")(&err)
 
 	applied, err := k.GetDoneHeight(sdkCtx, req.Name)
 
@@ -40,9 +40,9 @@ func (k Keeper) AppliedPlan(c context.Context, req *types.QueryAppliedPlanReques
 }
 
 // UpgradedConsensusState implements the Query/UpgradedConsensusState gRPC method
-func (k Keeper) UpgradedConsensusState(c context.Context, req *types.QueryUpgradedConsensusStateRequest) (*types.QueryUpgradedConsensusStateResponse, error) {
+func (k Keeper) UpgradedConsensusState(c context.Context, req *types.QueryUpgradedConsensusStateRequest) (meterResult *types.QueryUpgradedConsensusStateResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(c)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UpgradedConsensusState")()
+	defer k.Meter(c).FuncTiming(&sdkCtx, "UpgradedConsensusState")(&err)
 
 	//nolint:staticcheck // we're using a deprecated call for compatibility
 
@@ -61,9 +61,9 @@ func (k Keeper) UpgradedConsensusState(c context.Context, req *types.QueryUpgrad
 }
 
 // ModuleVersions implements the Query/QueryModuleVersions gRPC method
-func (k Keeper) ModuleVersions(c context.Context, req *types.QueryModuleVersionsRequest) (*types.QueryModuleVersionsResponse, error) {
+func (k Keeper) ModuleVersions(c context.Context, req *types.QueryModuleVersionsRequest) (meterResult *types.QueryModuleVersionsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(c)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "ModuleVersions")()
+	defer k.Meter(c).FuncTiming(&sdkCtx, "ModuleVersions")(&err)
 
 	// check if a specific module was requested
 	if len(req.ModuleName) > 0 {
@@ -90,9 +90,9 @@ func (k Keeper) ModuleVersions(c context.Context, req *types.QueryModuleVersions
 }
 
 // Authority implements the Query/Authority gRPC method, returning the account capable of performing upgrades
-func (k Keeper) Authority(c context.Context, req *types.QueryAuthorityRequest) (*types.QueryAuthorityResponse, error) {
+func (k Keeper) Authority(c context.Context, req *types.QueryAuthorityRequest) (meterResult *types.QueryAuthorityResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(c)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Authority")()
+	defer k.Meter(c).FuncTiming(&sdkCtx, "Authority")(&err)
 
 	return &types.QueryAuthorityResponse{Address: k.authority}, nil
 }

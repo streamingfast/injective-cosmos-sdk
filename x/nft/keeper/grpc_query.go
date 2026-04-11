@@ -15,9 +15,9 @@ import (
 var _ nft.QueryServer = Keeper{}
 
 // Balance return the number of NFTs of a given class owned by the owner, same as balanceOf in ERC721
-func (k Keeper) Balance(goCtx context.Context, r *nft.QueryBalanceRequest) (*nft.QueryBalanceResponse, error) {
+func (k Keeper) Balance(goCtx context.Context, r *nft.QueryBalanceRequest) (meterResult *nft.QueryBalanceResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Balance")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "Balance")(&err)
 
 	if r == nil {
 		return nil, sdkerrors.ErrInvalidRequest.Wrap("empty request")
@@ -37,9 +37,9 @@ func (k Keeper) Balance(goCtx context.Context, r *nft.QueryBalanceRequest) (*nft
 }
 
 // Owner return the owner of the NFT based on its class and id, same as ownerOf in ERC721
-func (k Keeper) Owner(goCtx context.Context, r *nft.QueryOwnerRequest) (*nft.QueryOwnerResponse, error) {
+func (k Keeper) Owner(goCtx context.Context, r *nft.QueryOwnerRequest) (meterResult *nft.QueryOwnerResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Owner")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "Owner")(&err)
 
 	if r == nil {
 		return nil, sdkerrors.ErrInvalidRequest.Wrap("empty request")
@@ -65,9 +65,9 @@ func (k Keeper) Owner(goCtx context.Context, r *nft.QueryOwnerRequest) (*nft.Que
 }
 
 // Supply return the number of NFTs from the given class, same as totalSupply of ERC721.
-func (k Keeper) Supply(goCtx context.Context, r *nft.QuerySupplyRequest) (*nft.QuerySupplyResponse, error) {
+func (k Keeper) Supply(goCtx context.Context, r *nft.QuerySupplyRequest) (meterResult *nft.QuerySupplyResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Supply")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "Supply")(&err)
 
 	if r == nil {
 		return nil, sdkerrors.ErrInvalidRequest.Wrap("empty request")
@@ -82,15 +82,14 @@ func (k Keeper) Supply(goCtx context.Context, r *nft.QuerySupplyRequest) (*nft.Q
 }
 
 // NFTs queries all NFTs of a given class or owner (at least one must be provided), similar to tokenByIndex in ERC721Enumerable
-func (k Keeper) NFTs(goCtx context.Context, r *nft.QueryNFTsRequest) (*nft.QueryNFTsResponse, error) {
+func (k Keeper) NFTs(goCtx context.Context, r *nft.QueryNFTsRequest) (meterResult *nft.QueryNFTsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "NFTs")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "NFTs")(&err)
 
 	if r == nil {
 		return nil, sdkerrors.ErrInvalidRequest.Wrap("empty request")
 	}
 
-	var err error
 	var owner sdk.AccAddress
 
 	if len(r.Owner) > 0 {
@@ -118,7 +117,7 @@ func (k Keeper) NFTs(goCtx context.Context, r *nft.QueryNFTsRequest) (*nft.Query
 		nftStore := k.getNFTStore(sdkCtx, r.ClassId)
 		if pageRes, err = query.Paginate(nftStore, r.Pagination, func(_, value []byte) error {
 			var nft nft.NFT
-			if err := k.cdc.Unmarshal(value, &nft); err != nil {
+			if err = k.cdc.Unmarshal(value, &nft); err != nil {
 				return err
 			}
 			nfts = append(nfts, &nft)
@@ -146,9 +145,9 @@ func (k Keeper) NFTs(goCtx context.Context, r *nft.QueryNFTsRequest) (*nft.Query
 }
 
 // NFT return an NFT based on its class and id.
-func (k Keeper) NFT(goCtx context.Context, r *nft.QueryNFTRequest) (*nft.QueryNFTResponse, error) {
+func (k Keeper) NFT(goCtx context.Context, r *nft.QueryNFTRequest) (meterResult *nft.QueryNFTResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "NFT")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "NFT")(&err)
 
 	if r == nil {
 		return nil, sdkerrors.ErrInvalidRequest.Wrap("empty request")
@@ -169,9 +168,9 @@ func (k Keeper) NFT(goCtx context.Context, r *nft.QueryNFTRequest) (*nft.QueryNF
 }
 
 // Class return an NFT class based on its id
-func (k Keeper) Class(goCtx context.Context, r *nft.QueryClassRequest) (*nft.QueryClassResponse, error) {
+func (k Keeper) Class(goCtx context.Context, r *nft.QueryClassRequest) (meterResult *nft.QueryClassResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Class")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "Class")(&err)
 
 	if r == nil {
 		return nil, sdkerrors.ErrInvalidRequest.Wrap("empty request")
@@ -189,9 +188,9 @@ func (k Keeper) Class(goCtx context.Context, r *nft.QueryClassRequest) (*nft.Que
 }
 
 // Classes return all NFT classes
-func (k Keeper) Classes(goCtx context.Context, r *nft.QueryClassesRequest) (*nft.QueryClassesResponse, error) {
+func (k Keeper) Classes(goCtx context.Context, r *nft.QueryClassesRequest) (meterResult *nft.QueryClassesResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Classes")()
+	defer k.Meter(goCtx).FuncTiming(&sdkCtx, "Classes")(&err)
 
 	if r == nil {
 		return nil, sdkerrors.ErrInvalidRequest.Wrap("empty request")
@@ -203,7 +202,7 @@ func (k Keeper) Classes(goCtx context.Context, r *nft.QueryClassesRequest) (*nft
 	var classes []*nft.Class
 	pageRes, err := query.Paginate(classStore, r.Pagination, func(_, value []byte) error {
 		var class nft.Class
-		if err := k.cdc.Unmarshal(value, &class); err != nil {
+		if err = k.cdc.Unmarshal(value, &class); err != nil {
 			return err
 		}
 		classes = append(classes, &class)

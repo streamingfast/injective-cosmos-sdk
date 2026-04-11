@@ -177,14 +177,14 @@ func (am AppModule) BeginBlock(ctx sdk.Context) {
 
 // EndBlock returns the end blocker for the bank module. It returns no validator
 // updates.
-func (am AppModule) EndBlock(ctx context.Context) error {
+func (am AppModule) EndBlock(ctx context.Context) (err error) {
 	switch k := am.keeper.(type) {
 	case keeper.BaseKeeper:
 		sdkCtx := sdk.UnwrapSDKContext(ctx)
-		defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "EndBlocker")()
+		defer k.Meter(ctx).FuncTiming(&sdkCtx, "EndBlocker")(&err)
 	case *keeper.BaseKeeper:
 		sdkCtx := sdk.UnwrapSDKContext(ctx)
-		defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "EndBlocker")()
+		defer k.Meter(ctx).FuncTiming(&sdkCtx, "EndBlocker")(&err)
 	}
 
 	am.keeper.EmitAllTransientBalances(ctx)

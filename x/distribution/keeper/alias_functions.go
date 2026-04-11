@@ -8,9 +8,9 @@ import (
 )
 
 // get outstanding rewards
-func (k Keeper) GetValidatorOutstandingRewardsCoins(ctx context.Context, val sdk.ValAddress) (sdk.DecCoins, error) {
+func (k Keeper) GetValidatorOutstandingRewardsCoins(ctx context.Context, val sdk.ValAddress) (meterResult sdk.DecCoins, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetValidatorOutstandingRewardsCoins")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetValidatorOutstandingRewardsCoins")(&err)
 
 	rewards, err := k.GetValidatorOutstandingRewards(sdkCtx, val)
 	if err != nil {
@@ -23,7 +23,7 @@ func (k Keeper) GetValidatorOutstandingRewardsCoins(ctx context.Context, val sdk
 // GetDistributionAccount returns the distribution ModuleAccount
 func (k Keeper) GetDistributionAccount(ctx context.Context) sdk.ModuleAccountI {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetDistributionAccount")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetDistributionAccount")()
 
 	return k.authKeeper.GetModuleAccount(sdkCtx, types.ModuleName)
 }

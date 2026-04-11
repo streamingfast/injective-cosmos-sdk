@@ -26,20 +26,19 @@ func NewMsgServerImpl(keeper Keeper) types.MsgServer {
 	return &msgServer{Keeper: keeper}
 }
 
-func (k msgServer) Send(goCtx context.Context, msg *types.MsgSend) (*types.MsgSendResponse, error) {
+func (k msgServer) Send(goCtx context.Context, msg *types.MsgSend) (meterResult *types.MsgSendResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
 
 	var (
 		base     BaseKeeper
 		from, to []byte
-		err      error
 	)
 
 	var ok bool
 	if base, ok = k.Keeper.(BaseKeeper); !ok {
 		return nil, sdkerrors.ErrInvalidRequest.Wrapf("invalid keeper type: %T", k.Keeper)
 	}
-	defer base.Meter(sdkCtx).FuncTiming(&sdkCtx, "Send")()
+	defer base.Meter(goCtx).FuncTiming(&sdkCtx, "Send")(&err)
 
 	from, err = base.ak.AddressCodec().StringToBytes(msg.FromAddress)
 	if err != nil {
@@ -58,7 +57,7 @@ func (k msgServer) Send(goCtx context.Context, msg *types.MsgSend) (*types.MsgSe
 		return nil, errorsmod.Wrap(sdkerrors.ErrInvalidCoins, msg.Amount.String())
 	}
 
-	if err := k.IsSendEnabledCoins(sdkCtx, msg.Amount...); err != nil {
+	if err = k.IsSendEnabledCoins(sdkCtx, msg.Amount...); err != nil {
 		return nil, err
 	}
 
@@ -86,13 +85,13 @@ func (k msgServer) Send(goCtx context.Context, msg *types.MsgSend) (*types.MsgSe
 	return &types.MsgSendResponse{}, nil
 }
 
-func (k msgServer) MultiSend(goCtx context.Context, msg *types.MsgMultiSend) (*types.MsgMultiSendResponse, error) {
+func (k msgServer) MultiSend(goCtx context.Context, msg *types.MsgMultiSend) (meterResult *types.MsgMultiSendResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
 	base, ok := k.Keeper.(BaseKeeper)
 	if !ok {
 		return nil, sdkerrors.ErrInvalidRequest.Wrapf("invalid keeper type: %T", k.Keeper)
 	}
-	defer base.Meter(sdkCtx).FuncTiming(&sdkCtx, "MultiSend")()
+	defer base.Meter(goCtx).FuncTiming(&sdkCtx, "MultiSend")(&err)
 
 	if len(msg.Inputs) == 0 {
 		return nil, types.ErrNoInputs
@@ -106,13 +105,13 @@ func (k msgServer) MultiSend(goCtx context.Context, msg *types.MsgMultiSend) (*t
 		return nil, types.ErrNoOutputs
 	}
 
-	if err := types.ValidateInputOutputs(msg.Inputs[0], msg.Outputs); err != nil {
+	if err = types.ValidateInputOutputs(msg.Inputs[0], msg.Outputs); err != nil {
 		return nil, err
 	}
 
 	// NOTE: totalIn == totalOut should already have been checked
 	for _, in := range msg.Inputs {
-		if err := k.IsSendEnabledCoins(sdkCtx, in.Coins...); err != nil {
+		if err = k.IsSendEnabledCoins(sdkCtx, in.Coins...); err != nil {
 			return nil, err
 		}
 	}
@@ -128,7 +127,7 @@ func (k msgServer) MultiSend(goCtx context.Context, msg *types.MsgMultiSend) (*t
 		}
 	}
 
-	err := k.InputOutputCoins(sdkCtx, msg.Inputs[0], msg.Outputs)
+	err = k.InputOutputCoins(sdkCtx, msg.Inputs[0], msg.Outputs)
 	if err != nil {
 		return nil, err
 	}
@@ -136,36 +135,36 @@ func (k msgServer) MultiSend(goCtx context.Context, msg *types.MsgMultiSend) (*t
 	return &types.MsgMultiSendResponse{}, nil
 }
 
-func (k msgServer) UpdateParams(goCtx context.Context, req *types.MsgUpdateParams) (*types.MsgUpdateParamsResponse, error) {
+func (k msgServer) UpdateParams(goCtx context.Context, req *types.MsgUpdateParams) (meterResult *types.MsgUpdateParamsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
 	base, ok := k.Keeper.(BaseKeeper)
 	if !ok {
 		return nil, sdkerrors.ErrInvalidRequest.Wrapf("invalid keeper type: %T", k.Keeper)
 	}
-	defer base.Meter(sdkCtx).FuncTiming(&sdkCtx, "UpdateParams")()
+	defer base.Meter(goCtx).FuncTiming(&sdkCtx, "UpdateParams")(&err)
 
 	if k.GetAuthority() != req.Authority {
 		return nil, errorsmod.Wrapf(govtypes.ErrInvalidSigner, "invalid authority; expected %s, got %s", k.GetAuthority(), req.Authority)
 	}
 
-	if err := req.Params.Validate(); err != nil {
+	if err = req.Params.Validate(); err != nil {
 		return nil, err
 	}
 
-	if err := k.SetParams(sdkCtx, req.Params); err != nil {
+	if err = k.SetParams(sdkCtx, req.Params); err != nil {
 		return nil, err
 	}
 
 	return &types.MsgUpdateParamsResponse{}, nil
 }
 
-func (k msgServer) SetSendEnabled(goCtx context.Context, msg *types.MsgSetSendEnabled) (*types.MsgSetSendEnabledResponse, error) {
+func (k msgServer) SetSendEnabled(goCtx context.Context, msg *types.MsgSetSendEnabled) (meterResult *types.MsgSetSendEnabledResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
 	base, ok := k.Keeper.(BaseKeeper)
 	if !ok {
 		return nil, sdkerrors.ErrInvalidRequest.Wrapf("invalid keeper type: %T", k.Keeper)
 	}
-	defer base.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetSendEnabled")()
+	defer base.Meter(goCtx).FuncTiming(&sdkCtx, "SetSendEnabled")(&err)
 
 	if k.GetAuthority() != msg.Authority {
 		return nil, errorsmod.Wrapf(govtypes.ErrInvalidSigner, "invalid authority; expected %s, got %s", k.GetAuthority(), msg.Authority)
@@ -179,13 +178,13 @@ func (k msgServer) SetSendEnabled(goCtx context.Context, msg *types.MsgSetSendEn
 
 		seen[se.Denom] = true
 
-		if err := se.Validate(); err != nil {
+		if err = se.Validate(); err != nil {
 			return nil, sdkerrors.ErrInvalidRequest.Wrapf("invalid SendEnabled denom %q: %s", se.Denom, err)
 		}
 	}
 
 	for _, denom := range msg.UseDefaultFor {
-		if err := sdk.ValidateDenom(denom); err != nil {
+		if err = sdk.ValidateDenom(denom); err != nil {
 			return nil, sdkerrors.ErrInvalidRequest.Wrapf("invalid UseDefaultFor denom %q: %s", denom, err)
 		}
 	}

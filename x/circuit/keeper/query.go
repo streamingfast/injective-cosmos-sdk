@@ -22,9 +22,9 @@ func NewQueryServer(keeper Keeper) types.QueryServer {
 }
 
 // Account returns account permissions.
-func (qs QueryServer) Account(ctx context.Context, req *types.QueryAccountRequest) (*types.AccountResponse, error) {
+func (qs QueryServer) Account(ctx context.Context, req *types.QueryAccountRequest) (meterResult *types.AccountResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer qs.keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Account")()
+	defer qs.keeper.Meter(ctx).FuncTiming(&sdkCtx, "Account")(&err)
 
 	add, err := qs.keeper.addressCodec.StringToBytes(req.Address)
 	if err != nil {
@@ -40,9 +40,9 @@ func (qs QueryServer) Account(ctx context.Context, req *types.QueryAccountReques
 }
 
 // Account returns account permissions.
-func (qs QueryServer) Accounts(ctx context.Context, req *types.QueryAccountsRequest) (*types.AccountsResponse, error) {
+func (qs QueryServer) Accounts(ctx context.Context, req *types.QueryAccountsRequest) (meterResult *types.AccountsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer qs.keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Accounts")()
+	defer qs.keeper.Meter(ctx).FuncTiming(&sdkCtx, "Accounts")(&err)
 
 	results, pageRes, err := query.CollectionPaginate(
 		sdkCtx,
@@ -67,13 +67,13 @@ func (qs QueryServer) Accounts(ctx context.Context, req *types.QueryAccountsRequ
 }
 
 // DisabledList returns a list of disabled message urls
-func (qs QueryServer) DisabledList(ctx context.Context, req *types.QueryDisabledListRequest) (*types.DisabledListResponse, error) {
+func (qs QueryServer) DisabledList(ctx context.Context, req *types.QueryDisabledListRequest) (meterResult *types.DisabledListResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer qs.keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DisabledList")()
+	defer qs.keeper.Meter(ctx).FuncTiming(&sdkCtx, "DisabledList")(&err)
 
 	// Iterate over disabled list and perform the callback
 	var msgs []string
-	err := qs.keeper.DisableList.Walk(sdkCtx, nil, func(msgUrl string) (bool, error) {
+	err = qs.keeper.DisableList.Walk(sdkCtx, nil, func(msgUrl string) (bool, error) {
 		msgs = append(msgs, msgUrl)
 		return false, nil
 	})

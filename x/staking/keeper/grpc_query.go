@@ -28,9 +28,9 @@ func NewQuerier(keeper *Keeper) Querier {
 }
 
 // Validators queries all validators that match the given status
-func (k Querier) Validators(ctx context.Context, req *types.QueryValidatorsRequest) (*types.QueryValidatorsResponse, error) {
+func (k Querier) Validators(ctx context.Context, req *types.QueryValidatorsRequest) (meterResult *types.QueryValidatorsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Validators")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "Validators")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -66,9 +66,9 @@ func (k Querier) Validators(ctx context.Context, req *types.QueryValidatorsReque
 }
 
 // Validator queries validator info for given validator address
-func (k Querier) Validator(ctx context.Context, req *types.QueryValidatorRequest) (*types.QueryValidatorResponse, error) {
+func (k Querier) Validator(ctx context.Context, req *types.QueryValidatorRequest) (meterResult *types.QueryValidatorResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Validator")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "Validator")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -92,9 +92,9 @@ func (k Querier) Validator(ctx context.Context, req *types.QueryValidatorRequest
 }
 
 // ValidatorDelegations queries delegate info for given validator
-func (k Querier) ValidatorDelegations(ctx context.Context, req *types.QueryValidatorDelegationsRequest) (*types.QueryValidatorDelegationsResponse, error) {
+func (k Querier) ValidatorDelegations(ctx context.Context, req *types.QueryValidatorDelegationsRequest) (meterResult *types.QueryValidatorDelegationsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "ValidatorDelegations")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "ValidatorDelegations")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -152,9 +152,9 @@ func (k Querier) ValidatorDelegations(ctx context.Context, req *types.QueryValid
 	}, nil
 }
 
-func (k Querier) getValidatorDelegationsLegacy(ctx context.Context, req *types.QueryValidatorDelegationsRequest) ([]*types.Delegation, *query.PageResponse, error) {
+func (k Querier) getValidatorDelegationsLegacy(ctx context.Context, req *types.QueryValidatorDelegationsRequest) (meterResult []*types.Delegation, meterResult1 *query.PageResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "getValidatorDelegationsLegacy")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "getValidatorDelegationsLegacy")(&err)
 
 	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(sdkCtx))
 
@@ -176,9 +176,9 @@ func (k Querier) getValidatorDelegationsLegacy(ctx context.Context, req *types.Q
 }
 
 // ValidatorUnbondingDelegations queries unbonding delegations of a validator
-func (k Querier) ValidatorUnbondingDelegations(ctx context.Context, req *types.QueryValidatorUnbondingDelegationsRequest) (*types.QueryValidatorUnbondingDelegationsResponse, error) {
+func (k Querier) ValidatorUnbondingDelegations(ctx context.Context, req *types.QueryValidatorUnbondingDelegationsRequest) (meterResult *types.QueryValidatorUnbondingDelegationsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "ValidatorUnbondingDelegations")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "ValidatorUnbondingDelegations")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -219,9 +219,9 @@ func (k Querier) ValidatorUnbondingDelegations(ctx context.Context, req *types.Q
 }
 
 // Delegation queries delegate info for given validator delegator pair
-func (k Querier) Delegation(ctx context.Context, req *types.QueryDelegationRequest) (*types.QueryDelegationResponse, error) {
+func (k Querier) Delegation(ctx context.Context, req *types.QueryDelegationRequest) (meterResult *types.QueryDelegationResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Delegation")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "Delegation")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -261,9 +261,9 @@ func (k Querier) Delegation(ctx context.Context, req *types.QueryDelegationReque
 }
 
 // UnbondingDelegation queries unbonding info for given validator delegator pair
-func (k Querier) UnbondingDelegation(ctx context.Context, req *types.QueryUnbondingDelegationRequest) (*types.QueryUnbondingDelegationResponse, error) {
+func (k Querier) UnbondingDelegation(ctx context.Context, req *types.QueryUnbondingDelegationRequest) (meterResult *types.QueryUnbondingDelegationResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "UnbondingDelegation")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "UnbondingDelegation")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -298,9 +298,9 @@ func (k Querier) UnbondingDelegation(ctx context.Context, req *types.QueryUnbond
 }
 
 // DelegatorDelegations queries all delegations of a given delegator address
-func (k Querier) DelegatorDelegations(ctx context.Context, req *types.QueryDelegatorDelegationsRequest) (*types.QueryDelegatorDelegationsResponse, error) {
+func (k Querier) DelegatorDelegations(ctx context.Context, req *types.QueryDelegatorDelegationsRequest) (meterResult *types.QueryDelegatorDelegationsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegatorDelegations")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "DelegatorDelegations")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -339,9 +339,9 @@ func (k Querier) DelegatorDelegations(ctx context.Context, req *types.QueryDeleg
 }
 
 // DelegatorValidator queries validator info for given delegator validator pair
-func (k Querier) DelegatorValidator(ctx context.Context, req *types.QueryDelegatorValidatorRequest) (*types.QueryDelegatorValidatorResponse, error) {
+func (k Querier) DelegatorValidator(ctx context.Context, req *types.QueryDelegatorValidatorRequest) (meterResult *types.QueryDelegatorValidatorResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegatorValidator")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "DelegatorValidator")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -373,9 +373,9 @@ func (k Querier) DelegatorValidator(ctx context.Context, req *types.QueryDelegat
 }
 
 // DelegatorUnbondingDelegations queries all unbonding delegations of a given delegator address
-func (k Querier) DelegatorUnbondingDelegations(ctx context.Context, req *types.QueryDelegatorUnbondingDelegationsRequest) (*types.QueryDelegatorUnbondingDelegationsResponse, error) {
+func (k Querier) DelegatorUnbondingDelegations(ctx context.Context, req *types.QueryDelegatorUnbondingDelegationsRequest) (meterResult *types.QueryDelegatorUnbondingDelegationsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegatorUnbondingDelegations")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "DelegatorUnbondingDelegations")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -410,9 +410,9 @@ func (k Querier) DelegatorUnbondingDelegations(ctx context.Context, req *types.Q
 	}, nil
 }
 
-func (k Querier) AllowedDelegationTransferReceivers(ctx context.Context, _ *types.QueryAllowedDelegationTransferReceiversRequest) (*types.QueryAllowedDelegationTransferReceiversResponse, error) {
+func (k Querier) AllowedDelegationTransferReceivers(ctx context.Context, _ *types.QueryAllowedDelegationTransferReceiversRequest) (meterResult *types.QueryAllowedDelegationTransferReceiversResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "AllowedDelegationTransferReceivers")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "AllowedDelegationTransferReceivers")(&err)
 
 	resp := &types.QueryAllowedDelegationTransferReceiversResponse{
 		Addresses: k.GetAllAllowedDelegationTransferReceivers(sdkCtx),
@@ -421,9 +421,9 @@ func (k Querier) AllowedDelegationTransferReceivers(ctx context.Context, _ *type
 }
 
 // HistoricalInfo queries the historical info for given height
-func (k Querier) HistoricalInfo(ctx context.Context, req *types.QueryHistoricalInfoRequest) (*types.QueryHistoricalInfoResponse, error) {
+func (k Querier) HistoricalInfo(ctx context.Context, req *types.QueryHistoricalInfoRequest) (meterResult *types.QueryHistoricalInfoResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "HistoricalInfo")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "HistoricalInfo")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -442,9 +442,9 @@ func (k Querier) HistoricalInfo(ctx context.Context, req *types.QueryHistoricalI
 }
 
 // Redelegations queries redelegations of given address
-func (k Querier) Redelegations(ctx context.Context, req *types.QueryRedelegationsRequest) (*types.QueryRedelegationsResponse, error) {
+func (k Querier) Redelegations(ctx context.Context, req *types.QueryRedelegationsRequest) (meterResult *types.QueryRedelegationsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Redelegations")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "Redelegations")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -452,7 +452,6 @@ func (k Querier) Redelegations(ctx context.Context, req *types.QueryRedelegation
 
 	var redels types.Redelegations
 	var pageRes *query.PageResponse
-	var err error
 
 	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(sdkCtx))
 	switch {
@@ -475,9 +474,9 @@ func (k Querier) Redelegations(ctx context.Context, req *types.QueryRedelegation
 }
 
 // DelegatorValidators queries all validators info for given delegator address
-func (k Querier) DelegatorValidators(ctx context.Context, req *types.QueryDelegatorValidatorsRequest) (*types.QueryDelegatorValidatorsResponse, error) {
+func (k Querier) DelegatorValidators(ctx context.Context, req *types.QueryDelegatorValidatorsRequest) (meterResult *types.QueryDelegatorValidatorsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "DelegatorValidators")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "DelegatorValidators")(&err)
 
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
@@ -522,9 +521,9 @@ func (k Querier) DelegatorValidators(ctx context.Context, req *types.QueryDelega
 }
 
 // Pool queries the pool info
-func (k Querier) Pool(ctx context.Context, _ *types.QueryPoolRequest) (*types.QueryPoolResponse, error) {
+func (k Querier) Pool(ctx context.Context, _ *types.QueryPoolRequest) (meterResult *types.QueryPoolResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Pool")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "Pool")(&err)
 
 	bondDenom, err := k.BondDenom(sdkCtx)
 	if err != nil {
@@ -542,9 +541,9 @@ func (k Querier) Pool(ctx context.Context, _ *types.QueryPoolRequest) (*types.Qu
 }
 
 // Params queries the staking parameters
-func (k Querier) Params(ctx context.Context, _ *types.QueryParamsRequest) (*types.QueryParamsResponse, error) {
+func (k Querier) Params(ctx context.Context, _ *types.QueryParamsRequest) (meterResult *types.QueryParamsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "Params")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "Params")(&err)
 
 	params, err := k.GetParams(sdkCtx)
 	if err != nil {

@@ -14,9 +14,9 @@ import (
 
 // AllocateTokens performs reward and fee distribution to all validators based
 // on the F1 fee distribution specification.
-func (k Keeper) AllocateTokens(ctx context.Context, totalPreviousPower int64, bondedVotes []abci.VoteInfo) error {
+func (k Keeper) AllocateTokens(ctx context.Context, totalPreviousPower int64, bondedVotes []abci.VoteInfo) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AllocateTokens")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "AllocateTokens")(&err)
 
 	// fetch and clear the collected fees for distribution, since this is
 	// called in BeginBlock, collected fees will be from the previous block
@@ -26,7 +26,7 @@ func (k Keeper) AllocateTokens(ctx context.Context, totalPreviousPower int64, bo
 	feesCollected := sdk.NewDecCoinsFromCoins(feesCollectedInt...)
 
 	// transfer collected fees to the distribution module account
-	err := k.bankKeeper.SendCoinsFromModuleToModule(sdkCtx, k.feeCollectorName, types.ModuleName, feesCollectedInt)
+	err = k.bankKeeper.SendCoinsFromModuleToModule(sdkCtx, k.feeCollectorName, types.ModuleName, feesCollectedInt)
 	if err != nil {
 		return err
 	}
@@ -85,9 +85,9 @@ func (k Keeper) AllocateTokens(ctx context.Context, totalPreviousPower int64, bo
 
 // AllocateTokensToValidator allocate tokens to a particular validator,
 // splitting according to commission.
-func (k Keeper) AllocateTokensToValidator(ctx context.Context, val stakingtypes.ValidatorI, tokens sdk.DecCoins) error {
+func (k Keeper) AllocateTokensToValidator(ctx context.Context, val stakingtypes.ValidatorI, tokens sdk.DecCoins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AllocateTokensToValidator")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "AllocateTokensToValidator")(&err)
 
 	// split tokens between validator and delegators according to commission
 	commission := tokens.MulDec(val.GetCommission())

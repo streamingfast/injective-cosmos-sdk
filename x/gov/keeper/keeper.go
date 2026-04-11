@@ -154,7 +154,7 @@ func (k *Keeper) SetLegacyRouter(router v1beta1.Router) {
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx context.Context) log.Logger {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Logger")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Logger")()
 	return sdkCtx.Logger().With("module", "x/"+types.ModuleName)
 }
 
@@ -171,7 +171,7 @@ func (k Keeper) LegacyRouter() v1beta1.Router {
 // GetGovernanceAccount returns the governance ModuleAccount
 func (k Keeper) GetGovernanceAccount(ctx context.Context) sdk.ModuleAccountI {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetGovernanceAccount")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetGovernanceAccount")()
 
 	return k.authKeeper.GetModuleAccount(sdkCtx, types.ModuleName)
 }

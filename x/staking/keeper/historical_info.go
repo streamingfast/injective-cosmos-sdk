@@ -11,9 +11,9 @@ import (
 )
 
 // GetHistoricalInfo gets the historical info at a given height
-func (k Keeper) GetHistoricalInfo(ctx context.Context, height int64) (types.HistoricalInfo, error) {
+func (k Keeper) GetHistoricalInfo(ctx context.Context, height int64) (meterResult types.HistoricalInfo, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetHistoricalInfo")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetHistoricalInfo")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	key := types.GetHistoricalInfoKey(height)
@@ -31,9 +31,9 @@ func (k Keeper) GetHistoricalInfo(ctx context.Context, height int64) (types.Hist
 }
 
 // SetHistoricalInfo sets the historical info at a given height
-func (k Keeper) SetHistoricalInfo(ctx context.Context, height int64, hi *types.HistoricalInfo) error {
+func (k Keeper) SetHistoricalInfo(ctx context.Context, height int64, hi *types.HistoricalInfo) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetHistoricalInfo")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetHistoricalInfo")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	key := types.GetHistoricalInfoKey(height)
@@ -45,9 +45,9 @@ func (k Keeper) SetHistoricalInfo(ctx context.Context, height int64, hi *types.H
 }
 
 // DeleteHistoricalInfo deletes the historical info at a given height
-func (k Keeper) DeleteHistoricalInfo(ctx context.Context, height int64) error {
+func (k Keeper) DeleteHistoricalInfo(ctx context.Context, height int64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "DeleteHistoricalInfo")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "DeleteHistoricalInfo")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	key := types.GetHistoricalInfoKey(height)
@@ -58,9 +58,9 @@ func (k Keeper) DeleteHistoricalInfo(ctx context.Context, height int64) error {
 // IterateHistoricalInfo provides an iterator over all stored HistoricalInfo
 // objects. For each HistoricalInfo object, cb will be called. If the cb returns
 // true, the iterator will break and close.
-func (k Keeper) IterateHistoricalInfo(ctx context.Context, cb func(types.HistoricalInfo) bool) error {
+func (k Keeper) IterateHistoricalInfo(ctx context.Context, cb func(types.HistoricalInfo) bool) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IterateHistoricalInfo")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IterateHistoricalInfo")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	iterator, err := store.Iterator(types.HistoricalInfoKey, storetypes.PrefixEndBytes(types.HistoricalInfoKey))
@@ -83,12 +83,12 @@ func (k Keeper) IterateHistoricalInfo(ctx context.Context, cb func(types.Histori
 }
 
 // GetAllHistoricalInfo returns all stored HistoricalInfo objects.
-func (k Keeper) GetAllHistoricalInfo(ctx context.Context) ([]types.HistoricalInfo, error) {
+func (k Keeper) GetAllHistoricalInfo(ctx context.Context) (meterResult []types.HistoricalInfo, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetAllHistoricalInfo")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetAllHistoricalInfo")(&err)
 
 	var infos []types.HistoricalInfo
-	err := k.IterateHistoricalInfo(sdkCtx, func(histInfo types.HistoricalInfo) bool {
+	err = k.IterateHistoricalInfo(sdkCtx, func(histInfo types.HistoricalInfo) bool {
 		infos = append(infos, histInfo)
 		return false
 	})
@@ -98,9 +98,9 @@ func (k Keeper) GetAllHistoricalInfo(ctx context.Context) ([]types.HistoricalInf
 
 // TrackHistoricalInfo saves the latest historical-info and deletes the oldest
 // heights that are below pruning height
-func (k Keeper) TrackHistoricalInfo(ctx context.Context) error {
+func (k Keeper) TrackHistoricalInfo(ctx context.Context) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "TrackHistoricalInfo")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "TrackHistoricalInfo")(&err)
 
 	entryNum, err := k.HistoricalEntries(sdkCtx)
 	if err != nil {

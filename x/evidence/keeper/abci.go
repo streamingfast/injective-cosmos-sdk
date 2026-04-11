@@ -13,9 +13,9 @@ import (
 
 // BeginBlocker iterates through and handles any newly discovered evidence of
 // misbehavior submitted by CometBFT. Currently, only equivocation is handled.
-func (k Keeper) BeginBlocker(ctx context.Context) error {
+func (k Keeper) BeginBlocker(ctx context.Context) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "BeginBlocker")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "BeginBlocker")(&err)
 
 	defer telemetry.ModuleMeasureSince(types.ModuleName, telemetry.Now(), telemetry.MetricKeyBeginBlocker)
 
@@ -33,7 +33,7 @@ func (k Keeper) BeginBlocker(ctx context.Context) error {
 		// premeditation. So for now we agree to treat them in the same way.
 		case comet.LightClientAttack, comet.DuplicateVote:
 			evidence := types.FromABCIEvidence(evidences.Get(i), k.stakingKeeper.ConsensusAddressCodec())
-			err := k.handleEquivocationEvidence(sdkCtx, evidence)
+			err = k.handleEquivocationEvidence(sdkCtx, evidence)
 			if err != nil {
 				return err
 			}

@@ -26,9 +26,9 @@ func NewMsgServerImpl(k Keeper) feegrant.MsgServer {
 var _ feegrant.MsgServer = msgServer{}
 
 // GrantAllowance grants an allowance from the granter's funds to be used by the grantee.
-func (k msgServer) GrantAllowance(goCtx context.Context, msg *feegrant.MsgGrantAllowance) (*feegrant.MsgGrantAllowanceResponse, error) {
+func (k msgServer) GrantAllowance(goCtx context.Context, msg *feegrant.MsgGrantAllowance) (meterResult *feegrant.MsgGrantAllowanceResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "GrantAllowance")()
+	defer k.Keeper.Meter(goCtx).FuncTiming(&sdkCtx, "GrantAllowance")(&err)
 
 	if strings.EqualFold(msg.Grantee, msg.Granter) {
 		return nil, errorsmod.Wrap(sdkerrors.ErrInvalidAddress, "cannot self-grant fee authorization")
@@ -53,7 +53,7 @@ func (k msgServer) GrantAllowance(goCtx context.Context, msg *feegrant.MsgGrantA
 		return nil, err
 	}
 
-	if err := allowance.ValidateBasic(); err != nil {
+	if err = allowance.ValidateBasic(); err != nil {
 		return nil, err
 	}
 
@@ -66,9 +66,9 @@ func (k msgServer) GrantAllowance(goCtx context.Context, msg *feegrant.MsgGrantA
 }
 
 // RevokeAllowance revokes a fee allowance between a granter and grantee.
-func (k msgServer) RevokeAllowance(goCtx context.Context, msg *feegrant.MsgRevokeAllowance) (*feegrant.MsgRevokeAllowanceResponse, error) {
+func (k msgServer) RevokeAllowance(goCtx context.Context, msg *feegrant.MsgRevokeAllowance) (meterResult *feegrant.MsgRevokeAllowanceResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(goCtx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "RevokeAllowance")()
+	defer k.Keeper.Meter(goCtx).FuncTiming(&sdkCtx, "RevokeAllowance")(&err)
 
 	if msg.Grantee == msg.Granter {
 		return nil, errorsmod.Wrap(sdkerrors.ErrInvalidAddress, "addresses must be different")
@@ -93,12 +93,12 @@ func (k msgServer) RevokeAllowance(goCtx context.Context, msg *feegrant.MsgRevok
 }
 
 // PruneAllowances removes expired allowances from the store.
-func (k msgServer) PruneAllowances(ctx context.Context, req *feegrant.MsgPruneAllowances) (*feegrant.MsgPruneAllowancesResponse, error) {
+func (k msgServer) PruneAllowances(ctx context.Context, req *feegrant.MsgPruneAllowances) (meterResult *feegrant.MsgPruneAllowancesResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Keeper.Meter(sdkCtx).FuncTiming(&sdkCtx, "PruneAllowances")()
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "PruneAllowances")(&err)
 
 	// 75 is an arbitrary value, we can change it later if needed
-	err := k.RemoveExpiredAllowances(sdkCtx, 75)
+	err = k.RemoveExpiredAllowances(sdkCtx, 75)
 	if err != nil {
 		return nil, err
 	}

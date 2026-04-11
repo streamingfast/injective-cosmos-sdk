@@ -28,9 +28,9 @@ func NewQuerier(keeper *Keeper) Querier {
 }
 
 // Evidence implements the Query/Evidence gRPC method
-func (k Querier) Evidence(c context.Context, req *types.QueryEvidenceRequest) (*types.QueryEvidenceResponse, error) {
+func (k Querier) Evidence(c context.Context, req *types.QueryEvidenceRequest) (meterResult *types.QueryEvidenceResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(c)
-	defer k.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Evidence")()
+	defer k.k.Meter(c).FuncTiming(&sdkCtx, "Evidence")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -64,9 +64,9 @@ func (k Querier) Evidence(c context.Context, req *types.QueryEvidenceRequest) (*
 }
 
 // AllEvidence implements the Query/AllEvidence gRPC method
-func (k Querier) AllEvidence(ctx context.Context, req *types.QueryAllEvidenceRequest) (*types.QueryAllEvidenceResponse, error) {
+func (k Querier) AllEvidence(ctx context.Context, req *types.QueryAllEvidenceRequest) (meterResult *types.QueryAllEvidenceResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.k.Meter(sdkCtx).FuncTiming(&sdkCtx, "AllEvidence")()
+	defer k.k.Meter(ctx).FuncTiming(&sdkCtx, "AllEvidence")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")

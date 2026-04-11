@@ -54,9 +54,9 @@ func (k *Keeper) GetAuthority() string {
 var _ types.QueryServer = Keeper{}
 
 // Params queries params of consensus module
-func (k Keeper) Params(ctx context.Context, _ *types.QueryParamsRequest) (*types.QueryParamsResponse, error) {
+func (k Keeper) Params(ctx context.Context, _ *types.QueryParamsRequest) (meterResult *types.QueryParamsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Params")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Params")(&err)
 
 	params, err := k.ParamsStore.Get(sdkCtx)
 	if err != nil {
@@ -70,9 +70,9 @@ func (k Keeper) Params(ctx context.Context, _ *types.QueryParamsRequest) (*types
 
 var _ types.MsgServer = Keeper{}
 
-func (k Keeper) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (*types.MsgUpdateParamsResponse, error) {
+func (k Keeper) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (meterResult *types.MsgUpdateParamsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "UpdateParams")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "UpdateParams")(&err)
 
 	if k.GetAuthority() != msg.Authority {
 		return nil, errors.Wrapf(govtypes.ErrInvalidSigner, "invalid authority; expected %s, got %s", k.GetAuthority(), msg.Authority)
@@ -97,19 +97,19 @@ func (k Keeper) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (*
 
 	nextParams := params.Update(&consensusParams)
 
-	if err := nextParams.ValidateBasic(); err != nil {
+	if err = nextParams.ValidateBasic(); err != nil {
 		return nil, err
 	}
 
-	if err := params.ValidateUpdate(&consensusParams, sdkCtx.BlockHeader().Height); err != nil {
+	if err = params.ValidateUpdate(&consensusParams, sdkCtx.BlockHeader().Height); err != nil {
 		return nil, err
 	}
 
-	if err := k.ParamsStore.Set(sdkCtx, nextParams.ToProto()); err != nil {
+	if err = k.ParamsStore.Set(sdkCtx, nextParams.ToProto()); err != nil {
 		return nil, err
 	}
 
-	if err := k.event.EventManager(sdkCtx).EmitKV(
+	if err = k.event.EventManager(sdkCtx).EmitKV(
 		sdkCtx,
 		"update_consensus_params",
 		event.Attribute{Key: "authority", Value: msg.Authority},

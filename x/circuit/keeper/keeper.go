@@ -73,9 +73,9 @@ func (k *Keeper) GetAuthority() []byte {
 }
 
 // IsAllowed returns true when msg URL is not found in the DisableList for given context, else false.
-func (k *Keeper) IsAllowed(ctx context.Context, msgURL string) (bool, error) {
+func (k *Keeper) IsAllowed(ctx context.Context, msgURL string) (meterResult bool, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IsAllowed")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IsAllowed")(&err)
 
 	has, err := k.DisableList.Has(sdkCtx, msgURL)
 	return !has, err

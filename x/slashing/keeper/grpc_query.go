@@ -26,9 +26,9 @@ func NewQuerier(keeper Keeper) Querier {
 }
 
 // Params returns parameters of x/slashing module
-func (k Keeper) Params(ctx context.Context, req *types.QueryParamsRequest) (*types.QueryParamsResponse, error) {
+func (k Keeper) Params(ctx context.Context, req *types.QueryParamsRequest) (meterResult *types.QueryParamsResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Params")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Params")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -40,9 +40,9 @@ func (k Keeper) Params(ctx context.Context, req *types.QueryParamsRequest) (*typ
 }
 
 // SigningInfo returns signing-info of a specific validator.
-func (k Keeper) SigningInfo(ctx context.Context, req *types.QuerySigningInfoRequest) (*types.QuerySigningInfoResponse, error) {
+func (k Keeper) SigningInfo(ctx context.Context, req *types.QuerySigningInfoRequest) (meterResult *types.QuerySigningInfoResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SigningInfo")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SigningInfo")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -66,9 +66,9 @@ func (k Keeper) SigningInfo(ctx context.Context, req *types.QuerySigningInfoRequ
 }
 
 // SigningInfos returns signing-infos of all validators.
-func (k Keeper) SigningInfos(ctx context.Context, req *types.QuerySigningInfosRequest) (*types.QuerySigningInfosResponse, error) {
+func (k Keeper) SigningInfos(ctx context.Context, req *types.QuerySigningInfosRequest) (meterResult *types.QuerySigningInfosResponse, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SigningInfos")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SigningInfos")(&err)
 
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
@@ -80,7 +80,7 @@ func (k Keeper) SigningInfos(ctx context.Context, req *types.QuerySigningInfosRe
 	sigInfoStore := prefix.NewStore(runtime.KVStoreAdapter(store), types.ValidatorSigningInfoKeyPrefix)
 	pageRes, err := query.Paginate(sigInfoStore, req.Pagination, func(key, value []byte) error {
 		var info types.ValidatorSigningInfo
-		err := k.cdc.Unmarshal(value, &info)
+		err = k.cdc.Unmarshal(value, &info)
 		if err != nil {
 			return err
 		}

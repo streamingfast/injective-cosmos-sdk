@@ -11,9 +11,9 @@ import (
 
 // Unjail calls the staking Unjail function to unjail a validator if the
 // jailed period has concluded
-func (k Keeper) Unjail(ctx context.Context, validatorAddr sdk.ValAddress) error {
+func (k Keeper) Unjail(ctx context.Context, validatorAddr sdk.ValAddress) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Unjail")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Unjail")(&err)
 
 	validator, err := k.sk.Validator(sdkCtx, validatorAddr)
 	if err != nil {

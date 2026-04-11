@@ -123,7 +123,7 @@ func (k BaseSendKeeper) GetAuthority() string {
 // GetParams returns the total set of bank parameters.
 func (k BaseSendKeeper) GetParams(ctx context.Context) (params types.Params) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetParams")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetParams")()
 
 	p, _ := k.Params.Get(sdkCtx)
 	return p
@@ -132,9 +132,9 @@ func (k BaseSendKeeper) GetParams(ctx context.Context) (params types.Params) {
 // SetParams sets the total set of bank parameters.
 //
 // Note: params.SendEnabled is deprecated but it should be here regardless.
-func (k BaseSendKeeper) SetParams(ctx context.Context, params types.Params) error {
+func (k BaseSendKeeper) SetParams(ctx context.Context, params types.Params) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetParams")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetParams")(&err)
 
 	// Normally SendEnabled is deprecated but we still support it for backwards
 	// compatibility. Using params.Validate() would fail due to the SendEnabled
@@ -151,13 +151,13 @@ func (k BaseSendKeeper) SetParams(ctx context.Context, params types.Params) erro
 // InputOutputCoins performs multi-send functionality. It accepts an
 // input that corresponds to a series of outputs. It returns an error if the
 // input and outputs don't line up or if any single transfer of tokens fails.
-func (k BaseSendKeeper) InputOutputCoins(ctx context.Context, input types.Input, outputs []types.Output) error {
+func (k BaseSendKeeper) InputOutputCoins(ctx context.Context, input types.Input, outputs []types.Output) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "InputOutputCoins")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "InputOutputCoins")(&err)
 
 	// Safety check ensuring that when sending coins the keeper must maintain the
 	// Check supply invariant and validity of Coins.
-	if err := types.ValidateInputOutputs(input, outputs); err != nil {
+	if err = types.ValidateInputOutputs(input, outputs); err != nil {
 		return err
 	}
 
@@ -166,7 +166,7 @@ func (k BaseSendKeeper) InputOutputCoins(ctx context.Context, input types.Input,
 		return err
 	}
 
-	if err := k.validateCoinsBeforeSend(sdkCtx, inAddress, input.Coins); err != nil {
+	if err = k.validateCoinsBeforeSend(sdkCtx, inAddress, input.Coins); err != nil {
 		return err
 	}
 
@@ -201,11 +201,11 @@ func (k BaseSendKeeper) InputOutputCoins(ctx context.Context, input types.Input,
 
 // SendCoins transfers amt coins from a sending account to a receiving account.
 // An error is returned upon failure.
-func (k BaseSendKeeper) SendCoins(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) error {
+func (k BaseSendKeeper) SendCoins(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SendCoins")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SendCoins")(&err)
 
-	if err := k.validateCoinsBeforeSend(sdkCtx, fromAddr, amt); err != nil {
+	if err = k.validateCoinsBeforeSend(sdkCtx, fromAddr, amt); err != nil {
 		return err
 	}
 
@@ -231,11 +231,11 @@ func (k BaseSendKeeper) SendCoins(ctx context.Context, fromAddr, toAddr sdk.AccA
 	return nil
 }
 
-func (k BaseSendKeeper) sendCoins(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) error {
+func (k BaseSendKeeper) sendCoins(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "sendCoins")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "sendCoins")(&err)
 
-	err := k.subUnlockedCoins(sdkCtx, fromAddr, amt, true) // only sub this coin
+	err = k.subUnlockedCoins(sdkCtx, fromAddr, amt, true) // only sub this coin
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func (k BaseSendKeeper) sendCoins(ctx context.Context, fromAddr, toAddr sdk.AccA
 
 func (k BaseSendKeeper) ensureAccountCreated(ctx context.Context, toAddr sdk.AccAddress) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "ensureAccountCreated")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "ensureAccountCreated")()
 
 	// Create account if recipient does not exist.
 	//
@@ -267,7 +267,7 @@ func (k BaseSendKeeper) ensureAccountCreated(ctx context.Context, toAddr sdk.Acc
 
 func (k BaseSendKeeper) emitSendCoinsEvents(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "emitSendCoinsEvents")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "emitSendCoinsEvents")()
 
 	sdkCtx.EventManager().EmitEvent(
 		sdk.NewEvent(
@@ -280,9 +280,9 @@ func (k BaseSendKeeper) emitSendCoinsEvents(ctx context.Context, fromAddr, toAdd
 }
 
 // validateCoinsBeforeSend is checks extracted from subUnlockedCoins to be run before sendRestrictionFn inside SendCoins
-func (k BaseSendKeeper) validateCoinsBeforeSend(ctx context.Context, addr sdk.AccAddress, amt sdk.Coins) error {
+func (k BaseSendKeeper) validateCoinsBeforeSend(ctx context.Context, addr sdk.AccAddress, amt sdk.Coins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "validateCoinsBeforeSend")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "validateCoinsBeforeSend")(&err)
 
 	if !amt.IsValid() {
 		return errorsmod.Wrap(sdkerrors.ErrInvalidCoins, amt.String())
@@ -318,12 +318,12 @@ func (k BaseSendKeeper) validateCoinsBeforeSend(ctx context.Context, addr sdk.Ac
 // subUnlockedCoins removes the unlocked amt coins of the given account. An error is
 // returned if the resulting balance is negative or the initial amount is invalid.
 // A coin_spent event is emitted after.
-func (k BaseSendKeeper) subUnlockedCoins(ctx context.Context, addr sdk.AccAddress, amt sdk.Coins, skipValidation bool) error {
+func (k BaseSendKeeper) subUnlockedCoins(ctx context.Context, addr sdk.AccAddress, amt sdk.Coins, skipValidation bool) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "subUnlockedCoins")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "subUnlockedCoins")(&err)
 
 	if !skipValidation {
-		err := k.validateCoinsBeforeSend(sdkCtx, addr, amt)
+		err = k.validateCoinsBeforeSend(sdkCtx, addr, amt)
 		if err != nil {
 			return err
 		}
@@ -334,7 +334,7 @@ func (k BaseSendKeeper) subUnlockedCoins(ctx context.Context, addr sdk.AccAddres
 
 		newBalance := balance.Sub(coin)
 
-		if err := k.setBalance(sdkCtx, addr, newBalance); err != nil {
+		if err = k.setBalance(sdkCtx, addr, newBalance); err != nil {
 			return err
 		}
 	}
@@ -348,9 +348,9 @@ func (k BaseSendKeeper) subUnlockedCoins(ctx context.Context, addr sdk.AccAddres
 
 // addCoins increase the addr balance by the given amt. Fails if the provided
 // amt is invalid. It emits a coin received event.
-func (k BaseSendKeeper) addCoins(ctx context.Context, addr sdk.AccAddress, amt sdk.Coins) error {
+func (k BaseSendKeeper) addCoins(ctx context.Context, addr sdk.AccAddress, amt sdk.Coins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "addCoins")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "addCoins")(&err)
 
 	if !amt.IsValid() {
 		return errorsmod.Wrap(sdkerrors.ErrInvalidCoins, amt.String())
@@ -360,7 +360,7 @@ func (k BaseSendKeeper) addCoins(ctx context.Context, addr sdk.AccAddress, amt s
 		balance := k.GetBalance(sdkCtx, addr, coin.Denom)
 		newBalance := balance.Add(coin)
 
-		err := k.setBalance(sdkCtx, addr, newBalance)
+		err = k.setBalance(sdkCtx, addr, newBalance)
 		if err != nil {
 			return err
 		}
@@ -375,9 +375,9 @@ func (k BaseSendKeeper) addCoins(ctx context.Context, addr sdk.AccAddress, amt s
 }
 
 // setBalance sets the coin balance for an account by address.
-func (k BaseSendKeeper) setBalance(ctx context.Context, addr sdk.AccAddress, balance sdk.Coin) error {
+func (k BaseSendKeeper) setBalance(ctx context.Context, addr sdk.AccAddress, balance sdk.Coin) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "setBalance")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "setBalance")(&err)
 
 	if !balance.IsValid() {
 		return errorsmod.Wrap(sdkerrors.ErrInvalidCoins, balance.String())
@@ -385,7 +385,7 @@ func (k BaseSendKeeper) setBalance(ctx context.Context, addr sdk.AccAddress, bal
 
 	// x/bank invariants prohibit persistence of zero balances
 	if balance.IsZero() {
-		err := k.Balances.Remove(sdkCtx, collections.Join(addr, balance.Denom))
+		err = k.Balances.Remove(sdkCtx, collections.Join(addr, balance.Denom))
 		if err != nil {
 			return err
 		}
@@ -403,9 +403,9 @@ func (k BaseSendKeeper) setBalance(ctx context.Context, addr sdk.AccAddress, bal
 // IsSendEnabledCoins checks the coins provided and returns an ErrSendDisabled
 // if any of the coins are not configured for sending. Returns nil if sending is
 // enabled for all provided coins.
-func (k BaseSendKeeper) IsSendEnabledCoins(ctx context.Context, coins ...sdk.Coin) error {
+func (k BaseSendKeeper) IsSendEnabledCoins(ctx context.Context, coins ...sdk.Coin) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IsSendEnabledCoins")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IsSendEnabledCoins")(&err)
 
 	if len(coins) == 0 {
 		return nil
@@ -425,7 +425,7 @@ func (k BaseSendKeeper) IsSendEnabledCoins(ctx context.Context, coins ...sdk.Coi
 // IsSendEnabledCoin returns the current SendEnabled status of the provided coin's denom
 func (k BaseSendKeeper) IsSendEnabledCoin(ctx context.Context, coin sdk.Coin) bool {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IsSendEnabledCoin")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IsSendEnabledCoin")()
 
 	return k.IsSendEnabledDenom(sdkCtx, coin.Denom)
 }
@@ -444,7 +444,7 @@ func (k BaseSendKeeper) GetBlockedAddresses() map[string]bool {
 // IsSendEnabledDenom returns the current SendEnabled status of the provided denom.
 func (k BaseSendKeeper) IsSendEnabledDenom(ctx context.Context, denom string) bool {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IsSendEnabledDenom")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IsSendEnabledDenom")()
 
 	return k.getSendEnabledOrDefault(sdkCtx, denom, k.GetParams(sdkCtx).DefaultSendEnabled)
 }
@@ -453,7 +453,7 @@ func (k BaseSendKeeper) IsSendEnabledDenom(ctx context.Context, denom string) bo
 // The second return argument is true iff a specific entry exists for the given denom.
 func (k BaseSendKeeper) GetSendEnabledEntry(ctx context.Context, denom string) (types.SendEnabled, bool) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetSendEnabledEntry")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetSendEnabledEntry")()
 
 	sendEnabled, found := k.getSendEnabled(sdkCtx, denom)
 	if !found {
@@ -466,7 +466,7 @@ func (k BaseSendKeeper) GetSendEnabledEntry(ctx context.Context, denom string) (
 // SetSendEnabled sets the SendEnabled flag for a denom to the provided value.
 func (k BaseSendKeeper) SetSendEnabled(ctx context.Context, denom string, value bool) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetSendEnabled")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetSendEnabled")()
 
 	_ = k.SendEnabled.Set(sdkCtx, denom, value)
 }
@@ -474,7 +474,7 @@ func (k BaseSendKeeper) SetSendEnabled(ctx context.Context, denom string, value 
 // SetAllSendEnabled sets all the provided SendEnabled entries in the bank store.
 func (k BaseSendKeeper) SetAllSendEnabled(ctx context.Context, entries []*types.SendEnabled) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "SetAllSendEnabled")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SetAllSendEnabled")()
 
 	for _, entry := range entries {
 		_ = k.SendEnabled.Set(sdkCtx, entry.Denom, entry.Enabled)
@@ -485,7 +485,7 @@ func (k BaseSendKeeper) SetAllSendEnabled(ctx context.Context, entries []*types.
 // If a denom is provided that doesn't have a SendEnabled entry, it is ignored.
 func (k BaseSendKeeper) DeleteSendEnabled(ctx context.Context, denoms ...string) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "DeleteSendEnabled")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "DeleteSendEnabled")()
 
 	for _, denom := range denoms {
 		_ = k.SendEnabled.Remove(sdkCtx, denom)
@@ -494,10 +494,11 @@ func (k BaseSendKeeper) DeleteSendEnabled(ctx context.Context, denoms ...string)
 
 // IterateSendEnabledEntries iterates over all the SendEnabled entries.
 func (k BaseSendKeeper) IterateSendEnabledEntries(ctx context.Context, cb func(denom string, sendEnabled bool) bool) {
+	var err error
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IterateSendEnabledEntries")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IterateSendEnabledEntries")(&err)
 
-	err := k.SendEnabled.Walk(sdkCtx, nil, func(key string, value bool) (stop bool, err error) {
+	err = k.SendEnabled.Walk(sdkCtx, nil, func(key string, value bool) (stop bool, err error) {
 		return cb(key, value), nil
 	})
 	if err != nil {
@@ -509,7 +510,7 @@ func (k BaseSendKeeper) IterateSendEnabledEntries(ctx context.Context, cb func(d
 // Any denominations not returned use the default value (set in Params).
 func (k BaseSendKeeper) GetAllSendEnabledEntries(ctx context.Context) []types.SendEnabled {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetAllSendEnabledEntries")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetAllSendEnabledEntries")()
 
 	var rv []types.SendEnabled
 	k.IterateSendEnabledEntries(sdkCtx, func(denom string, sendEnabled bool) bool {
@@ -532,7 +533,7 @@ func (k BaseSendKeeper) GetAllSendEnabledEntries(ctx context.Context) []types.Se
 //	}
 func (k BaseSendKeeper) getSendEnabled(ctx context.Context, denom string) (bool, bool) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "getSendEnabled")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "getSendEnabled")()
 
 	has, err := k.SendEnabled.Has(sdkCtx, denom)
 	if err != nil || !has {
@@ -551,7 +552,7 @@ func (k BaseSendKeeper) getSendEnabled(ctx context.Context, denom string) (bool,
 // in the store, this will return defaultVal.
 func (k BaseSendKeeper) getSendEnabledOrDefault(ctx context.Context, denom string, defaultVal bool) bool {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "getSendEnabledOrDefault")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "getSendEnabledOrDefault")()
 
 	sendEnabled, found := k.getSendEnabled(sdkCtx, denom)
 	if found {

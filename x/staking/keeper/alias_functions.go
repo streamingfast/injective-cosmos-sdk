@@ -12,9 +12,9 @@ import (
 // Validator Set
 
 // IterateValidators iterates through the validator set and perform the provided function
-func (k Keeper) IterateValidators(ctx context.Context, fn func(index int64, validator types.ValidatorI) (stop bool)) error {
+func (k Keeper) IterateValidators(ctx context.Context, fn func(index int64, validator types.ValidatorI) (stop bool)) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IterateValidators")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IterateValidators")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	iterator, err := store.Iterator(types.ValidatorsKey, storetypes.PrefixEndBytes(types.ValidatorsKey))
@@ -42,9 +42,9 @@ func (k Keeper) IterateValidators(ctx context.Context, fn func(index int64, vali
 }
 
 // IterateBondedValidatorsByPower iterates through the bonded validator set and perform the provided function
-func (k Keeper) IterateBondedValidatorsByPower(ctx context.Context, fn func(index int64, validator types.ValidatorI) (stop bool)) error {
+func (k Keeper) IterateBondedValidatorsByPower(ctx context.Context, fn func(index int64, validator types.ValidatorI) (stop bool)) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IterateBondedValidatorsByPower")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IterateBondedValidatorsByPower")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	maxValidators, err := k.MaxValidators(sdkCtx)
@@ -76,9 +76,9 @@ func (k Keeper) IterateBondedValidatorsByPower(ctx context.Context, fn func(inde
 }
 
 // IterateLastValidators iterates through the active validator set and perform the provided function
-func (k Keeper) IterateLastValidators(ctx context.Context, fn func(index int64, validator types.ValidatorI) (stop bool)) error {
+func (k Keeper) IterateLastValidators(ctx context.Context, fn func(index int64, validator types.ValidatorI) (stop bool)) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IterateLastValidators")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IterateLastValidators")(&err)
 
 	iterator, err := k.LastValidatorsIterator(sdkCtx)
 	if err != nil {
@@ -106,17 +106,17 @@ func (k Keeper) IterateLastValidators(ctx context.Context, fn func(index int64, 
 }
 
 // Validator gets the Validator interface for a particular address
-func (k Keeper) Validator(ctx context.Context, address sdk.ValAddress) (types.ValidatorI, error) {
+func (k Keeper) Validator(ctx context.Context, address sdk.ValAddress) (meterResult types.ValidatorI, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Validator")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Validator")(&err)
 
 	return k.GetValidator(sdkCtx, address)
 }
 
 // ValidatorByConsAddr gets the validator interface for a particular pubkey
-func (k Keeper) ValidatorByConsAddr(ctx context.Context, addr sdk.ConsAddress) (types.ValidatorI, error) {
+func (k Keeper) ValidatorByConsAddr(ctx context.Context, addr sdk.ConsAddress) (meterResult types.ValidatorI, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "ValidatorByConsAddr")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "ValidatorByConsAddr")(&err)
 
 	return k.GetValidatorByConsAddr(sdkCtx, addr)
 }
@@ -129,9 +129,9 @@ func (k Keeper) GetValidatorSet() types.ValidatorSet {
 }
 
 // Delegation gets the delegation interface for a particular set of delegator and validator addresses
-func (k Keeper) Delegation(ctx context.Context, addrDel sdk.AccAddress, addrVal sdk.ValAddress) (types.DelegationI, error) {
+func (k Keeper) Delegation(ctx context.Context, addrDel sdk.AccAddress, addrVal sdk.ValAddress) (meterResult types.DelegationI, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "Delegation")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Delegation")(&err)
 
 	bond, err := k.GetDelegation(sdkCtx, addrDel, addrVal)
 	if err != nil {
@@ -144,9 +144,9 @@ func (k Keeper) Delegation(ctx context.Context, addrDel sdk.AccAddress, addrVal 
 // IterateDelegations iterates through all of the delegations from a delegator
 func (k Keeper) IterateDelegations(ctx context.Context, delAddr sdk.AccAddress,
 	fn func(index int64, del types.DelegationI) (stop bool),
-) error {
+) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "IterateDelegations")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IterateDelegations")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	delegatorPrefixKey := types.GetDelegationsKey(delAddr)
@@ -176,7 +176,7 @@ func (k Keeper) IterateDelegations(ctx context.Context, delAddr sdk.AccAddress,
 // TODO: remove this func, change all usage for iterate functionality
 func (k Keeper) GetAllSDKDelegations(ctx context.Context) (delegations []types.Delegation, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	defer k.Meter(sdkCtx).FuncTiming(&sdkCtx, "GetAllSDKDelegations")()
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetAllSDKDelegations")(&err)
 
 	store := k.storeService.OpenKVStore(sdkCtx)
 	iterator, err := store.Iterator(types.DelegationKey, storetypes.PrefixEndBytes(types.DelegationKey))
