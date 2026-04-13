@@ -28,7 +28,10 @@ func NewMsgServerImpl(keeper *Keeper) v1.MsgServer {
 var _ v1.MsgServer = msgServer{}
 
 // SubmitProposal implements the MsgServer.SubmitProposal method.
-func (k msgServer) SubmitProposal(goCtx context.Context, msg *v1.MsgSubmitProposal) (*v1.MsgSubmitProposalResponse, error) {
+func (k msgServer) SubmitProposal(goCtx context.Context, msg *v1.MsgSubmitProposal) (meterResult *v1.MsgSubmitProposalResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Keeper.Meter(goCtx).FuncTiming(&sdkCtx, "SubmitProposal")(&err)
+
 	if msg.Title == "" {
 		return nil, errors.Wrap(sdkerrors.ErrInvalidRequest, "proposal title cannot be empty")
 	}
@@ -49,7 +52,7 @@ func (k msgServer) SubmitProposal(goCtx context.Context, msg *v1.MsgSubmitPropos
 	// verify that if present, the metadata title and summary equals the proposal title and summary
 	if len(msg.Metadata) != 0 {
 		proposalMetadata := govtypes.ProposalMetadata{}
-		if err := json.Unmarshal([]byte(msg.Metadata), &proposalMetadata); err == nil {
+		if err = json.Unmarshal([]byte(msg.Metadata), &proposalMetadata); err == nil {
 			if proposalMetadata.Title != msg.Title {
 				return nil, errors.Wrapf(govtypes.ErrInvalidProposalContent, "metadata title '%s' must equal proposal title '%s'", proposalMetadata.Title, msg.Title)
 			}
@@ -68,23 +71,22 @@ func (k msgServer) SubmitProposal(goCtx context.Context, msg *v1.MsgSubmitPropos
 		return nil, err
 	}
 
-	ctx := sdk.UnwrapSDKContext(goCtx)
 	initialDeposit := msg.GetInitialDeposit()
 
-	params, err := k.Params.Get(ctx)
+	params, err := k.Params.Get(sdkCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get governance parameters: %w", err)
 	}
 
-	if err := k.validateInitialDeposit(ctx, params, initialDeposit, msg.Expedited); err != nil {
+	if err = k.validateInitialDeposit(sdkCtx, params, initialDeposit, msg.Expedited); err != nil {
 		return nil, err
 	}
 
-	if err := k.validateDepositDenom(ctx, params, initialDeposit); err != nil {
+	if err = k.validateDepositDenom(sdkCtx, params, initialDeposit); err != nil {
 		return nil, err
 	}
 
-	proposal, err := k.Keeper.SubmitProposal(ctx, proposalMsgs, msg.Metadata, msg.Title, msg.Summary, proposer, msg.Expedited)
+	proposal, err := k.Keeper.SubmitProposal(sdkCtx, proposalMsgs, msg.Metadata, msg.Title, msg.Summary, proposer, msg.Expedited)
 	if err != nil {
 		return nil, err
 	}
@@ -95,18 +97,18 @@ func (k msgServer) SubmitProposal(goCtx context.Context, msg *v1.MsgSubmitPropos
 	}
 
 	// ref: https://github.com/cosmos/cosmos-sdk/issues/9683
-	ctx.GasMeter().ConsumeGas(
-		3*ctx.KVGasConfig().WriteCostPerByte*uint64(len(bytes)),
+	sdkCtx.GasMeter().ConsumeGas(
+		3*sdkCtx.KVGasConfig().WriteCostPerByte*uint64(len(bytes)),
 		"submit proposal",
 	)
 
-	votingStarted, err := k.Keeper.AddDeposit(ctx, proposal.Id, proposer, msg.GetInitialDeposit())
+	votingStarted, err := k.Keeper.AddDeposit(sdkCtx, proposal.Id, proposer, msg.GetInitialDeposit())
 	if err != nil {
 		return nil, err
 	}
 
 	if votingStarted {
-		ctx.EventManager().EmitEvent(
+		sdkCtx.EventManager().EmitEvent(
 			sdk.NewEvent(govtypes.EventTypeSubmitProposal,
 				sdk.NewAttribute(govtypes.AttributeKeyVotingPeriodStart, fmt.Sprintf("%d", proposal.Id)),
 			),
@@ -119,18 +121,20 @@ func (k msgServer) SubmitProposal(goCtx context.Context, msg *v1.MsgSubmitPropos
 }
 
 // CancelProposal implements the MsgServer.CancelProposal method.
-func (k msgServer) CancelProposal(goCtx context.Context, msg *v1.MsgCancelProposal) (*v1.MsgCancelProposalResponse, error) {
-	_, err := k.authKeeper.AddressCodec().StringToBytes(msg.Proposer)
+func (k msgServer) CancelProposal(goCtx context.Context, msg *v1.MsgCancelProposal) (meterResult *v1.MsgCancelProposalResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Keeper.Meter(goCtx).FuncTiming(&sdkCtx, "CancelProposal")(&err)
+
+	_, err = k.authKeeper.AddressCodec().StringToBytes(msg.Proposer)
 	if err != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid proposer address: %s", err)
 	}
 
-	ctx := sdk.UnwrapSDKContext(goCtx)
-	if err := k.Keeper.CancelProposal(ctx, msg.ProposalId, msg.Proposer); err != nil {
+	if err = k.Keeper.CancelProposal(sdkCtx, msg.ProposalId, msg.Proposer); err != nil {
 		return nil, err
 	}
 
-	ctx.EventManager().EmitEvent(
+	sdkCtx.EventManager().EmitEvent(
 		sdk.NewEvent(
 			govtypes.EventTypeCancelProposal,
 			sdk.NewAttribute(sdk.AttributeKeySender, msg.Proposer),
@@ -140,16 +144,17 @@ func (k msgServer) CancelProposal(goCtx context.Context, msg *v1.MsgCancelPropos
 
 	return &v1.MsgCancelProposalResponse{
 		ProposalId:     msg.ProposalId,
-		CanceledTime:   ctx.BlockTime(),
-		CanceledHeight: uint64(ctx.BlockHeight()),
+		CanceledTime:   sdkCtx.BlockTime(),
+		CanceledHeight: uint64(sdkCtx.BlockHeight()),
 	}, nil
 }
 
 // ExecLegacyContent implements the MsgServer.ExecLegacyContent method.
-func (k msgServer) ExecLegacyContent(goCtx context.Context, msg *v1.MsgExecLegacyContent) (*v1.MsgExecLegacyContentResponse, error) {
-	ctx := sdk.UnwrapSDKContext(goCtx)
+func (k msgServer) ExecLegacyContent(goCtx context.Context, msg *v1.MsgExecLegacyContent) (meterResult *v1.MsgExecLegacyContentResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Keeper.Meter(goCtx).FuncTiming(&sdkCtx, "ExecLegacyContent")(&err)
 
-	govAcct := k.GetGovernanceAccount(ctx).GetAddress().String()
+	govAcct := k.GetGovernanceAccount(sdkCtx).GetAddress().String()
 	if govAcct != msg.Authority {
 		return nil, errors.Wrapf(govtypes.ErrInvalidSigner, "expected %s got %s", govAcct, msg.Authority)
 	}
@@ -165,7 +170,7 @@ func (k msgServer) ExecLegacyContent(goCtx context.Context, msg *v1.MsgExecLegac
 	}
 
 	handler := k.Keeper.legacyRouter.GetRoute(content.ProposalRoute())
-	if err := handler(ctx, content); err != nil {
+	if err = handler(sdkCtx, content); err != nil {
 		return nil, errors.Wrapf(govtypes.ErrInvalidProposalContent, "failed to run legacy handler %s, %+v", content.ProposalRoute(), err)
 	}
 
@@ -173,7 +178,10 @@ func (k msgServer) ExecLegacyContent(goCtx context.Context, msg *v1.MsgExecLegac
 }
 
 // Vote implements the MsgServer.Vote method.
-func (k msgServer) Vote(goCtx context.Context, msg *v1.MsgVote) (*v1.MsgVoteResponse, error) {
+func (k msgServer) Vote(goCtx context.Context, msg *v1.MsgVote) (meterResult *v1.MsgVoteResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Keeper.Meter(goCtx).FuncTiming(&sdkCtx, "Vote")(&err)
+
 	accAddr, err := k.authKeeper.AddressCodec().StringToBytes(msg.Voter)
 	if err != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid voter address: %s", err)
@@ -183,8 +191,7 @@ func (k msgServer) Vote(goCtx context.Context, msg *v1.MsgVote) (*v1.MsgVoteResp
 		return nil, errors.Wrap(govtypes.ErrInvalidVote, msg.Option.String())
 	}
 
-	ctx := sdk.UnwrapSDKContext(goCtx)
-	err = k.Keeper.AddVote(ctx, msg.ProposalId, accAddr, v1.NewNonSplitVoteOption(msg.Option), msg.Metadata)
+	err = k.Keeper.AddVote(sdkCtx, msg.ProposalId, accAddr, v1.NewNonSplitVoteOption(msg.Option), msg.Metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +200,10 @@ func (k msgServer) Vote(goCtx context.Context, msg *v1.MsgVote) (*v1.MsgVoteResp
 }
 
 // VoteWeighted implements the MsgServer.VoteWeighted method.
-func (k msgServer) VoteWeighted(goCtx context.Context, msg *v1.MsgVoteWeighted) (*v1.MsgVoteWeightedResponse, error) {
+func (k msgServer) VoteWeighted(goCtx context.Context, msg *v1.MsgVoteWeighted) (meterResult *v1.MsgVoteWeightedResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Keeper.Meter(goCtx).FuncTiming(&sdkCtx, "VoteWeighted")(&err)
+
 	accAddr, accErr := k.authKeeper.AddressCodec().StringToBytes(msg.Voter)
 	if accErr != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid voter address: %s", accErr)
@@ -228,8 +238,7 @@ func (k msgServer) VoteWeighted(goCtx context.Context, msg *v1.MsgVoteWeighted) 
 		return nil, errors.Wrap(govtypes.ErrInvalidVote, "total weight lower than 1.00")
 	}
 
-	ctx := sdk.UnwrapSDKContext(goCtx)
-	err := k.Keeper.AddVote(ctx, msg.ProposalId, accAddr, msg.Options, msg.Metadata)
+	err = k.Keeper.AddVote(sdkCtx, msg.ProposalId, accAddr, msg.Options, msg.Metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -238,24 +247,26 @@ func (k msgServer) VoteWeighted(goCtx context.Context, msg *v1.MsgVoteWeighted) 
 }
 
 // Deposit implements the MsgServer.Deposit method.
-func (k msgServer) Deposit(goCtx context.Context, msg *v1.MsgDeposit) (*v1.MsgDepositResponse, error) {
+func (k msgServer) Deposit(goCtx context.Context, msg *v1.MsgDeposit) (meterResult *v1.MsgDepositResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Keeper.Meter(goCtx).FuncTiming(&sdkCtx, "Deposit")(&err)
+
 	accAddr, err := k.authKeeper.AddressCodec().StringToBytes(msg.Depositor)
 	if err != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid depositor address: %s", err)
 	}
 
-	if err := validateDeposit(msg.Amount); err != nil {
+	if err = validateDeposit(msg.Amount); err != nil {
 		return nil, err
 	}
 
-	ctx := sdk.UnwrapSDKContext(goCtx)
-	votingStarted, err := k.Keeper.AddDeposit(ctx, msg.ProposalId, accAddr, msg.Amount)
+	votingStarted, err := k.Keeper.AddDeposit(sdkCtx, msg.ProposalId, accAddr, msg.Amount)
 	if err != nil {
 		return nil, err
 	}
 
 	if votingStarted {
-		ctx.EventManager().EmitEvent(
+		sdkCtx.EventManager().EmitEvent(
 			sdk.NewEvent(
 				govtypes.EventTypeProposalDeposit,
 				sdk.NewAttribute(govtypes.AttributeKeyVotingPeriodStart, fmt.Sprintf("%d", msg.ProposalId)),
@@ -267,17 +278,19 @@ func (k msgServer) Deposit(goCtx context.Context, msg *v1.MsgDeposit) (*v1.MsgDe
 }
 
 // UpdateParams implements the MsgServer.UpdateParams method.
-func (k msgServer) UpdateParams(goCtx context.Context, msg *v1.MsgUpdateParams) (*v1.MsgUpdateParamsResponse, error) {
+func (k msgServer) UpdateParams(goCtx context.Context, msg *v1.MsgUpdateParams) (meterResult *v1.MsgUpdateParamsResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.Keeper.Meter(goCtx).FuncTiming(&sdkCtx, "UpdateParams")(&err)
+
 	if k.authority != msg.Authority {
 		return nil, errors.Wrapf(govtypes.ErrInvalidSigner, "invalid authority; expected %s, got %s", k.authority, msg.Authority)
 	}
 
-	if err := msg.Params.ValidateBasic(); err != nil {
+	if err = msg.Params.ValidateBasic(); err != nil {
 		return nil, err
 	}
 
-	ctx := sdk.UnwrapSDKContext(goCtx)
-	if err := k.Params.Set(ctx, msg.Params); err != nil {
+	if err = k.Params.Set(sdkCtx, msg.Params); err != nil {
 		return nil, err
 	}
 
@@ -286,18 +299,22 @@ func (k msgServer) UpdateParams(goCtx context.Context, msg *v1.MsgUpdateParams) 
 
 type legacyMsgServer struct {
 	govAcct string
+	keeper  *Keeper
 	server  v1.MsgServer
 }
 
 // NewLegacyMsgServerImpl returns an implementation of the v1beta1 legacy MsgServer interface. It wraps around
 // the current MsgServer
-func NewLegacyMsgServerImpl(govAcct string, v1Server v1.MsgServer) v1beta1.MsgServer {
-	return &legacyMsgServer{govAcct: govAcct, server: v1Server}
+func NewLegacyMsgServerImpl(govAcct string, keeper *Keeper, v1Server v1.MsgServer) v1beta1.MsgServer {
+	return &legacyMsgServer{govAcct: govAcct, keeper: keeper, server: v1Server}
 }
 
 var _ v1beta1.MsgServer = legacyMsgServer{}
 
-func (k legacyMsgServer) SubmitProposal(goCtx context.Context, msg *v1beta1.MsgSubmitProposal) (*v1beta1.MsgSubmitProposalResponse, error) {
+func (k legacyMsgServer) SubmitProposal(goCtx context.Context, msg *v1beta1.MsgSubmitProposal) (meterResult *v1beta1.MsgSubmitProposalResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.keeper.Meter(goCtx).FuncTiming(&sdkCtx, "SubmitProposal")(&err)
+
 	content := msg.GetContent()
 	if content == nil {
 		return nil, errors.Wrap(govtypes.ErrInvalidProposalContent, "missing content")
@@ -305,7 +322,7 @@ func (k legacyMsgServer) SubmitProposal(goCtx context.Context, msg *v1beta1.MsgS
 	if !v1beta1.IsValidProposalType(content.ProposalType()) {
 		return nil, errors.Wrap(govtypes.ErrInvalidProposalType, content.ProposalType())
 	}
-	if err := content.ValidateBasic(); err != nil {
+	if err = content.ValidateBasic(); err != nil {
 		return nil, err
 	}
 
@@ -327,7 +344,7 @@ func (k legacyMsgServer) SubmitProposal(goCtx context.Context, msg *v1beta1.MsgS
 		return nil, err
 	}
 
-	resp, err := k.server.SubmitProposal(goCtx, proposal)
+	resp, err := k.server.SubmitProposal(sdkCtx, proposal)
 	if err != nil {
 		return nil, err
 	}
@@ -335,8 +352,11 @@ func (k legacyMsgServer) SubmitProposal(goCtx context.Context, msg *v1beta1.MsgS
 	return &v1beta1.MsgSubmitProposalResponse{ProposalId: resp.ProposalId}, nil
 }
 
-func (k legacyMsgServer) Vote(goCtx context.Context, msg *v1beta1.MsgVote) (*v1beta1.MsgVoteResponse, error) {
-	_, err := k.server.Vote(goCtx, &v1.MsgVote{
+func (k legacyMsgServer) Vote(goCtx context.Context, msg *v1beta1.MsgVote) (meterResult *v1beta1.MsgVoteResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.keeper.Meter(goCtx).FuncTiming(&sdkCtx, "Vote")(&err)
+
+	_, err = k.server.Vote(sdkCtx, &v1.MsgVote{
 		ProposalId: msg.ProposalId,
 		Voter:      msg.Voter,
 		Option:     v1.VoteOption(msg.Option),
@@ -347,7 +367,10 @@ func (k legacyMsgServer) Vote(goCtx context.Context, msg *v1beta1.MsgVote) (*v1b
 	return &v1beta1.MsgVoteResponse{}, nil
 }
 
-func (k legacyMsgServer) VoteWeighted(goCtx context.Context, msg *v1beta1.MsgVoteWeighted) (*v1beta1.MsgVoteWeightedResponse, error) {
+func (k legacyMsgServer) VoteWeighted(goCtx context.Context, msg *v1beta1.MsgVoteWeighted) (meterResult *v1beta1.MsgVoteWeightedResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.keeper.Meter(goCtx).FuncTiming(&sdkCtx, "VoteWeighted")(&err)
+
 	opts := make([]*v1.WeightedVoteOption, len(msg.Options))
 	for idx, opt := range msg.Options {
 		opts[idx] = &v1.WeightedVoteOption{
@@ -356,7 +379,7 @@ func (k legacyMsgServer) VoteWeighted(goCtx context.Context, msg *v1beta1.MsgVot
 		}
 	}
 
-	_, err := k.server.VoteWeighted(goCtx, &v1.MsgVoteWeighted{
+	_, err = k.server.VoteWeighted(sdkCtx, &v1.MsgVoteWeighted{
 		ProposalId: msg.ProposalId,
 		Voter:      msg.Voter,
 		Options:    opts,
@@ -367,8 +390,11 @@ func (k legacyMsgServer) VoteWeighted(goCtx context.Context, msg *v1beta1.MsgVot
 	return &v1beta1.MsgVoteWeightedResponse{}, nil
 }
 
-func (k legacyMsgServer) Deposit(goCtx context.Context, msg *v1beta1.MsgDeposit) (*v1beta1.MsgDepositResponse, error) {
-	_, err := k.server.Deposit(goCtx, &v1.MsgDeposit{
+func (k legacyMsgServer) Deposit(goCtx context.Context, msg *v1beta1.MsgDeposit) (meterResult *v1beta1.MsgDepositResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(goCtx)
+	defer k.keeper.Meter(goCtx).FuncTiming(&sdkCtx, "Deposit")(&err)
+
+	_, err = k.server.Deposit(sdkCtx, &v1.MsgDeposit{
 		ProposalId: msg.ProposalId,
 		Depositor:  msg.Depositor,
 		Amount:     msg.Amount,

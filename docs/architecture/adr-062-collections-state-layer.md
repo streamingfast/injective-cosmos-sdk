@@ -34,13 +34,12 @@ This brings in a lot of problems:
   - how do I ensure when I don't have namespace collisions when dealing with secondary indexes?
 - The lack of standardisation makes life hard for clients, and the problem is exacerbated when it comes to providing proofs for objects present in state. Clients are forced to maintain a list of object paths to gather proofs.
 
-### Current Solution: ORM
+### Previous SDK State Layer
 
-The current SDK proposed solution to this problem is [ORM](https://github.com/cosmos/cosmos-sdk/blob/main/docs/architecture/adr-055-orm.md).
-Whilst ORM offers a lot of good functionality aimed at solving these specific problems, it has some downsides:
+The SDK previously explored a code-generated state layer for these problems, but it had several downsides:
 - It requires migrations.
 - It uses the newest protobuf golang API, whilst the SDK still mainly uses gogoproto. 
-- Integrating ORM into a module would require the developer to deal with two different golang frameworks (golang protobuf + gogoproto) representing the same API objects.
+- Integrating it into a module would require the developer to deal with two different golang frameworks (golang protobuf + gogoproto) representing the same API objects.
 - It has a high learning curve, even for simple storage layers as it requires developers to have knowledge around protobuf options, custom cosmos-sdk storage extensions, and tooling download. Then after this they still need to learn the code-generated API.
 
 ### CosmWasm Solution: cw-storage-plus

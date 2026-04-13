@@ -11,6 +11,7 @@ import (
 	"cosmossdk.io/core/store"
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/log"
+	"github.com/InjectiveLabs/metrics/v2"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
@@ -102,6 +103,8 @@ type AccountKeeper struct {
 	Params        collections.Item[types.Params]
 	AccountNumber collections.Sequence
 	Accounts      *collections.IndexedMap[sdk.AccAddress, sdk.AccountI, AccountsIndexes]
+
+	meter metrics.Meter
 }
 
 var _ AccountKeeperI = &AccountKeeper{}
@@ -160,8 +163,11 @@ func (ak AccountKeeper) Logger(ctx context.Context) log.Logger {
 }
 
 // GetPubKey Returns the PubKey of the account at address
-func (ak AccountKeeper) GetPubKey(ctx context.Context, addr sdk.AccAddress) (cryptotypes.PubKey, error) {
-	acc := ak.GetAccount(ctx, addr)
+func (ak AccountKeeper) GetPubKey(ctx context.Context, addr sdk.AccAddress) (meterResult cryptotypes.PubKey, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "GetPubKey")(&err)
+
+	acc := ak.GetAccount(sdkCtx, addr)
 	if acc == nil {
 		return nil, errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "account %s does not exist", addr)
 	}
@@ -170,8 +176,11 @@ func (ak AccountKeeper) GetPubKey(ctx context.Context, addr sdk.AccAddress) (cry
 }
 
 // GetSequence Returns the Sequence of the account at address
-func (ak AccountKeeper) GetSequence(ctx context.Context, addr sdk.AccAddress) (uint64, error) {
-	acc := ak.GetAccount(ctx, addr)
+func (ak AccountKeeper) GetSequence(ctx context.Context, addr sdk.AccAddress) (meterResult uint64, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "GetSequence")(&err)
+
+	acc := ak.GetAccount(sdkCtx, addr)
 	if acc == nil {
 		return 0, errorsmod.Wrapf(sdkerrors.ErrUnknownAddress, "account %s does not exist", addr)
 	}
@@ -182,7 +191,11 @@ func (ak AccountKeeper) GetSequence(ctx context.Context, addr sdk.AccAddress) (u
 // NextAccountNumber returns and increments the global account number counter.
 // If the global account number is not set, it initializes it with value 0.
 func (ak AccountKeeper) NextAccountNumber(ctx context.Context) uint64 {
-	n, err := ak.AccountNumber.Next(ctx)
+	var err error
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "NextAccountNumber")(&err)
+
+	n, err := ak.AccountNumber.Next(sdkCtx)
 	if err != nil {
 		panic(err)
 	}
@@ -230,12 +243,16 @@ func (ak AccountKeeper) GetModuleAddressAndPermissions(moduleName string) (addr 
 // GetModuleAccountAndPermissions gets the module account from the auth account store and its
 // registered permissions
 func (ak AccountKeeper) GetModuleAccountAndPermissions(ctx context.Context, moduleName string) (sdk.ModuleAccountI, []string) {
+	var err error
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "GetModuleAccountAndPermissions")(&err)
+
 	addr, perms := ak.GetModuleAddressAndPermissions(moduleName)
 	if addr == nil {
 		return nil, []string{}
 	}
 
-	acc := ak.GetAccount(ctx, addr)
+	acc := ak.GetAccount(sdkCtx, addr)
 	if acc != nil {
 		macc, ok := acc.(sdk.ModuleAccountI)
 		if !ok {
@@ -246,8 +263,8 @@ func (ak AccountKeeper) GetModuleAccountAndPermissions(ctx context.Context, modu
 
 	// create a new module account
 	macc := types.NewEmptyModuleAccount(moduleName, perms...)
-	maccI := (ak.NewAccount(ctx, macc)).(sdk.ModuleAccountI) // set the account number
-	ak.SetModuleAccount(ctx, maccI)
+	maccI := (ak.NewAccount(sdkCtx, macc)).(sdk.ModuleAccountI) // set the account number
+	ak.SetModuleAccount(sdkCtx, maccI)
 
 	return maccI, perms
 }
@@ -255,13 +272,19 @@ func (ak AccountKeeper) GetModuleAccountAndPermissions(ctx context.Context, modu
 // GetModuleAccount gets the module account from the auth account store, if the account does not
 // exist in the AccountKeeper, then it is created.
 func (ak AccountKeeper) GetModuleAccount(ctx context.Context, moduleName string) sdk.ModuleAccountI {
-	acc, _ := ak.GetModuleAccountAndPermissions(ctx, moduleName)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "GetModuleAccount")()
+
+	acc, _ := ak.GetModuleAccountAndPermissions(sdkCtx, moduleName)
 	return acc
 }
 
 // SetModuleAccount sets the module account to the auth account store
 func (ak AccountKeeper) SetModuleAccount(ctx context.Context, macc sdk.ModuleAccountI) {
-	ak.SetAccount(ctx, macc)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "SetModuleAccount")()
+
+	ak.SetAccount(sdkCtx, macc)
 }
 
 // add getter for bech32Prefix
@@ -271,9 +294,21 @@ func (ak AccountKeeper) getBech32Prefix() (string, error) {
 
 // GetParams gets the auth module's parameters.
 func (ak AccountKeeper) GetParams(ctx context.Context) (params types.Params) {
-	params, err := ak.Params.Get(ctx)
+	var err error
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer ak.Meter(ctx).FuncTiming(&sdkCtx, "GetParams")(&err)
+
+	params, err = ak.Params.Get(sdkCtx)
 	if err != nil && !errors.Is(err, collections.ErrNotFound) {
 		panic(err)
 	}
 	return params
+}
+
+func (ak *AccountKeeper) Meter(ctx context.Context) metrics.Meter {
+	if ak.meter == nil {
+		ak.meter = sdk.UnwrapSDKContext(ctx).Meter().SubMeter(types.ModuleName, metrics.Tag("svc", types.ModuleName))
+	}
+
+	return ak.meter
 }

@@ -11,8 +11,11 @@ import (
 // InitGenesis initializes the nft module's genesis state from a given
 // genesis state.
 func (k Keeper) InitGenesis(ctx sdk.Context, data *nft.GenesisState) {
+	var err error
+	defer k.Meter(ctx).FuncTiming(&ctx, "InitGenesis")(&err)
+
 	for _, class := range data.Classes {
-		if err := k.SaveClass(ctx, *class); err != nil {
+		if err = k.SaveClass(ctx, *class); err != nil {
 			panic(err)
 		}
 	}
@@ -23,7 +26,7 @@ func (k Keeper) InitGenesis(ctx sdk.Context, data *nft.GenesisState) {
 				panic(err)
 			}
 
-			if err := k.Mint(ctx, *nft, owner); err != nil {
+			if err = k.Mint(ctx, *nft, owner); err != nil {
 				panic(err)
 			}
 		}
@@ -32,6 +35,9 @@ func (k Keeper) InitGenesis(ctx sdk.Context, data *nft.GenesisState) {
 
 // ExportGenesis returns a GenesisState for a given context.
 func (k Keeper) ExportGenesis(ctx sdk.Context) *nft.GenesisState {
+	var err error
+	defer k.Meter(ctx).FuncTiming(&ctx, "ExportGenesis")(&err)
+
 	classes := k.GetClasses(ctx)
 	nftMap := make(map[string][]*nft.NFT)
 	for _, class := range classes {

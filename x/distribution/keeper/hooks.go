@@ -23,24 +23,30 @@ func (k Keeper) Hooks() Hooks {
 }
 
 // initialize validator distribution record
-func (h Hooks) AfterValidatorCreated(ctx context.Context, valAddr sdk.ValAddress) error {
-	val, err := h.k.stakingKeeper.Validator(ctx, valAddr)
+func (h Hooks) AfterValidatorCreated(ctx context.Context, valAddr sdk.ValAddress) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "AfterValidatorCreated")(&err)
+
+	val, err := h.k.stakingKeeper.Validator(sdkCtx, valAddr)
 	if err != nil {
 		return err
 	}
-	return h.k.initializeValidator(ctx, val)
+	return h.k.initializeValidator(sdkCtx, val)
 }
 
 // AfterValidatorRemoved performs clean up after a validator is removed
-func (h Hooks) AfterValidatorRemoved(ctx context.Context, _ sdk.ConsAddress, valAddr sdk.ValAddress) error {
+func (h Hooks) AfterValidatorRemoved(ctx context.Context, _ sdk.ConsAddress, valAddr sdk.ValAddress) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "AfterValidatorRemoved")(&err)
+
 	// fetch outstanding
-	outstanding, err := h.k.GetValidatorOutstandingRewardsCoins(ctx, valAddr)
+	outstanding, err := h.k.GetValidatorOutstandingRewardsCoins(sdkCtx, valAddr)
 	if err != nil {
 		return err
 	}
 
 	// force-withdraw commission
-	valCommission, err := h.k.GetValidatorAccumulatedCommission(ctx, valAddr)
+	valCommission, err := h.k.GetValidatorAccumulatedCommission(sdkCtx, valAddr)
 	if err != nil {
 		return err
 	}
@@ -55,13 +61,13 @@ func (h Hooks) AfterValidatorRemoved(ctx context.Context, _ sdk.ConsAddress, val
 		coins, remainder := commission.TruncateDecimal()
 
 		// remainder to community pool
-		feePool, err := h.k.FeePool.Get(ctx)
+		feePool, err := h.k.FeePool.Get(sdkCtx)
 		if err != nil {
 			return err
 		}
 
 		feePool.CommunityPool = feePool.CommunityPool.Add(remainder...)
-		err = h.k.FeePool.Set(ctx, feePool)
+		err = h.k.FeePool.Set(sdkCtx, feePool)
 		if err != nil {
 			return err
 		}
@@ -69,12 +75,12 @@ func (h Hooks) AfterValidatorRemoved(ctx context.Context, _ sdk.ConsAddress, val
 		// add to validator account
 		if !coins.IsZero() {
 			accAddr := sdk.AccAddress(valAddr)
-			withdrawAddr, err := h.k.GetDelegatorWithdrawAddr(ctx, accAddr)
+			withdrawAddr, err := h.k.GetDelegatorWithdrawAddr(sdkCtx, accAddr)
 			if err != nil {
 				return err
 			}
 
-			if err := h.k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, withdrawAddr, coins); err != nil {
+			if err = h.k.bankKeeper.SendCoinsFromModuleToAccount(sdkCtx, types.ModuleName, withdrawAddr, coins); err != nil {
 				return err
 			}
 		}
@@ -83,37 +89,37 @@ func (h Hooks) AfterValidatorRemoved(ctx context.Context, _ sdk.ConsAddress, val
 	// Add outstanding to community pool
 	// The validator is removed only after it has no more delegations.
 	// This operation sends only the remaining dust to the community pool.
-	feePool, err := h.k.FeePool.Get(ctx)
+	feePool, err := h.k.FeePool.Get(sdkCtx)
 	if err != nil {
 		return err
 	}
 
 	feePool.CommunityPool = feePool.CommunityPool.Add(outstanding...)
-	err = h.k.FeePool.Set(ctx, feePool)
+	err = h.k.FeePool.Set(sdkCtx, feePool)
 	if err != nil {
 		return err
 	}
 
 	// delete outstanding
-	err = h.k.DeleteValidatorOutstandingRewards(ctx, valAddr)
+	err = h.k.DeleteValidatorOutstandingRewards(sdkCtx, valAddr)
 	if err != nil {
 		return err
 	}
 
 	// remove commission record
-	err = h.k.DeleteValidatorAccumulatedCommission(ctx, valAddr)
+	err = h.k.DeleteValidatorAccumulatedCommission(sdkCtx, valAddr)
 	if err != nil {
 		return err
 	}
 
 	// clear slashes
-	h.k.DeleteValidatorSlashEvents(ctx, valAddr)
+	h.k.DeleteValidatorSlashEvents(sdkCtx, valAddr)
 
 	// clear historical rewards
-	h.k.DeleteValidatorHistoricalRewards(ctx, valAddr)
+	h.k.DeleteValidatorHistoricalRewards(sdkCtx, valAddr)
 
 	// clear current rewards
-	err = h.k.DeleteValidatorCurrentRewards(ctx, valAddr)
+	err = h.k.DeleteValidatorCurrentRewards(sdkCtx, valAddr)
 	if err != nil {
 		return err
 	}
@@ -122,29 +128,35 @@ func (h Hooks) AfterValidatorRemoved(ctx context.Context, _ sdk.ConsAddress, val
 }
 
 // increment period
-func (h Hooks) BeforeDelegationCreated(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) error {
-	val, err := h.k.stakingKeeper.Validator(ctx, valAddr)
+func (h Hooks) BeforeDelegationCreated(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "BeforeDelegationCreated")(&err)
+
+	val, err := h.k.stakingKeeper.Validator(sdkCtx, valAddr)
 	if err != nil {
 		return err
 	}
 
-	_, err = h.k.IncrementValidatorPeriod(ctx, val)
+	_, err = h.k.IncrementValidatorPeriod(sdkCtx, val)
 	return err
 }
 
 // withdraw delegation rewards (which also increments period)
-func (h Hooks) BeforeDelegationSharesModified(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) error {
-	val, err := h.k.stakingKeeper.Validator(ctx, valAddr)
+func (h Hooks) BeforeDelegationSharesModified(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "BeforeDelegationSharesModified")(&err)
+
+	val, err := h.k.stakingKeeper.Validator(sdkCtx, valAddr)
 	if err != nil {
 		return err
 	}
 
-	del, err := h.k.stakingKeeper.Delegation(ctx, delAddr, valAddr)
+	del, err := h.k.stakingKeeper.Delegation(sdkCtx, delAddr, valAddr)
 	if err != nil {
 		return err
 	}
 
-	if _, err := h.k.withdrawDelegationRewards(ctx, val, del); err != nil {
+	if _, err := h.k.withdrawDelegationRewards(sdkCtx, val, del); err != nil {
 		return err
 	}
 
@@ -152,13 +164,19 @@ func (h Hooks) BeforeDelegationSharesModified(ctx context.Context, delAddr sdk.A
 }
 
 // create new delegation period record
-func (h Hooks) AfterDelegationModified(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) error {
-	return h.k.initializeDelegation(ctx, valAddr, delAddr)
+func (h Hooks) AfterDelegationModified(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "AfterDelegationModified")(&err)
+
+	return h.k.initializeDelegation(sdkCtx, valAddr, delAddr)
 }
 
 // record the slash event
-func (h Hooks) BeforeValidatorSlashed(ctx context.Context, valAddr sdk.ValAddress, fraction sdkmath.LegacyDec) error {
-	return h.k.updateValidatorSlashFraction(ctx, valAddr, fraction)
+func (h Hooks) BeforeValidatorSlashed(ctx context.Context, valAddr sdk.ValAddress, fraction sdkmath.LegacyDec) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer h.k.Meter(ctx).FuncTiming(&sdkCtx, "BeforeValidatorSlashed")(&err)
+
+	return h.k.updateValidatorSlashFraction(sdkCtx, valAddr, fraction)
 }
 
 func (h Hooks) BeforeValidatorModified(_ context.Context, _ sdk.ValAddress) error {

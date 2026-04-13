@@ -34,17 +34,20 @@ func NewMsgServerImpl(keeper *Keeper) types.MsgServer {
 var _ types.MsgServer = msgServer{}
 
 // CreateValidator defines a method for creating a new validator
-func (k msgServer) CreateValidator(ctx context.Context, msg *types.MsgCreateValidator) (*types.MsgCreateValidatorResponse, error) {
+func (k msgServer) CreateValidator(ctx context.Context, msg *types.MsgCreateValidator) (meterResult *types.MsgCreateValidatorResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "CreateValidator")(&err)
+
 	valAddr, err := k.validatorAddressCodec.StringToBytes(msg.ValidatorAddress)
 	if err != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid validator address: %s", err)
 	}
 
-	if err := msg.Validate(k.validatorAddressCodec); err != nil {
+	if err = msg.Validate(k.validatorAddressCodec); err != nil {
 		return nil, err
 	}
 
-	minCommRate, err := k.MinCommissionRate(ctx)
+	minCommRate, err := k.MinCommissionRate(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +57,7 @@ func (k msgServer) CreateValidator(ctx context.Context, msg *types.MsgCreateVali
 	}
 
 	// check to see if the pubkey or sender has been registered before
-	if _, err := k.GetValidator(ctx, valAddr); err == nil {
+	if _, err := k.GetValidator(sdkCtx, valAddr); err == nil {
 		return nil, types.ErrValidatorOwnerExists
 	}
 
@@ -63,11 +66,11 @@ func (k msgServer) CreateValidator(ctx context.Context, msg *types.MsgCreateVali
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidType, "Expecting cryptotypes.PubKey, got %T", pk)
 	}
 
-	if _, err := k.GetValidatorByConsAddr(ctx, sdk.GetConsAddress(pk)); err == nil {
+	if _, err := k.GetValidatorByConsAddr(sdkCtx, sdk.GetConsAddress(pk)); err == nil {
 		return nil, types.ErrValidatorPubKeyExists
 	}
 
-	bondDenom, err := k.BondDenom(ctx)
+	bondDenom, err := k.BondDenom(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -81,8 +84,6 @@ func (k msgServer) CreateValidator(ctx context.Context, msg *types.MsgCreateVali
 	if _, err := msg.Description.EnsureLength(); err != nil {
 		return nil, err
 	}
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	cp := sdkCtx.ConsensusParams()
 	if cp.Validator != nil {
 		pkType := pk.Type()
@@ -118,30 +119,30 @@ func (k msgServer) CreateValidator(ctx context.Context, msg *types.MsgCreateVali
 
 	validator.MinSelfDelegation = msg.MinSelfDelegation
 
-	err = k.SetValidator(ctx, validator)
+	err = k.SetValidator(sdkCtx, validator)
 	if err != nil {
 		return nil, err
 	}
 
-	err = k.SetValidatorByConsAddr(ctx, validator)
+	err = k.SetValidatorByConsAddr(sdkCtx, validator)
 	if err != nil {
 		return nil, err
 	}
 
-	err = k.SetNewValidatorByPowerIndex(ctx, validator)
+	err = k.SetNewValidatorByPowerIndex(sdkCtx, validator)
 	if err != nil {
 		return nil, err
 	}
 
 	// call the after-creation hook
-	if err := k.Hooks().AfterValidatorCreated(ctx, valAddr); err != nil {
+	if err = k.Hooks().AfterValidatorCreated(sdkCtx, valAddr); err != nil {
 		return nil, err
 	}
 
 	// move coins from the msg.Address account to a (self-delegation) delegator account
 	// the validator account and global shares are updated within here
 	// NOTE source will always be from a wallet which are unbonded
-	_, err = k.Keeper.Delegate(ctx, sdk.AccAddress(valAddr), msg.Value.Amount, types.Unbonded, validator, true)
+	_, err = k.Keeper.Delegate(sdkCtx, sdk.AccAddress(valAddr), msg.Value.Amount, types.Unbonded, validator, true)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +159,10 @@ func (k msgServer) CreateValidator(ctx context.Context, msg *types.MsgCreateVali
 }
 
 // EditValidator defines a method for editing an existing validator
-func (k msgServer) EditValidator(ctx context.Context, msg *types.MsgEditValidator) (*types.MsgEditValidatorResponse, error) {
+func (k msgServer) EditValidator(ctx context.Context, msg *types.MsgEditValidator) (meterResult *types.MsgEditValidatorResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "EditValidator")(&err)
+
 	valAddr, err := k.validatorAddressCodec.StringToBytes(msg.ValidatorAddress)
 	if err != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid validator address: %s", err)
@@ -180,7 +184,7 @@ func (k msgServer) EditValidator(ctx context.Context, msg *types.MsgEditValidato
 			return nil, errorsmod.Wrap(sdkerrors.ErrInvalidRequest, "commission rate must be between 0 and 1 (inclusive)")
 		}
 
-		minCommissionRate, err := k.MinCommissionRate(ctx)
+		minCommissionRate, err := k.MinCommissionRate(sdkCtx)
 		if err != nil {
 			return nil, errorsmod.Wrap(sdkerrors.ErrLogic, err.Error())
 		}
@@ -191,7 +195,7 @@ func (k msgServer) EditValidator(ctx context.Context, msg *types.MsgEditValidato
 	}
 
 	// validator must already be registered
-	validator, err := k.GetValidator(ctx, valAddr)
+	validator, err := k.GetValidator(sdkCtx, valAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -205,13 +209,13 @@ func (k msgServer) EditValidator(ctx context.Context, msg *types.MsgEditValidato
 	validator.Description = description
 
 	if msg.CommissionRate != nil {
-		commission, err := k.UpdateValidatorCommission(ctx, validator, *msg.CommissionRate)
+		commission, err := k.UpdateValidatorCommission(sdkCtx, validator, *msg.CommissionRate)
 		if err != nil {
 			return nil, err
 		}
 
 		// call the before-modification hook since we're about to update the commission
-		if err := k.Hooks().BeforeValidatorModified(ctx, valAddr); err != nil {
+		if err = k.Hooks().BeforeValidatorModified(sdkCtx, valAddr); err != nil {
 			return nil, err
 		}
 
@@ -230,12 +234,10 @@ func (k msgServer) EditValidator(ctx context.Context, msg *types.MsgEditValidato
 		validator.MinSelfDelegation = *msg.MinSelfDelegation
 	}
 
-	err = k.SetValidator(ctx, validator)
+	err = k.SetValidator(sdkCtx, validator)
 	if err != nil {
 		return nil, err
 	}
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	sdkCtx.EventManager().EmitEvents(sdk.Events{
 		sdk.NewEvent(
 			types.EventTypeEditValidator,
@@ -248,7 +250,10 @@ func (k msgServer) EditValidator(ctx context.Context, msg *types.MsgEditValidato
 }
 
 // Delegate defines a method for performing a delegation of coins from a delegator to a validator
-func (k msgServer) Delegate(ctx context.Context, msg *types.MsgDelegate) (*types.MsgDelegateResponse, error) {
+func (k msgServer) Delegate(ctx context.Context, msg *types.MsgDelegate) (meterResult *types.MsgDelegateResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "Delegate")(&err)
+
 	valAddr, valErr := k.validatorAddressCodec.StringToBytes(msg.ValidatorAddress)
 	if valErr != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid validator address: %s", valErr)
@@ -266,12 +271,12 @@ func (k msgServer) Delegate(ctx context.Context, msg *types.MsgDelegate) (*types
 		)
 	}
 
-	validator, err := k.GetValidator(ctx, valAddr)
+	validator, err := k.GetValidator(sdkCtx, valAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	bondDenom, err := k.BondDenom(ctx)
+	bondDenom, err := k.BondDenom(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +288,7 @@ func (k msgServer) Delegate(ctx context.Context, msg *types.MsgDelegate) (*types
 	}
 
 	// NOTE: source funds are always unbonded
-	newShares, err := k.Keeper.Delegate(ctx, delegatorAddress, msg.Amount.Amount, types.Unbonded, validator, true)
+	newShares, err := k.Keeper.Delegate(sdkCtx, delegatorAddress, msg.Amount.Amount, types.Unbonded, validator, true)
 	if err != nil {
 		return nil, err
 	}
@@ -298,8 +303,6 @@ func (k msgServer) Delegate(ctx context.Context, msg *types.MsgDelegate) (*types
 			)
 		}()
 	}
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	sdkCtx.EventManager().EmitEvents(sdk.Events{
 		sdk.NewEvent(
 			types.EventTypeDelegate,
@@ -313,7 +316,10 @@ func (k msgServer) Delegate(ctx context.Context, msg *types.MsgDelegate) (*types
 	return &types.MsgDelegateResponse{}, nil
 }
 
-func (k msgServer) TransferDelegation(ctx context.Context, msg *types.MsgTransferDelegation) (*types.MsgTransferDelegationResponse, error) {
+func (k msgServer) TransferDelegation(ctx context.Context, msg *types.MsgTransferDelegation) (meterResult *types.MsgTransferDelegationResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "TransferDelegation")(&err)
+
 	valAddr, valErr := k.validatorAddressCodec.StringToBytes(msg.ValidatorAddress)
 	if valErr != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid validator address: %s", valErr)
@@ -339,11 +345,11 @@ func (k msgServer) TransferDelegation(ctx context.Context, msg *types.MsgTransfe
 	}
 
 	// Check if receiver is allowed
-	if !k.IsAllowedDelegationTransferReceiver(ctx, receiverAddress) {
+	if !k.IsAllowedDelegationTransferReceiver(sdkCtx, receiverAddress) {
 		return nil, sdkerrors.ErrUnauthorized.Wrap("receiver not in allowed receivers list")
 	}
 
-	bondDenom, err := k.BondDenom(ctx)
+	bondDenom, err := k.BondDenom(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -353,13 +359,13 @@ func (k msgServer) TransferDelegation(ctx context.Context, msg *types.MsgTransfe
 	}
 
 	transferShares, err := k.ValidateUnbondAmount(
-		ctx, delegatorAddress, valAddr, msg.Amount.Amount,
+		sdkCtx, delegatorAddress, valAddr, msg.Amount.Amount,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	validator, err := k.GetValidator(ctx, valAddr)
+	validator, err := k.GetValidator(sdkCtx, valAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +374,7 @@ func (k msgServer) TransferDelegation(ctx context.Context, msg *types.MsgTransfe
 		return nil, sdkerrors.ErrUnauthorized.Wrapf("validator %s must be bonded", msg.ValidatorAddress)
 	}
 
-	returnAmount, err := k.Unbond(ctx, delegatorAddress, valAddr, transferShares)
+	returnAmount, err := k.Unbond(sdkCtx, delegatorAddress, valAddr, transferShares)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +383,7 @@ func (k msgServer) TransferDelegation(ctx context.Context, msg *types.MsgTransfe
 		return nil, types.ErrTinyRedelegationAmount
 	}
 
-	validator, err = k.GetValidator(ctx, valAddr)
+	validator, err = k.GetValidator(sdkCtx, valAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -388,12 +394,10 @@ func (k msgServer) TransferDelegation(ctx context.Context, msg *types.MsgTransfe
 	}
 
 	// Add shares to the receiver - this will handle the destination delegation hooks internally
-	_, err = k.Keeper.Delegate(ctx, receiverAddress, returnAmount, validator.GetStatus(), validator, false)
+	_, err = k.Keeper.Delegate(sdkCtx, receiverAddress, returnAmount, validator.GetStatus(), validator, false)
 	if err != nil {
 		return nil, err
 	}
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	sdkCtx.EventManager().EmitEvents(sdk.Events{
 		sdk.NewEvent(
 			types.EventTypeTransferDelegation,
@@ -408,7 +412,10 @@ func (k msgServer) TransferDelegation(ctx context.Context, msg *types.MsgTransfe
 }
 
 // BeginRedelegate defines a method for performing a redelegation of coins from a source validator to a destination validator of given delegator
-func (k msgServer) BeginRedelegate(ctx context.Context, msg *types.MsgBeginRedelegate) (*types.MsgBeginRedelegateResponse, error) {
+func (k msgServer) BeginRedelegate(ctx context.Context, msg *types.MsgBeginRedelegate) (meterResult *types.MsgBeginRedelegateResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "BeginRedelegate")(&err)
+
 	valSrcAddr, err := k.validatorAddressCodec.StringToBytes(msg.ValidatorSrcAddress)
 	if err != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid source validator address: %s", err)
@@ -432,13 +439,13 @@ func (k msgServer) BeginRedelegate(ctx context.Context, msg *types.MsgBeginRedel
 	}
 
 	shares, err := k.ValidateUnbondAmount(
-		ctx, delegatorAddress, valSrcAddr, msg.Amount.Amount,
+		sdkCtx, delegatorAddress, valSrcAddr, msg.Amount.Amount,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	bondDenom, err := k.BondDenom(ctx)
+	bondDenom, err := k.BondDenom(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -450,7 +457,7 @@ func (k msgServer) BeginRedelegate(ctx context.Context, msg *types.MsgBeginRedel
 	}
 
 	completionTime, err := k.BeginRedelegation(
-		ctx, delegatorAddress, valSrcAddr, valDstAddr, shares,
+		sdkCtx, delegatorAddress, valSrcAddr, valDstAddr, shares,
 	)
 	if err != nil {
 		return nil, err
@@ -466,8 +473,6 @@ func (k msgServer) BeginRedelegate(ctx context.Context, msg *types.MsgBeginRedel
 			)
 		}()
 	}
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	sdkCtx.EventManager().EmitEvents(sdk.Events{
 		sdk.NewEvent(
 			types.EventTypeRedelegate,
@@ -484,7 +489,10 @@ func (k msgServer) BeginRedelegate(ctx context.Context, msg *types.MsgBeginRedel
 }
 
 // Undelegate defines a method for performing an undelegation from a delegate and a validator
-func (k msgServer) Undelegate(ctx context.Context, msg *types.MsgUndelegate) (*types.MsgUndelegateResponse, error) {
+func (k msgServer) Undelegate(ctx context.Context, msg *types.MsgUndelegate) (meterResult *types.MsgUndelegateResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "Undelegate")(&err)
+
 	addr, err := k.validatorAddressCodec.StringToBytes(msg.ValidatorAddress)
 	if err != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid validator address: %s", err)
@@ -503,13 +511,13 @@ func (k msgServer) Undelegate(ctx context.Context, msg *types.MsgUndelegate) (*t
 	}
 
 	shares, err := k.ValidateUnbondAmount(
-		ctx, delegatorAddress, addr, msg.Amount.Amount,
+		sdkCtx, delegatorAddress, addr, msg.Amount.Amount,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	bondDenom, err := k.BondDenom(ctx)
+	bondDenom, err := k.BondDenom(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -520,7 +528,7 @@ func (k msgServer) Undelegate(ctx context.Context, msg *types.MsgUndelegate) (*t
 		)
 	}
 
-	completionTime, undelegatedAmt, err := k.Keeper.Undelegate(ctx, delegatorAddress, addr, shares)
+	completionTime, undelegatedAmt, err := k.Keeper.Undelegate(sdkCtx, delegatorAddress, addr, shares)
 	if err != nil {
 		return nil, err
 	}
@@ -537,8 +545,6 @@ func (k msgServer) Undelegate(ctx context.Context, msg *types.MsgUndelegate) (*t
 			)
 		}()
 	}
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	sdkCtx.EventManager().EmitEvents(sdk.Events{
 		sdk.NewEvent(
 			types.EventTypeUnbond,
@@ -557,7 +563,10 @@ func (k msgServer) Undelegate(ctx context.Context, msg *types.MsgUndelegate) (*t
 
 // CancelUnbondingDelegation defines a method for canceling the unbonding delegation
 // and delegate back to the validator.
-func (k msgServer) CancelUnbondingDelegation(ctx context.Context, msg *types.MsgCancelUnbondingDelegation) (*types.MsgCancelUnbondingDelegationResponse, error) {
+func (k msgServer) CancelUnbondingDelegation(ctx context.Context, msg *types.MsgCancelUnbondingDelegation) (meterResult *types.MsgCancelUnbondingDelegationResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "CancelUnbondingDelegation")(&err)
+
 	valAddr, err := k.validatorAddressCodec.StringToBytes(msg.ValidatorAddress)
 	if err != nil {
 		return nil, sdkerrors.ErrInvalidAddress.Wrapf("invalid validator address: %s", err)
@@ -582,7 +591,7 @@ func (k msgServer) CancelUnbondingDelegation(ctx context.Context, msg *types.Msg
 		)
 	}
 
-	bondDenom, err := k.BondDenom(ctx)
+	bondDenom, err := k.BondDenom(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -593,7 +602,7 @@ func (k msgServer) CancelUnbondingDelegation(ctx context.Context, msg *types.Msg
 		)
 	}
 
-	validator, err := k.GetValidator(ctx, valAddr)
+	validator, err := k.GetValidator(sdkCtx, valAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -609,7 +618,7 @@ func (k msgServer) CancelUnbondingDelegation(ctx context.Context, msg *types.Msg
 		return nil, types.ErrValidatorJailed
 	}
 
-	ubd, err := k.GetUnbondingDelegation(ctx, delegatorAddress, valAddr)
+	ubd, err := k.GetUnbondingDelegation(sdkCtx, delegatorAddress, valAddr)
 	if err != nil {
 		return nil, status.Errorf(
 			codes.NotFound,
@@ -637,14 +646,12 @@ func (k msgServer) CancelUnbondingDelegation(ctx context.Context, msg *types.Msg
 	if unbondEntry.Balance.LT(msg.Amount.Amount) {
 		return nil, sdkerrors.ErrInvalidRequest.Wrap("amount is greater than the unbonding delegation entry balance")
 	}
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	if unbondEntry.CompletionTime.Before(sdkCtx.BlockTime()) {
 		return nil, sdkerrors.ErrInvalidRequest.Wrap("unbonding delegation is already processed")
 	}
 
 	// delegate back the unbonding delegation amount to the validator
-	_, err = k.Keeper.Delegate(ctx, delegatorAddress, msg.Amount.Amount, types.Unbonding, validator, false)
+	_, err = k.Keeper.Delegate(sdkCtx, delegatorAddress, msg.Amount.Amount, types.Unbonding, validator, false)
 	if err != nil {
 		return nil, err
 	}
@@ -661,9 +668,9 @@ func (k msgServer) CancelUnbondingDelegation(ctx context.Context, msg *types.Msg
 
 	// set the unbonding delegation or remove it if there are no more entries
 	if len(ubd.Entries) == 0 {
-		err = k.RemoveUnbondingDelegation(ctx, ubd)
+		err = k.RemoveUnbondingDelegation(sdkCtx, ubd)
 	} else {
-		err = k.SetUnbondingDelegation(ctx, ubd)
+		err = k.SetUnbondingDelegation(sdkCtx, ubd)
 	}
 
 	if err != nil {
@@ -684,17 +691,20 @@ func (k msgServer) CancelUnbondingDelegation(ctx context.Context, msg *types.Msg
 }
 
 // UpdateParams defines a method to perform updation of params exist in x/staking module.
-func (k msgServer) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (*types.MsgUpdateParamsResponse, error) {
+func (k msgServer) UpdateParams(ctx context.Context, msg *types.MsgUpdateParams) (meterResult *types.MsgUpdateParamsResponse, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Keeper.Meter(ctx).FuncTiming(&sdkCtx, "UpdateParams")(&err)
+
 	if k.authority != msg.Authority {
 		return nil, errorsmod.Wrapf(govtypes.ErrInvalidSigner, "invalid authority; expected %s, got %s", k.authority, msg.Authority)
 	}
 
-	if err := msg.Params.Validate(); err != nil {
+	if err = msg.Params.Validate(); err != nil {
 		return nil, err
 	}
 
 	// store params
-	if err := k.SetParams(ctx, msg.Params); err != nil {
+	if err = k.SetParams(sdkCtx, msg.Params); err != nil {
 		return nil, err
 	}
 

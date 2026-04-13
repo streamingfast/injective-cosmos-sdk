@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/InjectiveLabs/metrics"
+	"github.com/InjectiveLabs/metrics/v2"
 	"github.com/cockroachdb/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
@@ -409,6 +409,15 @@ func (app *BaseApp) PrepareProposal(req *abci.PrepareProposalRequest) (resp *abc
 		return nil, errors.New("PrepareProposal called with invalid height")
 	}
 
+	// metrics and trace
+	heightStr := strconv.Itoa(int(req.Height))
+	sdkCtx := app.prepareProposalState.Context()
+	defer app.meter.FuncTiming(&sdkCtx, "PrepareProposal", metrics.TraceTag("height", req.Height))(&err)
+	if app.traceFlightRecorder != nil {
+		defer app.traceFlightRecorder.StartRegion("prepare-proposal", heightStr)()
+	}
+	app.prepareProposalState.SetContext(sdkCtx)
+
 	app.prepareProposalState.SetContext(app.getContextForProposal(app.prepareProposalState.Context(), req.Height).
 		WithVoteInfos(toVoteInfo(req.LocalLastCommit.Votes)). // this is a set of votes that are not finalized yet, wait for commit
 		WithBlockHeight(req.Height).
@@ -427,12 +436,12 @@ func (app *BaseApp) PrepareProposal(req *abci.PrepareProposalRequest) (resp *abc
 		WithBlockGasMeter(app.getBlockGasMeter(app.prepareProposalState.Context())))
 
 	defer func() {
-		if err := recover(); err != nil {
+		if rec := recover(); rec != nil {
 			app.logger.Error(
 				"panic recovered in PrepareProposal",
 				"height", req.Height,
 				"time", req.Time,
-				"panic", err,
+				"panic", rec,
 			)
 
 			resp = &abci.PrepareProposalResponse{Txs: req.Txs}
@@ -499,12 +508,12 @@ func (app *BaseApp) ProcessProposal(req *abci.ProcessProposalRequest) (resp *abc
 
 	// metrics and trace
 	heightStr := strconv.Itoa(int(req.Height))
-	metricsCtx, doneFn := metrics.ReportFuncCallAndTimingSdkCtx(app.processProposalState.Context(), metrics.Tags{"svc": "app", "height": heightStr})
-	defer doneFn()
+	sdkCtx := app.processProposalState.Context()
+	defer app.meter.FuncTiming(&sdkCtx, "ProcessProposal", metrics.TraceTag("height", req.Height))(&err)
 	if app.traceFlightRecorder != nil {
 		defer app.traceFlightRecorder.StartRegion("process-proposal", heightStr)()
 	}
-	app.processProposalState.SetContext(metricsCtx)
+	app.processProposalState.SetContext(sdkCtx)
 
 	app.processProposalState.SetContext(app.getContextForProposal(app.processProposalState.Context(), req.Height).
 		WithVoteInfos(req.ProposedLastCommit.Votes). // this is a set of votes that are not finalized yet, wait for commit
@@ -525,13 +534,13 @@ func (app *BaseApp) ProcessProposal(req *abci.ProcessProposalRequest) (resp *abc
 		WithBlockGasMeter(app.getBlockGasMeter(app.processProposalState.Context())))
 
 	defer func() {
-		if err := recover(); err != nil {
+		if rec := recover(); rec != nil {
 			app.logger.Error(
 				"panic recovered in ProcessProposal",
 				"height", req.Height,
 				"time", req.Time,
 				"hash", fmt.Sprintf("%X", req.Hash),
-				"panic", err,
+				"panic", rec,
 			)
 			resp = &abci.ProcessProposalResponse{Status: abci.PROCESS_PROPOSAL_STATUS_REJECT}
 		}
@@ -709,14 +718,14 @@ func (app *BaseApp) VerifyVoteExtension(req *abci.VerifyVoteExtensionRequest) (r
 // Execution flow or by the FinalizeBlock ABCI method. The context received is
 // only used to handle early cancellation, for anything related to state app.finalizeBlockState.Context()
 // must be used.
-func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.FinalizeBlockRequest) (*abci.FinalizeBlockResponse, error) {
+func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.FinalizeBlockRequest) (res *abci.FinalizeBlockResponse, err error) {
 	var events []abci.Event
 
-	if err := app.checkHalt(req.Height, req.Time); err != nil {
+	if err = app.checkHalt(req.Height, req.Time); err != nil {
 		return nil, err
 	}
 
-	if err := app.validateFinalizeBlockHeight(req); err != nil {
+	if err = app.validateFinalizeBlockHeight(req); err != nil {
 		return nil, err
 	}
 
@@ -767,12 +776,12 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 
 	// metrics and trace
 	heightStr := strconv.Itoa(int(req.Height))
-	metricsCtx, doneFn := metrics.ReportFuncCallAndTimingSdkCtx(app.finalizeBlockState.Context(), metrics.Tags{"svc": "app", "height": heightStr})
-	defer doneFn()
+	sdkCtx := app.finalizeBlockState.Context()
+	defer app.meter.FuncTiming(&sdkCtx, "internalFinalizeBlock", metrics.TraceTag("height", req.Height))(&err)
 	if app.traceFlightRecorder != nil {
 		defer app.traceFlightRecorder.StartRegion("finalize-block", heightStr)()
 	}
-	app.finalizeBlockState.SetContext(metricsCtx)
+	app.finalizeBlockState.SetContext(sdkCtx)
 
 	// Context is now updated with Header information.
 	app.finalizeBlockState.SetContext(app.finalizeBlockState.Context().
@@ -875,7 +884,7 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 	}, nil
 }
 
-func (app *BaseApp) executeTxs(ctx context.Context, txs [][]byte) ([]*abci.ExecTxResult, error) {
+func (app *BaseApp) executeTxs(ctx context.Context, txs [][]byte) (res []*abci.ExecTxResult, err error) {
 	txResults := make([]*abci.ExecTxResult, 0, len(txs))
 	for txIdx, rawTx := range txs {
 		var response *abci.ExecTxResult

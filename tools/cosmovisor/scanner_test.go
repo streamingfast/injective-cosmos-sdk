@@ -1,11 +1,14 @@
 package cosmovisor
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"cosmossdk.io/log"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 )
 
@@ -75,4 +78,22 @@ func TestParseUpgradeInfoFile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFileWatcherCheckUpdateRetriesAfterTransientParseError(t *testing.T) {
+	home := t.TempDir()
+	filename := filepath.Join(home, "upgrade-info.json")
+
+	fw, err := newUpgradeFileWatcher(log.NewTestLogger(t), filename, time.Millisecond)
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(filename, []byte(`{"name":"upgrade1"`), 0o644))
+	require.False(t, fw.CheckUpdate(upgradetypes.Plan{}))
+	require.False(t, fw.initialized)
+	require.True(t, fw.lastModTime.IsZero())
+
+	require.NoError(t, os.WriteFile(filename, []byte(`{"name":"upgrade1","height":123,"info":"some info"}`), 0o644))
+	require.True(t, fw.CheckUpdate(upgradetypes.Plan{}))
+	require.True(t, fw.initialized)
+	require.Equal(t, upgradetypes.Plan{Name: "upgrade1", Height: 123, Info: "some info"}, fw.currentInfo)
 }

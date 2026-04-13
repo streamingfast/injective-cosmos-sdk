@@ -12,9 +12,12 @@ import (
 // GetDelegatorValidators returns all validators that a delegator is bonded to. If maxRetrieve is supplied, the respective amount will be returned.
 func (k Keeper) GetDelegatorValidators(
 	ctx context.Context, delegatorAddr sdk.AccAddress, maxRetrieve uint32,
-) (types.Validators, error) {
+) (meterResult types.Validators, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetDelegatorValidators")(&err)
+
 	validators := make([]types.Validator, maxRetrieve)
-	store := k.storeService.OpenKVStore(ctx)
+	store := k.storeService.OpenKVStore(sdkCtx)
 	delegatorPrefixKey := types.GetDelegationsKey(delegatorAddr)
 
 	iterator, err := store.Iterator(delegatorPrefixKey, storetypes.PrefixEndBytes(delegatorPrefixKey)) // smallest to largest
@@ -32,7 +35,7 @@ func (k Keeper) GetDelegatorValidators(
 			return types.Validators{}, err
 		}
 
-		validator, err := k.GetValidator(ctx, valAddr)
+		validator, err := k.GetValidator(sdkCtx, valAddr)
 		if err != nil {
 			return types.Validators{}, err
 		}
@@ -48,7 +51,10 @@ func (k Keeper) GetDelegatorValidators(
 func (k Keeper) GetDelegatorValidator(
 	ctx context.Context, delegatorAddr sdk.AccAddress, validatorAddr sdk.ValAddress,
 ) (validator types.Validator, err error) {
-	delegation, err := k.GetDelegation(ctx, delegatorAddr, validatorAddr)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetDelegatorValidator")(&err)
+
+	delegation, err := k.GetDelegation(sdkCtx, delegatorAddr, validatorAddr)
 	if err != nil {
 		return validator, err
 	}
@@ -58,14 +64,17 @@ func (k Keeper) GetDelegatorValidator(
 		return validator, err
 	}
 
-	return k.GetValidator(ctx, valAddr)
+	return k.GetValidator(sdkCtx, valAddr)
 }
 
 // GetAllDelegatorDelegations returns all delegations of a delegator
-func (k Keeper) GetAllDelegatorDelegations(ctx context.Context, delegator sdk.AccAddress) ([]types.Delegation, error) {
+func (k Keeper) GetAllDelegatorDelegations(ctx context.Context, delegator sdk.AccAddress) (meterResult []types.Delegation, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetAllDelegatorDelegations")(&err)
+
 	delegations := make([]types.Delegation, 0)
 
-	store := k.storeService.OpenKVStore(ctx)
+	store := k.storeService.OpenKVStore(sdkCtx)
 	delegatorPrefixKey := types.GetDelegationsKey(delegator)
 
 	iterator, err := store.Iterator(delegatorPrefixKey, storetypes.PrefixEndBytes(delegatorPrefixKey)) // smallest to largest
@@ -87,10 +96,13 @@ func (k Keeper) GetAllDelegatorDelegations(ctx context.Context, delegator sdk.Ac
 }
 
 // GetAllUnbondingDelegations returns all unbonding-delegations of a delegator
-func (k Keeper) GetAllUnbondingDelegations(ctx context.Context, delegator sdk.AccAddress) ([]types.UnbondingDelegation, error) {
+func (k Keeper) GetAllUnbondingDelegations(ctx context.Context, delegator sdk.AccAddress) (meterResult []types.UnbondingDelegation, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetAllUnbondingDelegations")(&err)
+
 	unbondingDelegations := make([]types.UnbondingDelegation, 0)
 
-	store := k.storeService.OpenKVStore(ctx)
+	store := k.storeService.OpenKVStore(sdkCtx)
 	delegatorPrefixKey := types.GetUBDsKey(delegator)
 
 	iterator, err := store.Iterator(delegatorPrefixKey, storetypes.PrefixEndBytes(delegatorPrefixKey)) // smallest to largest
@@ -114,8 +126,11 @@ func (k Keeper) GetAllUnbondingDelegations(ctx context.Context, delegator sdk.Ac
 // GetAllRedelegations returns all redelegations of a delegator
 func (k Keeper) GetAllRedelegations(
 	ctx context.Context, delegator sdk.AccAddress, srcValAddress, dstValAddress sdk.ValAddress,
-) ([]types.Redelegation, error) {
-	store := k.storeService.OpenKVStore(ctx)
+) (meterResult []types.Redelegation, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetAllRedelegations")(&err)
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	delegatorPrefixKey := types.GetREDsKey(delegator)
 
 	iterator, err := store.Iterator(delegatorPrefixKey, storetypes.PrefixEndBytes(delegatorPrefixKey)) // smallest to largest

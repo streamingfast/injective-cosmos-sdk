@@ -253,7 +253,7 @@ All or most of the code in the API module would be generated from protobuf
 files, so we can probably control this with how code generation is done, but
 it is a risk to be aware of.
 
-For instance, we do code generation for the ORM that in the future could
+For instance, we do code generation for state-management helpers that in the future could
 contain optimizations that are state machine breaking. We
 would either need to ensure very carefully that the optimizations aren't
 actually state machine breaking in generated code or separate this generated code

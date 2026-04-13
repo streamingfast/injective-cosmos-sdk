@@ -499,6 +499,86 @@ func (s *TestSuite) TestGetAuthorizations() {
 	require.Equal(sdk.MsgTypeURL(&banktypes.MsgSend{}), authzs[1].MsgTypeURL())
 }
 
+func (s *TestSuite) TestOnEnforcedRestrictionRemoveAuthorizations_RemovesGranteeSendAuths() {
+	require := s.Require()
+	granter := s.addrs[0]
+	grantee := s.addrs[1]
+
+	sendAuth := banktypes.NewSendAuthorization(coins10, nil)
+	err := s.authzKeeper.SaveGrant(s.ctx, grantee, granter, sendAuth, nil)
+	require.NoError(err)
+	genAuth := authz.NewGenericAuthorization("random_msg_url")
+	err = s.authzKeeper.SaveGrant(s.ctx, grantee, granter, genAuth, nil)
+	require.NoError(err)
+
+	authzs, err := s.authzKeeper.GetAuthorizations(s.ctx, grantee, granter)
+	require.NoError(err)
+	require.Len(authzs, 2)
+
+	err = s.authzKeeper.OnEnforcedRestrictionRemoveAuthorizations(s.ctx, grantee)
+	require.NoError(err)
+
+	authzs, err = s.authzKeeper.GetAuthorizations(s.ctx, grantee, granter)
+	require.NoError(err)
+	require.Len(authzs, 1)
+
+	// GenericAuthorization for MsgSend should also be removed
+	genSendAuth := authz.NewGenericAuthorization(sdk.MsgTypeURL(&banktypes.MsgSend{}))
+	err = s.authzKeeper.SaveGrant(s.ctx, grantee, granter, genSendAuth, nil)
+	require.NoError(err)
+
+	authzs, err = s.authzKeeper.GetAuthorizations(s.ctx, grantee, granter)
+	require.NoError(err)
+	require.Len(authzs, 2)
+
+	err = s.authzKeeper.OnEnforcedRestrictionRemoveAuthorizations(s.ctx, grantee)
+	require.NoError(err)
+
+	authzs, err = s.authzKeeper.GetAuthorizations(s.ctx, grantee, granter)
+	require.NoError(err)
+	require.Len(authzs, 1)
+}
+
+func (s *TestSuite) TestOnEnforcedRestrictionRemoveAuthorizations_RemovesGranterSendAuths() {
+	require := s.Require()
+	granter := s.addrs[0]
+	grantee := s.addrs[1]
+
+	sendAuth := banktypes.NewSendAuthorization(coins10, nil)
+	err := s.authzKeeper.SaveGrant(s.ctx, grantee, granter, sendAuth, nil)
+	require.NoError(err)
+	genAuth := authz.NewGenericAuthorization("random_msg_url")
+	err = s.authzKeeper.SaveGrant(s.ctx, grantee, granter, genAuth, nil)
+	require.NoError(err)
+
+	authzs, err := s.authzKeeper.GetAuthorizations(s.ctx, grantee, granter)
+	require.NoError(err)
+	require.Len(authzs, 2)
+
+	err = s.authzKeeper.OnEnforcedRestrictionRemoveAuthorizations(s.ctx, granter)
+	require.NoError(err)
+
+	authzs, err = s.authzKeeper.GetAuthorizations(s.ctx, grantee, granter)
+	require.NoError(err)
+	require.Len(authzs, 1)
+
+	// GenericAuthorization for MsgSend should also be removed
+	genSendAuth := authz.NewGenericAuthorization(sdk.MsgTypeURL(&banktypes.MsgSend{}))
+	err = s.authzKeeper.SaveGrant(s.ctx, grantee, granter, genSendAuth, nil)
+	require.NoError(err)
+
+	authzs, err = s.authzKeeper.GetAuthorizations(s.ctx, grantee, granter)
+	require.NoError(err)
+	require.Len(authzs, 2)
+
+	err = s.authzKeeper.OnEnforcedRestrictionRemoveAuthorizations(s.ctx, granter)
+	require.NoError(err)
+
+	authzs, err = s.authzKeeper.GetAuthorizations(s.ctx, grantee, granter)
+	require.NoError(err)
+	require.Len(authzs, 1)
+}
+
 func TestTestSuite(t *testing.T) {
 	suite.Run(t, new(TestSuite))
 }

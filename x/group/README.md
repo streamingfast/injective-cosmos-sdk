@@ -227,8 +227,8 @@ whichever happens first.
 
 ## State
 
-The `group` module uses the `orm` package which provides table storage with support for
-primary keys and secondary indexes. `orm` also defines `Sequence` which is a persistent unique key generator based on a counter that can be used along with `Table`s.
+The `group` module uses an internal table package which provides table storage with support for
+primary keys and secondary indexes. It also defines `Sequence`, which is a persistent unique key generator based on a counter that can be used along with `Table`s.
 
 Here's the list of tables and associated sequences and indexes stored as part of the `group` module.
 
@@ -240,7 +240,7 @@ The `groupTable` stores `GroupInfo`: `0x0 | BigEndian(GroupId) -> ProtocolBuffer
 
 The value of `groupSeq` is incremented when creating a new group and corresponds to the new `GroupId`: `0x1 | 0x1 -> BigEndian`.
 
-The second `0x1` corresponds to the ORM `sequenceStorageKey`.
+The second `0x1` corresponds to the internal `sequenceStorageKey`.
 
 #### groupByAdminIndex
 
@@ -276,7 +276,7 @@ The `groupPolicyTable` is a primary key table and its `PrimaryKey` is given by
 The value of `groupPolicySeq` is incremented when creating a new group policy and is used to generate the new group policy account `Address`:
 `0x21 | 0x1 -> BigEndian`.
 
-The second `0x1` corresponds to the ORM `sequenceStorageKey`.
+The second `0x1` corresponds to the internal `sequenceStorageKey`.
 
 #### groupPolicyByGroupIndex
 
@@ -296,7 +296,7 @@ The `proposalTable` stores `Proposal`s: `0x30 | BigEndian(ProposalId) -> Protoco
 
 The value of `proposalSeq` is incremented when creating a new proposal and corresponds to the new `ProposalId`: `0x31 | 0x1 -> BigEndian`.
 
-The second `0x1` corresponds to the ORM `sequenceStorageKey`.
+The second `0x1` corresponds to the internal `sequenceStorageKey`.
 
 #### proposalByGroupPolicyIndex
 

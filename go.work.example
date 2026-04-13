@@ -1,4 +1,4 @@
-go 1.23
+go 1.26.2
 
 use (
 	.
@@ -10,7 +10,6 @@ use (
 	./errors
 	./log
 	./math
-	./orm
 	./simapp
 	./tests
 	./store

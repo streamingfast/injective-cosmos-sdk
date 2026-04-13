@@ -13,10 +13,13 @@ import (
 
 // BeginBlocker iterates through and handles any newly discovered evidence of
 // misbehavior submitted by CometBFT. Currently, only equivocation is handled.
-func (k Keeper) BeginBlocker(ctx context.Context) error {
+func (k Keeper) BeginBlocker(ctx context.Context) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "BeginBlocker")(&err)
+
 	defer telemetry.ModuleMeasureSince(types.ModuleName, telemetry.Now(), telemetry.MetricKeyBeginBlocker)
 
-	bi := k.cometInfo.GetCometBlockInfo(ctx)
+	bi := k.cometInfo.GetCometBlockInfo(sdkCtx)
 	if bi == nil {
 		// If we don't have block info, we don't have any evidence to process.  Block info may be nil during
 		// genesis calls or in tests.
@@ -24,14 +27,13 @@ func (k Keeper) BeginBlocker(ctx context.Context) error {
 	}
 
 	evidences := bi.GetEvidence()
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	for i := 0; i < evidences.Len(); i++ {
 		switch evidences.Get(i).Type() {
 		// It's still ongoing discussion how should we treat and slash attacks with
 		// premeditation. So for now we agree to treat them in the same way.
 		case comet.LightClientAttack, comet.DuplicateVote:
 			evidence := types.FromABCIEvidence(evidences.Get(i), k.stakingKeeper.ConsensusAddressCodec())
-			err := k.handleEquivocationEvidence(ctx, evidence)
+			err = k.handleEquivocationEvidence(sdkCtx, evidence)
 			if err != nil {
 				return err
 			}

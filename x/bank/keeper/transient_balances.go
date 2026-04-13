@@ -14,22 +14,30 @@ import (
 
 // getTransientAccountStore gets the transient account store of the given address.
 func (k BaseViewKeeper) getTransientAccountStore(ctx context.Context, addr sdk.AccAddress) prefix.Store {
-	store := k.tStoreService.OpenTransientStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "getTransientAccountStore")()
+
+	store := k.tStoreService.OpenTransientStore(sdkCtx)
 	return prefix.NewStore(runtime.KVStoreAdapter(store), createAccountBalancesPrefix(addr))
 }
 
 // setTransientBalance sets the transient coin balance for an account by address.
 func (k BaseSendKeeper) setTransientBalance(ctx context.Context, addr sdk.AccAddress, balance sdk.Coin) {
-	accountStore := k.getTransientAccountStore(ctx, addr)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "setTransientBalance")()
+
+	accountStore := k.getTransientAccountStore(sdkCtx, addr)
 
 	bz := k.cdc.MustMarshal(&balance)
 	accountStore.Set([]byte(balance.Denom), bz)
 }
 
 func (k BaseKeeper) EmitAllTransientBalances(ctx context.Context) {
-	balanceUpdates := k.GetAllTransientAccountBalanceUpdates(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "EmitAllTransientBalances")()
+
+	balanceUpdates := k.GetAllTransientAccountBalanceUpdates(sdkCtx)
 	if len(balanceUpdates) > 0 {
-		sdkCtx := sdk.UnwrapSDKContext(ctx)
 		sdkCtx.EventManager().EmitTypedEvent(&types.EventSetBalances{
 			BalanceUpdates: balanceUpdates,
 		})
@@ -38,9 +46,12 @@ func (k BaseKeeper) EmitAllTransientBalances(ctx context.Context) {
 
 // GetAllTransientAccountBalanceUpdates returns all the transient accounts balances from the transient store.
 func (k BaseViewKeeper) GetAllTransientAccountBalanceUpdates(ctx context.Context) []*types.BalanceUpdate {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetAllTransientAccountBalanceUpdates")()
+
 	balanceUpdates := make([]*types.BalanceUpdate, 0)
 
-	k.IterateAllTransientBalances(ctx, func(addr sdk.AccAddress, balance sdk.Coin) bool {
+	k.IterateAllTransientBalances(sdkCtx, func(addr sdk.AccAddress, balance sdk.Coin) bool {
 		balanceUpdate := &types.BalanceUpdate{
 			Addr:  addr.Bytes(),
 			Denom: []byte(balance.Denom),
@@ -57,7 +68,10 @@ func (k BaseViewKeeper) GetAllTransientAccountBalanceUpdates(ctx context.Context
 // denominations that are provided to a callback. If true is returned from the
 // callback, iteration is halted.
 func (k BaseViewKeeper) IterateAllTransientBalances(ctx context.Context, cb func(sdk.AccAddress, sdk.Coin) bool) {
-	store := k.tStoreService.OpenTransientStore(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "IterateAllTransientBalances")()
+
+	store := k.tStoreService.OpenTransientStore(sdkCtx)
 	balancesStore := prefix.NewStore(runtime.KVStoreAdapter(store), types.BalancesPrefix)
 
 	iterator := balancesStore.Iterator(nil, nil)

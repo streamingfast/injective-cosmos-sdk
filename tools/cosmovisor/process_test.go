@@ -5,8 +5,10 @@ package cosmovisor_test
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -116,6 +118,7 @@ func (s *processTestSuite) TestLaunchProcessWithDownloads() {
 	cfg := &cosmovisor.Config{Home: home, Name: "autod", AllowDownloadBinaries: true, PollInterval: 100, UnsafeSkipBackup: true}
 	logger := log.NewLogger(os.Stdout).With(log.ModuleKey, "cosmovisor")
 	upgradeFilename := cfg.UpgradeInfoFilePath()
+	localRefPath := rewriteLocalDownloadFixtures(s.T(), home, cfg)
 
 	// should run the genesis binary and produce expected output
 	currentBin, err := cfg.CurrentBin()
@@ -136,6 +139,7 @@ func (s *processTestSuite) TestLaunchProcessWithDownloads() {
 	currentBin, err = cfg.CurrentBin()
 	require.NoError(err)
 	require.Equal(cfg.UpgradeBin("chain2"), currentBin)
+	rewriteDownloadedChain2Binary(s.T(), cfg.UpgradeBin("chain2"), localRefPath)
 
 	// start chain2
 	stdout.Reset()
@@ -166,6 +170,78 @@ func (s *processTestSuite) TestLaunchProcessWithDownloads() {
 	currentBin, err = cfg.CurrentBin()
 	require.NoError(err)
 	require.Equal(cfg.UpgradeBin("chain3"), currentBin)
+}
+
+func rewriteLocalDownloadFixtures(t *testing.T, home string, cfg *cosmovisor.Config) string {
+	t.Helper()
+
+	chain2Zip := absTestRepoPath(t, "chain2-zip_bin", "autod.zip")
+	chain3Zip := absTestRepoPath(t, "chain3-zip_dir", "autod.zip")
+
+	localRefPath := filepath.Join(home, "ref_to_chain3-zip_dir.json")
+	localRefContents := fmt.Sprintf(`{
+  "binaries": {
+    "linux/amd64": "%s?checksum=sha256:%s"
+  }
+}
+`, chain3Zip, fileSHA256(t, chain3Zip))
+	require.NoError(t, os.WriteFile(localRefPath, []byte(localRefContents), 0o644))
+
+	genesisScript := fmt.Sprintf(`#!/bin/sh
+
+echo Genesis autod. Args: $@
+sleep 0.1
+echo 'ERROR: UPGRADE "chain2" NEEDED at height: 49: zip_binary'
+
+# create upgrade info
+# this info contains directly information about binaries (in chain2->chain3 update we test with info containing a link to the file with an address for the new chain binary)
+echo '{"name":"chain2","height":49,"info":"{\"binaries\":{\"linux/amd64\":\"%s?checksum=sha256:%s\"}}"}' >$3
+
+sleep 0.1
+echo Never should be printed!!!
+`, chain2Zip, fileSHA256(t, chain2Zip))
+	require.NoError(t, os.WriteFile(cfg.GenesisBin(), []byte(genesisScript), 0o755))
+
+	return localRefPath
+}
+
+func rewriteDownloadedChain2Binary(t *testing.T, chain2BinPath, localRefPath string) {
+	t.Helper()
+
+	chain2Script := fmt.Sprintf(`#!/bin/sh
+
+echo Chain 2 from zipped binary
+echo Args: $@
+# note that we just have a url (follow the ref), not a full link
+echo 'ERROR: UPGRADE "chain3" NEEDED at height: 936: ref_to_chain3-zip_dir.json module=main'
+
+# this update info doesn't contain binaries, instead it is a reference for further download instructions.
+echo '{"name":"chain3","height":936,"info":"%s?checksum=sha256:%s"}' >$3
+
+sleep 1
+echo 'Do not print'
+`, localRefPath, fileSHA256(t, localRefPath))
+	require.NoError(t, os.WriteFile(chain2BinPath, []byte(chain2Script), 0o755))
+}
+
+func absTestRepoPath(t *testing.T, parts ...string) string {
+	t.Helper()
+
+	pathParts := append([]string{"testdata", "repo"}, parts...)
+	path, err := filepath.Abs(filepath.Join(pathParts...))
+	require.NoError(t, err)
+
+	return path
+}
+
+func fileSHA256(t *testing.T, path string) string {
+	t.Helper()
+
+	bz, err := os.ReadFile(path)
+	require.NoError(t, err)
+
+	sum := sha256.Sum256(bz)
+	return fmt.Sprintf("%x", sum)
 }
 
 // TestSkipUpgrade tests heights that are identified to be skipped and return if upgrade height matches the skip heights

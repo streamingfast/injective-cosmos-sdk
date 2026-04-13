@@ -2,11 +2,12 @@ package keeper
 
 import (
 	"context"
-	"fmt"
 
 	storetypes "cosmossdk.io/core/store"
 	"cosmossdk.io/log"
 	sdkmath "cosmossdk.io/math"
+	"fmt"
+	metrics "github.com/InjectiveLabs/metrics/v2"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
@@ -17,6 +18,7 @@ import (
 
 // Keeper of the slashing store
 type Keeper struct {
+	meter        metrics.Meter
 	storeService storetypes.KVStoreService
 	cdc          codec.BinaryCodec
 	legacyAmino  *codec.LegacyAmino
@@ -46,23 +48,30 @@ func (k Keeper) GetAuthority() string {
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx context.Context) log.Logger {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Logger")()
 	return sdkCtx.Logger().With("module", "x/"+types.ModuleName)
 }
 
 // AddPubkey sets a address-pubkey relation
-func (k Keeper) AddPubkey(ctx context.Context, pubkey cryptotypes.PubKey) error {
+func (k Keeper) AddPubkey(ctx context.Context, pubkey cryptotypes.PubKey) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "AddPubkey")(&err)
+
 	bz, err := k.cdc.MarshalInterface(pubkey)
 	if err != nil {
 		return err
 	}
-	store := k.storeService.OpenKVStore(ctx)
+	store := k.storeService.OpenKVStore(sdkCtx)
 	key := types.AddrPubkeyRelationKey(pubkey.Address())
 	return store.Set(key, bz)
 }
 
 // GetPubkey returns the pubkey from the adddress-pubkey relation
-func (k Keeper) GetPubkey(ctx context.Context, a cryptotypes.Address) (cryptotypes.PubKey, error) {
-	store := k.storeService.OpenKVStore(ctx)
+func (k Keeper) GetPubkey(ctx context.Context, a cryptotypes.Address) (meterResult cryptotypes.PubKey, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetPubkey")(&err)
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	bz, err := store.Get(types.AddrPubkeyRelationKey(a))
 	if err != nil {
 		return nil, err
@@ -76,14 +85,20 @@ func (k Keeper) GetPubkey(ctx context.Context, a cryptotypes.Address) (cryptotyp
 
 // Slash attempts to slash a validator. The slash is delegated to the staking
 // module to make the necessary validator changes. It specifies no intraction reason.
-func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, fraction sdkmath.LegacyDec, power, distributionHeight int64) error {
-	return k.SlashWithInfractionReason(ctx, consAddr, fraction, power, distributionHeight, stakingtypes.Infraction_INFRACTION_UNSPECIFIED)
+func (k Keeper) Slash(ctx context.Context, consAddr sdk.ConsAddress, fraction sdkmath.LegacyDec, power, distributionHeight int64) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Slash")(&err)
+
+	return k.SlashWithInfractionReason(sdkCtx, consAddr, fraction, power, distributionHeight, stakingtypes.Infraction_INFRACTION_UNSPECIFIED)
 }
 
 // SlashWithInfractionReason attempts to slash a validator. The slash is delegated to the staking
 // module to make the necessary validator changes. It specifies an intraction reason.
-func (k Keeper) SlashWithInfractionReason(ctx context.Context, consAddr sdk.ConsAddress, fraction sdkmath.LegacyDec, power, distributionHeight int64, infraction stakingtypes.Infraction) error {
-	coinsBurned, err := k.sk.SlashWithInfractionReason(ctx, consAddr, distributionHeight, power, fraction, infraction)
+func (k Keeper) SlashWithInfractionReason(ctx context.Context, consAddr sdk.ConsAddress, fraction sdkmath.LegacyDec, power, distributionHeight int64, infraction stakingtypes.Infraction) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SlashWithInfractionReason")(&err)
+
+	coinsBurned, err := k.sk.SlashWithInfractionReason(sdkCtx, consAddr, distributionHeight, power, fraction, infraction)
 	if err != nil {
 		return err
 	}
@@ -95,8 +110,6 @@ func (k Keeper) SlashWithInfractionReason(ctx context.Context, consAddr sdk.Cons
 	case stakingtypes.Infraction_INFRACTION_DOWNTIME:
 		reasonAttr = sdk.NewAttribute(types.AttributeKeyReason, types.AttributeValueMissingSignature)
 	}
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	sdkCtx.EventManager().EmitEvent(
 		sdk.NewEvent(
 			types.EventTypeSlash,
@@ -111,8 +124,9 @@ func (k Keeper) SlashWithInfractionReason(ctx context.Context, consAddr sdk.Cons
 
 // Jail attempts to jail a validator. The slash is delegated to the staking module
 // to make the necessary validator changes.
-func (k Keeper) Jail(ctx context.Context, consAddr sdk.ConsAddress) error {
+func (k Keeper) Jail(ctx context.Context, consAddr sdk.ConsAddress) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Jail")(&err)
 	k.sk.Jail(sdkCtx, consAddr)
 	sdkCtx.EventManager().EmitEvent(
 		sdk.NewEvent(
@@ -123,7 +137,18 @@ func (k Keeper) Jail(ctx context.Context, consAddr sdk.ConsAddress) error {
 	return nil
 }
 
-func (k Keeper) deleteAddrPubkeyRelation(ctx context.Context, addr cryptotypes.Address) error {
-	store := k.storeService.OpenKVStore(ctx)
+func (k Keeper) deleteAddrPubkeyRelation(ctx context.Context, addr cryptotypes.Address) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "deleteAddrPubkeyRelation")(&err)
+
+	store := k.storeService.OpenKVStore(sdkCtx)
 	return store.Delete(types.AddrPubkeyRelationKey(addr))
+}
+
+func (k *Keeper) Meter(ctx context.Context) metrics.Meter {
+	if k.meter == nil {
+		k.meter = sdk.UnwrapSDKContext(ctx).Meter().SubMeter(types.ModuleName, metrics.Tag("svc", types.ModuleName))
+	}
+
+	return k.meter
 }

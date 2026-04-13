@@ -10,10 +10,16 @@ import (
 
 // TokensToConsensusPower converts input tokens to potential consensus-engine power
 func (k Keeper) TokensToConsensusPower(ctx context.Context, tokens math.Int) int64 {
-	return sdk.TokensToConsensusPower(tokens, k.PowerReduction(ctx))
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "TokensToConsensusPower")()
+
+	return sdk.TokensToConsensusPower(tokens, k.PowerReduction(sdkCtx))
 }
 
 // TokensFromConsensusPower converts input power to tokens
 func (k Keeper) TokensFromConsensusPower(ctx context.Context, power int64) math.Int {
-	return sdk.TokensFromConsensusPower(power, k.PowerReduction(ctx))
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "TokensFromConsensusPower")()
+
+	return sdk.TokensFromConsensusPower(power, k.PowerReduction(sdkCtx))
 }

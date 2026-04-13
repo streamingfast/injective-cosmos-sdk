@@ -18,7 +18,10 @@ import (
 
 // BlockValidatorUpdates calculates the ValidatorUpdates for the current block
 // Called in each EndBlock
-func (k Keeper) BlockValidatorUpdates(ctx context.Context) ([]abci.ValidatorUpdate, error) {
+func (k Keeper) BlockValidatorUpdates(ctx context.Context) (meterResult []abci.ValidatorUpdate, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "BlockValidatorUpdates")(&err)
+
 	// Calculate validator set changes.
 	//
 	// NOTE: ApplyAndReturnValidatorSetUpdates has to come before
@@ -28,20 +31,18 @@ func (k Keeper) BlockValidatorUpdates(ctx context.Context) ([]abci.ValidatorUpda
 	// unbonded after the Endblocker (go from Bonded -> Unbonding during
 	// ApplyAndReturnValidatorSetUpdates and then Unbonding -> Unbonded during
 	// UnbondAllMatureValidatorQueue).
-	validatorUpdates, err := k.ApplyAndReturnValidatorSetUpdates(ctx)
+	validatorUpdates, err := k.ApplyAndReturnValidatorSetUpdates(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
 
 	// unbond all mature validators from the unbonding queue
-	err = k.UnbondAllMatureValidators(ctx)
+	err = k.UnbondAllMatureValidators(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	// Remove all mature unbonding delegations from the ubd queue.
-	matureUnbonds, err := k.DequeueAllMatureUBDQueue(ctx, sdkCtx.BlockHeader().Time)
+	matureUnbonds, err := k.DequeueAllMatureUBDQueue(sdkCtx, sdkCtx.BlockHeader().Time)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +57,7 @@ func (k Keeper) BlockValidatorUpdates(ctx context.Context) ([]abci.ValidatorUpda
 			return nil, err
 		}
 
-		balances, err := k.CompleteUnbonding(ctx, delegatorAddress, addr)
+		balances, err := k.CompleteUnbonding(sdkCtx, delegatorAddress, addr)
 		if err != nil {
 			continue
 		}
@@ -72,7 +73,7 @@ func (k Keeper) BlockValidatorUpdates(ctx context.Context) ([]abci.ValidatorUpda
 	}
 
 	// Remove all mature redelegations from the red queue.
-	matureRedelegations, err := k.DequeueAllMatureRedelegationQueue(ctx, sdkCtx.BlockHeader().Time)
+	matureRedelegations, err := k.DequeueAllMatureRedelegationQueue(sdkCtx, sdkCtx.BlockHeader().Time)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +93,7 @@ func (k Keeper) BlockValidatorUpdates(ctx context.Context) ([]abci.ValidatorUpda
 		}
 
 		balances, err := k.CompleteRedelegation(
-			ctx,
+			sdkCtx,
 			delegatorAddress,
 			valSrcAddr,
 			valDstAddr,
@@ -128,25 +129,28 @@ func (k Keeper) BlockValidatorUpdates(ctx context.Context) ([]abci.ValidatorUpda
 // at the previous block height or were removed from the validator set entirely
 // are returned to CometBFT.
 func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates []abci.ValidatorUpdate, err error) {
-	params, err := k.GetParams(ctx)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "ApplyAndReturnValidatorSetUpdates")(&err)
+
+	params, err := k.GetParams(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
 	maxValidators := params.MaxValidators
-	powerReduction := k.PowerReduction(ctx)
+	powerReduction := k.PowerReduction(sdkCtx)
 	totalPower := math.ZeroInt()
 	amtFromBondedToNotBonded, amtFromNotBondedToBonded := math.ZeroInt(), math.ZeroInt()
 
 	// Retrieve the last validator set.
 	// The persistent set is updated later in this function.
 	// (see LastValidatorPowerKey).
-	last, err := k.getLastValidatorsByAddr(ctx)
+	last, err := k.getLastValidatorsByAddr(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Iterate over validators, highest power to lowest.
-	iterator, err := k.ValidatorsPowerStoreIterator(ctx)
+	iterator, err := k.ValidatorsPowerStoreIterator(sdkCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +160,7 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates 
 		// everything that is iterated in this loop is becoming or already a
 		// part of the bonded validator set
 		valAddr := sdk.ValAddress(iterator.Value())
-		validator := k.mustGetValidator(ctx, valAddr)
+		validator := k.mustGetValidator(sdkCtx, valAddr)
 
 		if validator.Jailed {
 			panic("should never retrieve a jailed validator from the power store")
@@ -164,20 +168,20 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates 
 
 		// if we get to a zero-power validator (which we don't bond),
 		// there are no more possible bonded validators
-		if validator.PotentialConsensusPower(k.PowerReduction(ctx)) == 0 {
+		if validator.PotentialConsensusPower(k.PowerReduction(sdkCtx)) == 0 {
 			break
 		}
 
 		// apply the appropriate state change if necessary
 		switch {
 		case validator.IsUnbonded():
-			validator, err = k.unbondedToBonded(ctx, validator)
+			validator, err = k.unbondedToBonded(sdkCtx, validator)
 			if err != nil {
 				return
 			}
 			amtFromNotBondedToBonded = amtFromNotBondedToBonded.Add(validator.GetTokens())
 		case validator.IsUnbonding():
-			validator, err = k.unbondingToBonded(ctx, validator)
+			validator, err = k.unbondingToBonded(sdkCtx, validator)
 			if err != nil {
 				return
 			}
@@ -201,7 +205,7 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates 
 		if !found || !bytes.Equal(oldPowerBytes, newPowerBytes) {
 			updates = append(updates, validator.ABCIValidatorUpdate(powerReduction))
 
-			if err = k.SetLastValidatorPower(ctx, valAddr, newPower); err != nil {
+			if err = k.SetLastValidatorPower(sdkCtx, valAddr, newPower); err != nil {
 				return nil, err
 			}
 		}
@@ -218,8 +222,8 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates 
 	}
 
 	for _, valAddrBytes := range noLongerBonded {
-		validator := k.mustGetValidator(ctx, sdk.ValAddress(valAddrBytes))
-		validator, err = k.bondedToUnbonding(ctx, validator)
+		validator := k.mustGetValidator(sdkCtx, sdk.ValAddress(valAddrBytes))
+		validator, err = k.bondedToUnbonding(sdkCtx, validator)
 		if err != nil {
 			return nil, err
 		}
@@ -228,7 +232,7 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates 
 			return nil, err
 		}
 		amtFromBondedToNotBonded = amtFromBondedToNotBonded.Add(validator.GetTokens())
-		if err = k.DeleteLastValidatorPower(ctx, str); err != nil {
+		if err = k.DeleteLastValidatorPower(sdkCtx, str); err != nil {
 			return nil, err
 		}
 
@@ -244,11 +248,11 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates 
 	// Compare and subtract the respective amounts to only perform one transfer.
 	// This is done in order to avoid doing multiple updates inside each iterator/loop.
 	case amtFromNotBondedToBonded.GT(amtFromBondedToNotBonded):
-		if err = k.notBondedTokensToBonded(ctx, amtFromNotBondedToBonded.Sub(amtFromBondedToNotBonded)); err != nil {
+		if err = k.notBondedTokensToBonded(sdkCtx, amtFromNotBondedToBonded.Sub(amtFromBondedToNotBonded)); err != nil {
 			return nil, err
 		}
 	case amtFromNotBondedToBonded.LT(amtFromBondedToNotBonded):
-		if err = k.bondedTokensToNotBonded(ctx, amtFromBondedToNotBonded.Sub(amtFromNotBondedToBonded)); err != nil {
+		if err = k.bondedTokensToNotBonded(sdkCtx, amtFromBondedToNotBonded.Sub(amtFromNotBondedToBonded)); err != nil {
 			return nil, err
 		}
 	default: // equal amounts of tokens; no update required
@@ -256,13 +260,13 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates 
 
 	// set total power on lookup index if there are any updates
 	if len(updates) > 0 {
-		if err = k.SetLastTotalPower(ctx, totalPower); err != nil {
+		if err = k.SetLastTotalPower(sdkCtx, totalPower); err != nil {
 			return nil, err
 		}
 	}
 
 	// set the list of validator updates
-	if err = k.SetValidatorUpdates(ctx, updates); err != nil {
+	if err = k.SetValidatorUpdates(sdkCtx, updates); err != nil {
 		return nil, err
 	}
 
@@ -271,87 +275,108 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates 
 
 // Validator state transitions
 
-func (k Keeper) bondedToUnbonding(ctx context.Context, validator types.Validator) (types.Validator, error) {
+func (k Keeper) bondedToUnbonding(ctx context.Context, validator types.Validator) (meterResult types.Validator, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "bondedToUnbonding")(&err)
+
 	if !validator.IsBonded() {
 		panic(fmt.Sprintf("bad state transition bondedToUnbonding, validator: %v\n", validator))
 	}
 
-	return k.BeginUnbondingValidator(ctx, validator)
+	return k.BeginUnbondingValidator(sdkCtx, validator)
 }
 
-func (k Keeper) unbondingToBonded(ctx context.Context, validator types.Validator) (types.Validator, error) {
+func (k Keeper) unbondingToBonded(ctx context.Context, validator types.Validator) (meterResult types.Validator, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "unbondingToBonded")(&err)
+
 	if !validator.IsUnbonding() {
 		panic(fmt.Sprintf("bad state transition unbondingToBonded, validator: %v\n", validator))
 	}
 
-	return k.bondValidator(ctx, validator)
+	return k.bondValidator(sdkCtx, validator)
 }
 
-func (k Keeper) unbondedToBonded(ctx context.Context, validator types.Validator) (types.Validator, error) {
+func (k Keeper) unbondedToBonded(ctx context.Context, validator types.Validator) (meterResult types.Validator, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "unbondedToBonded")(&err)
+
 	if !validator.IsUnbonded() {
 		panic(fmt.Sprintf("bad state transition unbondedToBonded, validator: %v\n", validator))
 	}
 
-	return k.bondValidator(ctx, validator)
+	return k.bondValidator(sdkCtx, validator)
 }
 
 // UnbondingToUnbonded switches a validator from unbonding state to unbonded state
-func (k Keeper) UnbondingToUnbonded(ctx context.Context, validator types.Validator) (types.Validator, error) {
+func (k Keeper) UnbondingToUnbonded(ctx context.Context, validator types.Validator) (meterResult types.Validator, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "UnbondingToUnbonded")(&err)
+
 	if !validator.IsUnbonding() {
 		return types.Validator{}, fmt.Errorf("bad state transition unbondingToUnbonded, validator: %v", validator)
 	}
 
-	return k.completeUnbondingValidator(ctx, validator)
+	return k.completeUnbondingValidator(sdkCtx, validator)
 }
 
 // send a validator to jail
-func (k Keeper) jailValidator(ctx context.Context, validator types.Validator) error {
+func (k Keeper) jailValidator(ctx context.Context, validator types.Validator) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "jailValidator")(&err)
+
 	if validator.Jailed {
 		return types.ErrValidatorJailed.Wrapf("cannot jail already jailed validator, validator: %v", validator)
 	}
 
 	validator.Jailed = true
-	if err := k.SetValidator(ctx, validator); err != nil {
+	if err = k.SetValidator(sdkCtx, validator); err != nil {
 		return err
 	}
 
-	return k.DeleteValidatorByPowerIndex(ctx, validator)
+	return k.DeleteValidatorByPowerIndex(sdkCtx, validator)
 }
 
 // remove a validator from jail
-func (k Keeper) unjailValidator(ctx context.Context, validator types.Validator) error {
+func (k Keeper) unjailValidator(ctx context.Context, validator types.Validator) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "unjailValidator")(&err)
+
 	if !validator.Jailed {
 		return fmt.Errorf("cannot unjail already unjailed validator, validator: %v", validator)
 	}
 
 	validator.Jailed = false
-	if err := k.SetValidator(ctx, validator); err != nil {
+	if err = k.SetValidator(sdkCtx, validator); err != nil {
 		return err
 	}
 
-	return k.SetValidatorByPowerIndex(ctx, validator)
+	return k.SetValidatorByPowerIndex(sdkCtx, validator)
 }
 
 // perform all the store operations for when a validator status becomes bonded
-func (k Keeper) bondValidator(ctx context.Context, validator types.Validator) (types.Validator, error) {
+func (k Keeper) bondValidator(ctx context.Context, validator types.Validator) (meterResult types.Validator, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "bondValidator")(&err)
+
 	// delete the validator by power index, as the key will change
-	if err := k.DeleteValidatorByPowerIndex(ctx, validator); err != nil {
+	if err = k.DeleteValidatorByPowerIndex(sdkCtx, validator); err != nil {
 		return validator, err
 	}
 
 	validator = validator.UpdateStatus(types.Bonded)
 
 	// save the now bonded validator record to the two referenced stores
-	if err := k.SetValidator(ctx, validator); err != nil {
+	if err = k.SetValidator(sdkCtx, validator); err != nil {
 		return validator, err
 	}
 
-	if err := k.SetValidatorByPowerIndex(ctx, validator); err != nil {
+	if err = k.SetValidatorByPowerIndex(sdkCtx, validator); err != nil {
 		return validator, err
 	}
 
 	// delete from queue if present
-	if err := k.DeleteValidatorQueue(ctx, validator); err != nil {
+	if err = k.DeleteValidatorQueue(sdkCtx, validator); err != nil {
 		return validator, err
 	}
 
@@ -366,7 +391,7 @@ func (k Keeper) bondValidator(ctx context.Context, validator types.Validator) (t
 		return validator, err
 	}
 
-	if err := k.Hooks().AfterValidatorBonded(ctx, consAddr, str); err != nil {
+	if err = k.Hooks().AfterValidatorBonded(sdkCtx, consAddr, str); err != nil {
 		return validator, err
 	}
 
@@ -374,14 +399,17 @@ func (k Keeper) bondValidator(ctx context.Context, validator types.Validator) (t
 }
 
 // BeginUnbondingValidator performs all the store operations for when a validator begins unbonding
-func (k Keeper) BeginUnbondingValidator(ctx context.Context, validator types.Validator) (types.Validator, error) {
-	params, err := k.GetParams(ctx)
+func (k Keeper) BeginUnbondingValidator(ctx context.Context, validator types.Validator) (meterResult types.Validator, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "BeginUnbondingValidator")(&err)
+
+	params, err := k.GetParams(sdkCtx)
 	if err != nil {
 		return validator, err
 	}
 
 	// delete the validator by power index, as the key will change
-	if err = k.DeleteValidatorByPowerIndex(ctx, validator); err != nil {
+	if err = k.DeleteValidatorByPowerIndex(sdkCtx, validator); err != nil {
 		return validator, err
 	}
 
@@ -390,14 +418,12 @@ func (k Keeper) BeginUnbondingValidator(ctx context.Context, validator types.Val
 		panic(fmt.Sprintf("should not already be unbonded or unbonding, validator: %v\n", validator))
 	}
 
-	id, err := k.IncrementUnbondingID(ctx)
+	id, err := k.IncrementUnbondingID(sdkCtx)
 	if err != nil {
 		return validator, err
 	}
 
 	validator = validator.UpdateStatus(types.Unbonding)
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	// set the unbonding completion time and completion height appropriately
 	validator.UnbondingTime = sdkCtx.BlockHeader().Time.Add(params.UnbondingTime)
 	validator.UnbondingHeight = sdkCtx.BlockHeader().Height
@@ -405,16 +431,16 @@ func (k Keeper) BeginUnbondingValidator(ctx context.Context, validator types.Val
 	validator.UnbondingIds = append(validator.UnbondingIds, id)
 
 	// save the now unbonded validator record and power index
-	if err = k.SetValidator(ctx, validator); err != nil {
+	if err = k.SetValidator(sdkCtx, validator); err != nil {
 		return validator, err
 	}
 
-	if err = k.SetValidatorByPowerIndex(ctx, validator); err != nil {
+	if err = k.SetValidatorByPowerIndex(sdkCtx, validator); err != nil {
 		return validator, err
 	}
 
 	// Adds to unbonding validator queue
-	if err = k.InsertUnbondingValidatorQueue(ctx, validator); err != nil {
+	if err = k.InsertUnbondingValidatorQueue(sdkCtx, validator); err != nil {
 		return validator, err
 	}
 
@@ -429,15 +455,15 @@ func (k Keeper) BeginUnbondingValidator(ctx context.Context, validator types.Val
 		return validator, err
 	}
 
-	if err := k.Hooks().AfterValidatorBeginUnbonding(ctx, consAddr, str); err != nil {
+	if err = k.Hooks().AfterValidatorBeginUnbonding(sdkCtx, consAddr, str); err != nil {
 		return validator, err
 	}
 
-	if err := k.SetValidatorByUnbondingID(ctx, validator, id); err != nil {
+	if err = k.SetValidatorByUnbondingID(sdkCtx, validator, id); err != nil {
 		return validator, err
 	}
 
-	if err := k.Hooks().AfterUnbondingInitiated(ctx, id); err != nil {
+	if err = k.Hooks().AfterUnbondingInitiated(sdkCtx, id); err != nil {
 		return validator, err
 	}
 
@@ -445,9 +471,12 @@ func (k Keeper) BeginUnbondingValidator(ctx context.Context, validator types.Val
 }
 
 // perform all the store operations for when a validator status becomes unbonded
-func (k Keeper) completeUnbondingValidator(ctx context.Context, validator types.Validator) (types.Validator, error) {
+func (k Keeper) completeUnbondingValidator(ctx context.Context, validator types.Validator) (meterResult types.Validator, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "completeUnbondingValidator")(&err)
+
 	validator = validator.UpdateStatus(types.Unbonded)
-	if err := k.SetValidator(ctx, validator); err != nil {
+	if err = k.SetValidator(sdkCtx, validator); err != nil {
 		return validator, err
 	}
 
@@ -459,10 +488,13 @@ func (k Keeper) completeUnbondingValidator(ctx context.Context, validator types.
 type validatorsByAddr map[string][]byte
 
 // get the last validator set
-func (k Keeper) getLastValidatorsByAddr(ctx context.Context) (validatorsByAddr, error) {
+func (k Keeper) getLastValidatorsByAddr(ctx context.Context) (meterResult validatorsByAddr, err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "getLastValidatorsByAddr")(&err)
+
 	last := make(validatorsByAddr)
 
-	iterator, err := k.LastValidatorsIterator(ctx)
+	iterator, err := k.LastValidatorsIterator(sdkCtx)
 	if err != nil {
 		return nil, err
 	}

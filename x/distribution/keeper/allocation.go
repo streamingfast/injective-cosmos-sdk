@@ -14,35 +14,38 @@ import (
 
 // AllocateTokens performs reward and fee distribution to all validators based
 // on the F1 fee distribution specification.
-func (k Keeper) AllocateTokens(ctx context.Context, totalPreviousPower int64, bondedVotes []abci.VoteInfo) error {
+func (k Keeper) AllocateTokens(ctx context.Context, totalPreviousPower int64, bondedVotes []abci.VoteInfo) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "AllocateTokens")(&err)
+
 	// fetch and clear the collected fees for distribution, since this is
 	// called in BeginBlock, collected fees will be from the previous block
 	// (and distributed to the previous proposer)
-	feeCollector := k.authKeeper.GetModuleAccount(ctx, k.feeCollectorName)
-	feesCollectedInt := k.bankKeeper.GetAllBalances(ctx, feeCollector.GetAddress())
+	feeCollector := k.authKeeper.GetModuleAccount(sdkCtx, k.feeCollectorName)
+	feesCollectedInt := k.bankKeeper.GetAllBalances(sdkCtx, feeCollector.GetAddress())
 	feesCollected := sdk.NewDecCoinsFromCoins(feesCollectedInt...)
 
 	// transfer collected fees to the distribution module account
-	err := k.bankKeeper.SendCoinsFromModuleToModule(ctx, k.feeCollectorName, types.ModuleName, feesCollectedInt)
+	err = k.bankKeeper.SendCoinsFromModuleToModule(sdkCtx, k.feeCollectorName, types.ModuleName, feesCollectedInt)
 	if err != nil {
 		return err
 	}
 
 	// temporary workaround to keep CanWithdrawInvariant happy
 	// general discussions here: https://github.com/cosmos/cosmos-sdk/issues/2906#issuecomment-441867634
-	feePool, err := k.FeePool.Get(ctx)
+	feePool, err := k.FeePool.Get(sdkCtx)
 	if err != nil {
 		return err
 	}
 
 	if totalPreviousPower == 0 {
 		feePool.CommunityPool = feePool.CommunityPool.Add(feesCollected...)
-		return k.FeePool.Set(ctx, feePool)
+		return k.FeePool.Set(sdkCtx, feePool)
 	}
 
 	// calculate fraction allocated to validators
 	remaining := feesCollected
-	communityTax, err := k.GetCommunityTax(ctx)
+	communityTax, err := k.GetCommunityTax(sdkCtx)
 	if err != nil {
 		return err
 	}
@@ -56,7 +59,7 @@ func (k Keeper) AllocateTokens(ctx context.Context, totalPreviousPower int64, bo
 	//
 	// Ref: https://github.com/cosmos/cosmos-sdk/pull/3099#discussion_r246276376
 	for _, vote := range bondedVotes {
-		validator, err := k.stakingKeeper.ValidatorByConsAddr(ctx, vote.Validator.Address)
+		validator, err := k.stakingKeeper.ValidatorByConsAddr(sdkCtx, vote.Validator.Address)
 		if err != nil {
 			return err
 		}
@@ -67,7 +70,7 @@ func (k Keeper) AllocateTokens(ctx context.Context, totalPreviousPower int64, bo
 		powerFraction := math.LegacyNewDec(vote.Validator.Power).QuoTruncate(math.LegacyNewDec(totalPreviousPower))
 		reward := feeMultiplier.MulDecTruncate(powerFraction)
 
-		err = k.AllocateTokensToValidator(ctx, validator, reward)
+		err = k.AllocateTokensToValidator(sdkCtx, validator, reward)
 		if err != nil {
 			return err
 		}
@@ -77,12 +80,15 @@ func (k Keeper) AllocateTokens(ctx context.Context, totalPreviousPower int64, bo
 
 	// allocate community funding
 	feePool.CommunityPool = feePool.CommunityPool.Add(remaining...)
-	return k.FeePool.Set(ctx, feePool)
+	return k.FeePool.Set(sdkCtx, feePool)
 }
 
 // AllocateTokensToValidator allocate tokens to a particular validator,
 // splitting according to commission.
-func (k Keeper) AllocateTokensToValidator(ctx context.Context, val stakingtypes.ValidatorI, tokens sdk.DecCoins) error {
+func (k Keeper) AllocateTokensToValidator(ctx context.Context, val stakingtypes.ValidatorI, tokens sdk.DecCoins) (err error) {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "AllocateTokensToValidator")(&err)
+
 	// split tokens between validator and delegators according to commission
 	commission := tokens.MulDec(val.GetCommission())
 	shared := tokens.Sub(commission)
@@ -93,7 +99,6 @@ func (k Keeper) AllocateTokensToValidator(ctx context.Context, val stakingtypes.
 	}
 
 	// update current commission
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	sdkCtx.EventManager().EmitEvent(
 		sdk.NewEvent(
 			types.EventTypeCommission,
@@ -101,25 +106,25 @@ func (k Keeper) AllocateTokensToValidator(ctx context.Context, val stakingtypes.
 			sdk.NewAttribute(types.AttributeKeyValidator, val.GetOperator()),
 		),
 	)
-	currentCommission, err := k.GetValidatorAccumulatedCommission(ctx, valBz)
+	currentCommission, err := k.GetValidatorAccumulatedCommission(sdkCtx, valBz)
 	if err != nil {
 		return err
 	}
 
 	currentCommission.Commission = currentCommission.Commission.Add(commission...)
-	err = k.SetValidatorAccumulatedCommission(ctx, valBz, currentCommission)
+	err = k.SetValidatorAccumulatedCommission(sdkCtx, valBz, currentCommission)
 	if err != nil {
 		return err
 	}
 
 	// update current rewards
-	currentRewards, err := k.GetValidatorCurrentRewards(ctx, valBz)
+	currentRewards, err := k.GetValidatorCurrentRewards(sdkCtx, valBz)
 	if err != nil {
 		return err
 	}
 
 	currentRewards.Rewards = currentRewards.Rewards.Add(shared...)
-	err = k.SetValidatorCurrentRewards(ctx, valBz, currentRewards)
+	err = k.SetValidatorCurrentRewards(sdkCtx, valBz, currentRewards)
 	if err != nil {
 		return err
 	}
@@ -133,11 +138,11 @@ func (k Keeper) AllocateTokensToValidator(ctx context.Context, val stakingtypes.
 		),
 	)
 
-	outstanding, err := k.GetValidatorOutstandingRewards(ctx, valBz)
+	outstanding, err := k.GetValidatorOutstandingRewards(sdkCtx, valBz)
 	if err != nil {
 		return err
 	}
 
 	outstanding.Rewards = outstanding.Rewards.Add(tokens...)
-	return k.SetValidatorOutstandingRewards(ctx, valBz, outstanding)
+	return k.SetValidatorOutstandingRewards(sdkCtx, valBz, outstanding)
 }

@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"encoding/binary"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/internal/conv"
@@ -18,6 +19,7 @@ import (
 var (
 	GrantKey         = []byte{0x01} // prefix for each key
 	GrantQueuePrefix = []byte{0x02}
+	GrantsByGrantee  = []byte{0x21} // index for grants by grantee address and msg_type_url: grantee_address + msg_type_url + granter_address => []byte{} (empty value)
 )
 
 var lenTime = len(sdk.FormatTimeBytes(time.Now()))
@@ -96,4 +98,37 @@ func GrantQueueTimePrefix(expiration time.Time) []byte {
 func firstAddressFromGrantStoreKey(key []byte) sdk.AccAddress {
 	addrLen := key[0]
 	return sdk.AccAddress(key[1 : 1+addrLen])
+}
+
+func grantStorePrefix(granter sdk.AccAddress) []byte {
+	return sdk.AppendLengthPrefixedBytes(GrantKey, address.MustLengthPrefix(granter))
+}
+
+func grantsByGranteePrefix(grantee sdk.AccAddress) []byte {
+	return sdk.AppendLengthPrefixedBytes(GrantsByGrantee, address.MustLengthPrefix(grantee))
+}
+
+func grantsByGranteeAndMsgTypePrefix(grantee sdk.AccAddress, msgType string) []byte {
+	msgLen := make([]byte, 2)
+	binary.LittleEndian.PutUint16(msgLen, uint16(len(msgType)))
+	return sdk.AppendLengthPrefixedBytes(grantsByGranteePrefix(grantee), msgLen, conv.UnsafeStrToBytes(msgType))
+}
+
+func grantsByGranteeAndMsgTypeAndGranterKey(grantee sdk.AccAddress, msgType string, granter sdk.AccAddress) []byte {
+	return sdk.AppendLengthPrefixedBytes(grantsByGranteeAndMsgTypePrefix(grantee, msgType), address.MustLengthPrefix(granter))
+}
+
+func parseIndexByGranteeAndMsgTypeKey(key []byte) (grantee sdk.AccAddress, msgType string, granter sdk.AccAddress) {
+	granteeAddrLen, granteeAddrLenEndIndex := sdk.ParseLengthPrefixedBytes(key, 1, 1)
+	granteeAddr, granteeAddrEndIndex := sdk.ParseLengthPrefixedBytes(key, granteeAddrLenEndIndex+1, int(granteeAddrLen[0]))
+
+	msgLenBytes, msgLenEndIndex := sdk.ParseLengthPrefixedBytes(key, granteeAddrEndIndex+1, 2)
+	msgLen := binary.LittleEndian.Uint16(msgLenBytes)
+	msgTypeBytes, msgTypeEndIndex := sdk.ParseLengthPrefixedBytes(key, msgLenEndIndex+1, int(msgLen))
+	msgType = conv.UnsafeBytesToStr(msgTypeBytes)
+
+	granterAddrLen, granterAddrLenEndIndex := sdk.ParseLengthPrefixedBytes(key, msgTypeEndIndex+1, 1) // ignore key[0] since it is a prefix key
+	granterAddr, _ := sdk.ParseLengthPrefixedBytes(key, granterAddrLenEndIndex+1, int(granterAddrLen[0]))
+
+	return sdk.AccAddress(granteeAddr), msgType, sdk.AccAddress(granterAddr)
 }

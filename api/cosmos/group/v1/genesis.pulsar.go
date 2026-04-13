@@ -1223,19 +1223,19 @@ type GenesisState struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// group_seq is the group table orm.Sequence,
+	// group_seq is the group table sequence,
 	// it is used to get the next group ID.
 	GroupSeq uint64 `protobuf:"varint,1,opt,name=group_seq,json=groupSeq,proto3" json:"group_seq,omitempty"`
 	// groups is the list of groups info.
 	Groups []*GroupInfo `protobuf:"bytes,2,rep,name=groups,proto3" json:"groups,omitempty"`
 	// group_members is the list of groups members.
 	GroupMembers []*GroupMember `protobuf:"bytes,3,rep,name=group_members,json=groupMembers,proto3" json:"group_members,omitempty"`
-	// group_policy_seq is the group policy table orm.Sequence,
+	// group_policy_seq is the group policy table sequence,
 	// it is used to generate the next group policy account address.
 	GroupPolicySeq uint64 `protobuf:"varint,4,opt,name=group_policy_seq,json=groupPolicySeq,proto3" json:"group_policy_seq,omitempty"`
 	// group_policies is the list of group policies info.
 	GroupPolicies []*GroupPolicyInfo `protobuf:"bytes,5,rep,name=group_policies,json=groupPolicies,proto3" json:"group_policies,omitempty"`
-	// proposal_seq is the proposal table orm.Sequence,
+	// proposal_seq is the proposal table sequence,
 	// it is used to get the next proposal ID.
 	ProposalSeq uint64 `protobuf:"varint,6,opt,name=proposal_seq,json=proposalSeq,proto3" json:"proposal_seq,omitempty"`
 	// proposals is the list of proposals.

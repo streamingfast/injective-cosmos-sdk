@@ -2,12 +2,12 @@ package keeper
 
 import (
 	"context"
-	"fmt"
-	"time"
 
 	"cosmossdk.io/collections"
 	corestoretypes "cosmossdk.io/core/store"
 	"cosmossdk.io/log"
+	"fmt"
+	metrics "github.com/InjectiveLabs/metrics/v2"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -15,10 +15,12 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/gov/types"
 	v1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	"github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
+	"time"
 )
 
 // Keeper defines the governance module Keeper
 type Keeper struct {
+	meter       metrics.Meter
 	authKeeper  types.AccountKeeper
 	bankKeeper  types.BankKeeper
 	distrKeeper types.DistributionKeeper
@@ -152,6 +154,7 @@ func (k *Keeper) SetLegacyRouter(router v1beta1.Router) {
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx context.Context) log.Logger {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "Logger")()
 	return sdkCtx.Logger().With("module", "x/"+types.ModuleName)
 }
 
@@ -167,7 +170,10 @@ func (k Keeper) LegacyRouter() v1beta1.Router {
 
 // GetGovernanceAccount returns the governance ModuleAccount
 func (k Keeper) GetGovernanceAccount(ctx context.Context) sdk.ModuleAccountI {
-	return k.authKeeper.GetModuleAccount(ctx, types.ModuleName)
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	defer k.Meter(ctx).FuncTiming(&sdkCtx, "GetGovernanceAccount")()
+
+	return k.authKeeper.GetModuleAccount(sdkCtx, types.ModuleName)
 }
 
 // ModuleAccountAddress returns gov module account address
@@ -191,4 +197,12 @@ func (k Keeper) assertSummaryLength(summary string) error {
 		return types.ErrSummaryTooLong.Wrapf("got summary with length %d", len(summary))
 	}
 	return nil
+}
+
+func (k *Keeper) Meter(ctx context.Context) metrics.Meter {
+	if k.meter == nil {
+		k.meter = sdk.UnwrapSDKContext(ctx).Meter().SubMeter(types.ModuleName, metrics.Tag("svc", types.ModuleName))
+	}
+
+	return k.meter
 }
