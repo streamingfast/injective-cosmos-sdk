@@ -26,6 +26,7 @@ type SendKeeper interface {
 	AppendSendRestriction(restriction types.SendRestrictionFn)
 	PrependSendRestriction(restriction types.SendRestrictionFn)
 	ClearSendRestriction()
+	AppendPostSendHook(postHook types.PostSendHook)
 
 	InputOutputCoins(ctx context.Context, input types.Input, outputs []types.Output) error
 	SendCoins(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) error
@@ -71,6 +72,7 @@ type BaseSendKeeper struct {
 	authority string
 
 	sendRestriction *sendRestriction
+	postSendHook    *types.PostSendHookWrapper
 }
 
 func NewBaseSendKeeper(
@@ -97,6 +99,7 @@ func NewBaseSendKeeper(
 		authority:       authority,
 		logger:          logger,
 		sendRestriction: newSendRestriction(),
+		postSendHook:    types.NewPostSendHook(),
 	}
 }
 
@@ -113,6 +116,11 @@ func (k BaseSendKeeper) PrependSendRestriction(restriction types.SendRestriction
 // ClearSendRestriction removes the send restriction (if there is one).
 func (k BaseSendKeeper) ClearSendRestriction() {
 	k.sendRestriction.clear()
+}
+
+// AppendPostSendHook adds the provided post send hook to run after every successful send.
+func (k BaseSendKeeper) AppendPostSendHook(postHook types.PostSendHook) {
+	k.postSendHook.Append(postHook)
 }
 
 // GetAuthority returns the x/bank module's authority.
@@ -170,6 +178,9 @@ func (k BaseSendKeeper) InputOutputCoins(ctx context.Context, input types.Input,
 		return err
 	}
 
+	// this array is here to record new destination addresses to be used by post send hook
+	newToAddresses := make([]sdk.AccAddress, 0)
+
 	for _, out := range outputs {
 		outAddress, err := k.ak.AddressCodec().StringToBytes(out.Address)
 		if err != nil {
@@ -186,6 +197,19 @@ func (k BaseSendKeeper) InputOutputCoins(ctx context.Context, input types.Input,
 			if err != nil {
 				return err
 			}
+
+			newToAddresses = append(newToAddresses, newOutAddress)
+		}
+	}
+
+	// first wait for all coins in the basket to be sent, and only after call post send hook
+	cnt := 0
+	for _, out := range outputs {
+		for _, coin := range out.Coins {
+			if k.postSendHook != nil {
+				k.postSendHook.Apply(sdkCtx, inAddress, newToAddresses[cnt], coin)
+			}
+			cnt++
 		}
 	}
 
@@ -209,6 +233,9 @@ func (k BaseSendKeeper) SendCoins(ctx context.Context, fromAddr, toAddr sdk.AccA
 		return err
 	}
 
+	// this array is here to record new destination addresses to be used by post send hook
+	newToAddresses := make([]sdk.AccAddress, 0, len(amt))
+
 	for _, coin := range amt {
 		newToAddr, err := k.sendRestriction.apply(sdkCtx, fromAddr, toAddr, coin)
 		if err != nil {
@@ -218,6 +245,15 @@ func (k BaseSendKeeper) SendCoins(ctx context.Context, fromAddr, toAddr sdk.AccA
 		err = k.sendCoins(sdkCtx, fromAddr, newToAddr, sdk.NewCoins(coin))
 		if err != nil {
 			return err
+		}
+
+		newToAddresses = append(newToAddresses, newToAddr)
+	}
+
+	// first wait for all coins in the basket to be sent, and only after call post send hook
+	for i, coin := range amt {
+		if k.postSendHook != nil {
+			k.postSendHook.Apply(sdkCtx, fromAddr, newToAddresses[i], coin)
 		}
 	}
 
