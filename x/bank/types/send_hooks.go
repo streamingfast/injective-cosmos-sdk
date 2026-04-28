@@ -27,7 +27,7 @@ type PostSendHookWrapper struct {
 	fn PostSendHook
 }
 
-// NewPostSendHook creates a new sendRestriction with nil send restriction.
+// NewPostSendHook creates a new post send hook wrapper with nil hook.
 func NewPostSendHook() *PostSendHookWrapper {
 	return &PostSendHookWrapper{
 		fn: nil,
@@ -40,8 +40,8 @@ func (r *PostSendHookWrapper) Append(hook PostSendHook) {
 }
 
 // Prepend adds the provided restriction to this, to be run before the existing function.
-func (r *PostSendHookWrapper) Prepend(restriction PostSendHook) {
-	r.fn = restriction.Then(r.fn)
+func (r *PostSendHookWrapper) Prepend(hook PostSendHook) {
+	r.fn = hook.Then(r.fn)
 }
 
 // Clear removes the send restriction (sets it to nil).
