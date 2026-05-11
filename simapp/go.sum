@@ -215,10 +215,10 @@ github.com/DataDog/datadog-go v3.2.0+incompatible h1:qSG2N4FghB1He/r2mFrWKCaL7dX
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/DataDog/zstd v1.5.6 h1:LbEglqepa/ipmmQJUDnSsfvA8e8IStVcGaFWDuxvGOY=
 github.com/DataDog/zstd v1.5.6/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwSAmyw=
-github.com/InjectiveLabs/cometbft v1.0.1-inj.7 h1:TjiWFNOd7EcIw4hJV4T4pXSsXuF/kYJxYJkHGbVCZ5E=
-github.com/InjectiveLabs/cometbft v1.0.1-inj.7/go.mod h1:GjHzF+48UzwdWUUG4uUD+e52h2L6Pq9rK4eL+oYIyBU=
-github.com/InjectiveLabs/cometbft/api v1.0.0-inj.3 h1:nr+WvziQ0eehb9i0A85KCb71JjWQh+oIKF18946NEcE=
-github.com/InjectiveLabs/cometbft/api v1.0.0-inj.3/go.mod h1:rr73UKPAv9CIvQBxZZ3KEVGIl2BUpOncx1krVXmOg1g=
+github.com/InjectiveLabs/cometbft v1.0.1-inj.v1.19.0-rollback h1:otJtsxbZ0b4GMCM0ARhjlGIr9tznyqqijYsL/HydQBs=
+github.com/InjectiveLabs/cometbft v1.0.1-inj.v1.19.0-rollback/go.mod h1:GjHzF+48UzwdWUUG4uUD+e52h2L6Pq9rK4eL+oYIyBU=
+github.com/InjectiveLabs/cometbft/api v1.0.1-inj.v1.19.0-rollback h1:GoMfLIjcNcd14Beb9IG4u4HiUdPidQEi3Q0ex0u92Gk=
+github.com/InjectiveLabs/cometbft/api v1.0.1-inj.v1.19.0-rollback/go.mod h1:rr73UKPAv9CIvQBxZZ3KEVGIl2BUpOncx1krVXmOg1g=
 github.com/InjectiveLabs/metrics/v2 v2.0.0-beta.8 h1:zvIV7ifNcH2Dvl0RrXd2qYRkaDSc+iP0hqaAhfS85MY=
 github.com/InjectiveLabs/metrics/v2 v2.0.0-beta.8/go.mod h1:fdW28eWh1Ace92UW2TzINdJVaVP7whCmHKkGQZHsxGI=
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
