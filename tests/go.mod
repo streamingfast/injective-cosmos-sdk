@@ -34,6 +34,8 @@ require (
 require github.com/cometbft/cometbft/api v1.0.0
 
 require (
+	buf.build/gen/go/cometbft/cometbft/protocolbuffers/go v1.36.5-20241120201313-68e42a58b301.1 // indirect
+	buf.build/gen/go/cosmos/gogo-proto/protocolbuffers/go v1.36.5-20240130113600-88ef6483f90f.1 // indirect
 	cloud.google.com/go v0.112.1 // indirect
 	cloud.google.com/go/compute/metadata v0.7.0 // indirect
 	cloud.google.com/go/iam v1.1.6 // indirect
@@ -215,6 +217,7 @@ require (
 // Below are the long-lived replace for tests.
 replace (
 	// We always want to test against the latest version of the simapp.
+	cosmossdk.io/api => ../api
 	cosmossdk.io/simapp => ../simapp
 	cosmossdk.io/store => ../store
 	cosmossdk.io/x/circuit => ../x/circuit
