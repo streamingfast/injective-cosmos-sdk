@@ -1,19 +1,5 @@
 name: Build & Push SDK Proto Builder
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - "contrib/devtools/Dockerfile"
-  workflow_dispatch:
-    inputs:
-      tags:
-        description: "Docker image tags"
-        required: true
-        type: string
-  pull_request:
-    paths:
-      - "contrib/devtools/Dockerfile"
+on: []
 
 env:
   REGISTRY: ghcr.io

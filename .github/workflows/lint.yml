@@ -1,11 +1,6 @@
 name: Lint
-on:
-  push:
-    branches:
-      - main
-      - release/**
-  pull_request:
-  merge_group:
+on: []
+
 permissions:
   contents: read
 

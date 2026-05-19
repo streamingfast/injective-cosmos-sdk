@@ -1,9 +1,6 @@
 name: Remove GitHub Action Old Artifacts
 
-on:
-  schedule:
-    # Every day at 1am
-    - cron: "0 1 * * *"
+on: []
 
 jobs:
   remove-old-artifacts:

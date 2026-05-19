@@ -1,9 +1,7 @@
 name: Release Confix
 
-on:
-  push:
-    tags:
-      - "tools/confix/v*.*.*"
+on: []
+
 permissions:
   contents: read
 

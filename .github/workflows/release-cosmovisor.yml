@@ -1,9 +1,7 @@
 name: Release Cosmovisor
 
-on:
-  push:
-    tags:
-      - "tools/cosmovisor/v*.*.*"
+on: []
+
 permissions:
   contents: read
 

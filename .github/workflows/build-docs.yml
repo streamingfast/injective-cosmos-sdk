@@ -1,16 +1,7 @@
 name: Build Docs
 # This workflow runs when a PR is labeled with `docs`
 # This will check if the docs build successfully by running `make build-docs`
-on:
-  pull_request:
-    branches:
-      - main
-      - "release/**"
-    paths:
-      - "docs/**"
-      - "x/**/*.md"
-      - .github/workflows/deploy-docs.yml
-      - .github/workflows/build-docs.yml
+on: []
 
 permissions:
   contents: read

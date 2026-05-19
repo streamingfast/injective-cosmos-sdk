@@ -1,9 +1,7 @@
 name: Release Simd
 
-on:
-  push:
-    tags:
-      - "simd/v*.*.*"
+on: []
+
 permissions:
   contents: read
 

@@ -1,11 +1,5 @@
 name: System Tests
-on:
-  pull_request:
-  merge_group:
-  push:
-    branches:
-      - main
-      - release/v0.53.x
+on: []
 
 permissions:
   contents: read

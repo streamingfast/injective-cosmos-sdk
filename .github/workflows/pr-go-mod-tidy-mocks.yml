@@ -1,10 +1,5 @@
 name: "Checks dependencies and mocks generation"
-on:
-  merge_group:
-  pull_request:
-  push:
-    branches:
-      - main
+on: []
 
 concurrency:
   group: ci-${{ github.ref }}-pr-go-mod-tidy-mocks

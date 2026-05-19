@@ -1,11 +1,6 @@
 name: "Warn about consensus code changes"
 
-on:
-  pull_request_target:
-    types:
-      - opened
-      - edited
-      - synchronize
+on: []
 
 jobs:
   main:
