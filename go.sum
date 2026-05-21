@@ -677,10 +677,10 @@ github.com/spf13/viper v1.19.0/go.mod h1:GQUN9bilAbhU/jgc1bKs99f/suXKeUMct8Adx5+
 github.com/streadway/amqp v0.0.0-20190404075320-75d898a42a94/go.mod h1:AZpEONHx3DKn8O/DFsRAY58/XVQiIPMTMB1SddzLXVw=
 github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271/go.mod h1:AZpEONHx3DKn8O/DFsRAY58/XVQiIPMTMB1SddzLXVw=
 github.com/streadway/handy v0.0.0-20190108123426-d5acb3125c2a/go.mod h1:qNTQ5P5JnDBl6z3cMAg/SywNDC5ABu5ApDIw6lUbRmI=
-github.com/streamingfast/cometbft v1.0.1-inj.7-firehose h1:ptw7jhAoLjyczcaef/awuU6fKkpBtl4pRjVtmA8M1JA=
-github.com/streamingfast/cometbft v1.0.1-inj.7-firehose/go.mod h1:GjHzF+48UzwdWUUG4uUD+e52h2L6Pq9rK4eL+oYIyBU=
-github.com/streamingfast/cometbft/api v1.0.0-inj.3-firehose h1:PWf7yyxrSISNCtzBwhVlGHZIAg/RWti69gVBtPR9qJA=
-github.com/streamingfast/cometbft/api v1.0.0-inj.3-firehose/go.mod h1:rr73UKPAv9CIvQBxZZ3KEVGIl2BUpOncx1krVXmOg1g=
+github.com/streamingfast/cometbft v1.0.1-inj.v1.19.0-rollback-firehose h1:oUuOxPHRpu4KnrlvuV2GUywOmDCROJ+JjVN/0xBXuWo=
+github.com/streamingfast/cometbft v1.0.1-inj.v1.19.0-rollback-firehose/go.mod h1:GjHzF+48UzwdWUUG4uUD+e52h2L6Pq9rK4eL+oYIyBU=
+github.com/streamingfast/cometbft/api v1.0.1-inj.v1.19.0-rollback-firehose h1:EHzbb7kPLNH41VxA95ukpCEwr2IhECIRHQkvacoOegE=
+github.com/streamingfast/cometbft/api v1.0.1-inj.v1.19.0-rollback-firehose/go.mod h1:rr73UKPAv9CIvQBxZZ3KEVGIl2BUpOncx1krVXmOg1g=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=

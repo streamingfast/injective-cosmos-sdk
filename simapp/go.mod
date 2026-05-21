@@ -35,6 +35,8 @@ require (
 require github.com/cometbft/cometbft/api v1.0.0
 
 require (
+	buf.build/gen/go/cometbft/cometbft/protocolbuffers/go v1.36.5-20241120201313-68e42a58b301.1 // indirect
+	buf.build/gen/go/cosmos/gogo-proto/protocolbuffers/go v1.36.5-20240130113600-88ef6483f90f.1 // indirect
 	cloud.google.com/go v0.112.1 // indirect
 	cloud.google.com/go/compute/metadata v0.7.0 // indirect
 	cloud.google.com/go/iam v1.1.6 // indirect
@@ -217,6 +219,8 @@ require (
 
 // Below are the long-lived replace of the SimApp
 replace (
+	// Simapp always use the latest version of the api (we actually forgot to do this when we did the original EIP712_V2)
+	cosmossdk.io/api => ../api
 	cosmossdk.io/store => ../store
 	cosmossdk.io/x/circuit => ../x/circuit
 	cosmossdk.io/x/evidence => ../x/evidence
@@ -230,6 +234,7 @@ replace (
 
 	// Simapp always use the latest version of the cosmos-sdk
 	github.com/cosmos/cosmos-sdk => ../.
+
 	// Fix upstream GHSA-h395-qcrw-5vmq and GHSA-3vp4-m3rf-835h vulnerabilities.
 	// TODO Remove it: https://github.com/cosmos/cosmos-sdk/issues/10409
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1
@@ -238,7 +243,7 @@ replace (
 )
 
 replace (
-	// Use CometBFT v1.0.1 with Mempool lanes and DOG
-	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.7
-	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.0-inj.3
+	// Use CometBFT rollback build
+	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.v1.19.0-rollback
+	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.1-inj.v1.19.0-rollback
 )
