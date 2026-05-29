@@ -210,6 +210,10 @@ type BaseApp struct {
 	EnableStreamer bool
 	StreamEvents   chan StreamEvents
 
+	EnablePublish bool
+	PublishEvents chan PublishEventFlush
+	flushData     PublishEventFlush
+
 	traceFlightRecorder flightrecorder.TraceFlightRecorder
 
 	// txResultsPostHook can be used to alter TxResults inside block results,
@@ -241,6 +245,7 @@ func NewBaseApp(
 		queryGasLimit:    math.MaxUint64,
 		StreamEvents:     make(chan StreamEvents),
 		meter:            metrics.NewNilMeter(),
+		PublishEvents: make(chan PublishEventFlush),
 	}
 
 	for _, option := range options {
