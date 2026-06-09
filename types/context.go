@@ -96,9 +96,6 @@ func (c Context) IsSigverifyTx() bool                           { return c.sigve
 func (c Context) ExecMode() ExecMode                            { return c.execMode }
 func (c Context) MinGasPrices() DecCoins                        { return c.minGasPrice }
 func (c Context) EventManager() EventManagerI                   { return c.eventManager }
-func (c Context) PublishEventManager() PublishEventManagerI {
-	return &EventPlaceholderManager{c.eventManager, c.publishEventManager}
-}
 func (c Context) Priority() int64                               { return c.priority }
 func (c Context) KVGasConfig() storetypes.GasConfig             { return c.kvGasConfig }
 func (c Context) TransientKVGasConfig() storetypes.GasConfig    { return c.transientKVGasConfig }
@@ -107,6 +104,12 @@ func (c Context) CometInfo() comet.BlockInfo                    { return c.comet
 func (c Context) HeaderInfo() header.Info                       { return c.headerInfo }
 func (c Context) TxIndex() int                                  { return c.txIndex }
 func (c Context) MsgIndex() int                                 { return c.msgIndex }
+func (c Context) PublishEventManager() PublishEventManagerI {
+	return &EventPlaceholderManager{
+		c.eventManager,
+		c.publishEventManager,
+	}
+}
 
 // clone the header before returning
 func (c Context) BlockHeader() cmtproto.Header {
@@ -405,17 +408,20 @@ func (c Context) ObjectStore(key storetypes.StoreKey) storetypes.ObjKVStore {
 // EventManager when the caller executes the write.
 func (c Context) CacheContext() (cc Context, writeCache func()) {
 	cms := c.ms.CacheMultiStore()
-	cc = c.WithMultiStore(cms).WithEventManager(NewEventManager()).WithPublishEventManager(NewPublishEventManager())
+	cc = c.WithMultiStore(cms).WithEventManager(NewEventManager())
+	cc = cc.WithPublishEventManager(NewPublishEventManager())
 
 	writeCache = func() {
 		c.EventManager().EmitEvents(cc.EventManager().Events())
 
 		pem := c.PublishEventManager()
-		// EventPlaceholderManager already emitted event placeholders to the EventManager
-		// so we do not emit them again by unwrapping it.
+		// pem contains EventPlaceholderManager within the interface and by the time this callback is called
+		// it already put placeholder events in the regular EventManager whenever PublishEvent was called.
+		// We just need to forward the published events to the original context (see PublishEventManager method of sdk Context)
 		if pem.(*EventPlaceholderManager) != nil {
 			pem = pem.(*EventPlaceholderManager).publishEventManager
 		}
+
 		pem.EmitEvents(cc.PublishEventManager().Events())
 
 		cms.Write()

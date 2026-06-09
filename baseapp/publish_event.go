@@ -2,7 +2,7 @@ package baseapp
 
 import (
 	abci "github.com/cometbft/cometbft/abci/types"
-	types "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types"
 )
 
 type EventType byte

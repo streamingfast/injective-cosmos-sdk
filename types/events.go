@@ -341,3 +341,69 @@ func MarkEventsToIndex(events []abci.Event, indexSet map[string]struct{}) []abci
 
 	return updatedEvents
 }
+
+type PublishEventManagerI interface {
+	Events() PublishEvents
+	EmitEvent(event PublishEvent)
+	EmitEvents(events PublishEvents)
+}
+
+var _ PublishEventManagerI = (*PublishEventManager)(nil)
+
+// PublishEventManager implements a simple wrapper around a slice of PublishEvent objects that
+// can be emitted from.
+type PublishEventManager struct {
+	events PublishEvents
+}
+
+func NewPublishEventManager() *PublishEventManager {
+	return &PublishEventManager{make(PublishEvents, 0)}
+}
+
+func (em *PublishEventManager) Events() PublishEvents { return em.events }
+
+func (em *PublishEventManager) EmitEvent(event PublishEvent) {
+	em.events = append(em.events, event)
+}
+
+func (em *PublishEventManager) EmitEvents(events PublishEvents) {
+	em.events = append(em.events, events...)
+}
+
+type PublishEvent interface {
+	Serialize() ([]byte, error)
+}
+
+type PublishEvents []PublishEvent
+
+const PlaceholderEventType = "publish event placeholder"
+
+var _ PublishEventManagerI = (*EventPlaceholderManager)(nil)
+
+// EventPlaceholderManager is used to preserve event emission order between EmitEvent and PublishEvent calls.
+// Since published events go into a different pipeline than regular events empty placeholders are put into
+// the regular EventManager and later stripped during block finalization (see abci.go for more details).
+type EventPlaceholderManager struct {
+	eventManager        EventManagerI
+	publishEventManager PublishEventManagerI
+}
+
+func (e *EventPlaceholderManager) Events() PublishEvents {
+	return e.publishEventManager.Events()
+}
+
+func (e *EventPlaceholderManager) EmitEvent(event PublishEvent) {
+	e.publishEventManager.EmitEvent(event)
+	e.eventManager.EmitEvent(NewEvent(PlaceholderEventType))
+}
+
+func (e *EventPlaceholderManager) EmitEvents(events PublishEvents) {
+	e.publishEventManager.EmitEvents(events)
+
+	placeholders := make(Events, 0, len(events))
+	for _, _ = range events {
+		placeholders = append(placeholders, NewEvent(PlaceholderEventType))
+	}
+
+	e.eventManager.EmitEvents(placeholders)
+}
