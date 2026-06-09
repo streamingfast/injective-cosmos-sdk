@@ -26,8 +26,10 @@ type PublishEventFlush struct {
 	TxEvents    []EventSet
 }
 
-func (app *BaseApp) PublishBlockEvents(flush PublishEventFlush) {
+func (app *BaseApp) publishEvents(commitHash []byte) {
+	app.flushData.NewAppHash = commitHash
+
 	if app.EnablePublish {
-		app.PublishEvents <- flush
+		app.PublishEvents <- app.flushData
 	}
 }

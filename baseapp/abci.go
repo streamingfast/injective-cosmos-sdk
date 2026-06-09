@@ -923,19 +923,22 @@ func (app *BaseApp) executeTxs(ctx context.Context, txs [][]byte) ([]*abci.ExecT
 }
 
 func filterOutPublishEvents(events []abci.Event) ([]abci.Event, []EventType) {
-	var filteredEvents []abci.Event
-	var trueOrder []EventType
+	var (
+		abciEvents = make([]abci.Event, 0, len(events))
+		ordering   = make([]EventType, 0, len(events))
+	)
 
 	for _, e := range events {
 		if e.Type == sdk.PlaceholderEventType {
-			trueOrder = append(trueOrder, EventTypePublish)
+			ordering = append(ordering, EventTypePublish)
 			continue
 		}
-		filteredEvents = append(filteredEvents, e)
-		trueOrder = append(trueOrder, EventTypeAbci)
+
+		abciEvents = append(abciEvents, e)
+		ordering = append(ordering, EventTypeAbci)
 	}
 
-	return filteredEvents, trueOrder
+	return abciEvents, ordering
 }
 
 // FinalizeBlock will execute the block proposal provided by RequestFinalizeBlock.
@@ -1027,8 +1030,7 @@ func (app *BaseApp) Commit() (*abci.CommitResponse, error) {
 
 	commitId := app.cms.Commit()
 
-	app.flushData.NewAppHash = commitId.Hash
-	app.PublishBlockEvents(app.flushData)
+	app.publishEvents(commitId.Hash)
 
 	resp := &abci.CommitResponse{
 		RetainHeight: retainHeight,
