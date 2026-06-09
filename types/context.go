@@ -416,7 +416,7 @@ func (c Context) CacheContext() (cc Context, writeCache func()) {
 
 		pem := c.PublishEventManager()
 		// pem contains EventPlaceholderManager within the interface and by the time this callback is called
-		// it already put placeholder events in the regular EventManager whenever PublishEvent was called.
+		// it already put placeholder events in the regular EventManager whenever a published event was emitted.
 		// We just need to forward the published events to the original context (see PublishEventManager method of sdk Context)
 		if pem.(*EventPlaceholderManager) != nil {
 			pem = pem.(*EventPlaceholderManager).publishEventManager

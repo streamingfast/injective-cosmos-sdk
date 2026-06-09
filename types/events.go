@@ -343,44 +343,37 @@ func MarkEventsToIndex(events []abci.Event, indexSet map[string]struct{}) []abci
 }
 
 type PublishEventManagerI interface {
-	Events() PublishEvents
-	EmitEvent(event PublishEvent)
-	EmitEvents(events PublishEvents)
+	Events() []proto.Message
+	EmitEvent(event proto.Message)
+	EmitEvents(events []proto.Message)
 }
 
 var _ PublishEventManagerI = (*PublishEventManager)(nil)
 
-// PublishEventManager implements a simple wrapper around a slice of PublishEvent objects that
-// can be emitted from.
+// PublishEventManager implements a simple wrapper around a slice of proto messages that can be used to publish events.
 type PublishEventManager struct {
-	events PublishEvents
+	events []proto.Message
 }
 
 func NewPublishEventManager() *PublishEventManager {
-	return &PublishEventManager{make(PublishEvents, 0)}
+	return &PublishEventManager{make([]proto.Message, 0)}
 }
 
-func (em *PublishEventManager) Events() PublishEvents { return em.events }
+func (em *PublishEventManager) Events() []proto.Message { return em.events }
 
-func (em *PublishEventManager) EmitEvent(event PublishEvent) {
+func (em *PublishEventManager) EmitEvent(event proto.Message) {
 	em.events = append(em.events, event)
 }
 
-func (em *PublishEventManager) EmitEvents(events PublishEvents) {
+func (em *PublishEventManager) EmitEvents(events []proto.Message) {
 	em.events = append(em.events, events...)
 }
-
-type PublishEvent interface {
-	Serialize() ([]byte, error)
-}
-
-type PublishEvents []PublishEvent
 
 const PlaceholderEventType = "publish event placeholder"
 
 var _ PublishEventManagerI = (*EventPlaceholderManager)(nil)
 
-// EventPlaceholderManager is used to preserve event emission order between EmitEvent and PublishEvent calls.
+// EventPlaceholderManager is used to preserve event emission order between regular and published events.
 // Since published events go into a different pipeline than regular events empty placeholders are put into
 // the regular EventManager and later stripped during block finalization (see abci.go for more details).
 type EventPlaceholderManager struct {
@@ -388,16 +381,16 @@ type EventPlaceholderManager struct {
 	publishEventManager PublishEventManagerI
 }
 
-func (e *EventPlaceholderManager) Events() PublishEvents {
+func (e *EventPlaceholderManager) Events() []proto.Message {
 	return e.publishEventManager.Events()
 }
 
-func (e *EventPlaceholderManager) EmitEvent(event PublishEvent) {
+func (e *EventPlaceholderManager) EmitEvent(event proto.Message) {
 	e.publishEventManager.EmitEvent(event)
 	e.eventManager.EmitEvent(NewEvent(PlaceholderEventType))
 }
 
-func (e *EventPlaceholderManager) EmitEvents(events PublishEvents) {
+func (e *EventPlaceholderManager) EmitEvents(events []proto.Message) {
 	e.publishEventManager.EmitEvents(events)
 
 	placeholders := make(Events, 0, len(events))

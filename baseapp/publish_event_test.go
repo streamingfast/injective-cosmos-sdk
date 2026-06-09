@@ -8,6 +8,7 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	dbm "github.com/cosmos/cosmos-db"
+	"github.com/cosmos/gogoproto/proto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
@@ -16,19 +17,21 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-var _ types.PublishEvent = (*StringPublishEvent)(nil)
+var _ proto.Message = StringPublishEvent{}
 
 type StringPublishEvent struct {
 	data string
 }
 
-func (e StringPublishEvent) ToString() string {
+func (e StringPublishEvent) Reset() {
+	e = StringPublishEvent{}
+}
+
+func (e StringPublishEvent) String() string {
 	return e.data
 }
 
-func (e StringPublishEvent) Serialize() ([]byte, error) {
-	return []byte(e.data), nil
-}
+func (StringPublishEvent) ProtoMessage() {}
 
 func getStreamEventFlushChan(app *baseapp.BaseApp) chan baseapp.PublishEventFlush {
 	app.EnablePublish = true

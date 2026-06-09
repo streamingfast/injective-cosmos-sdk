@@ -2,7 +2,7 @@ package baseapp
 
 import (
 	abci "github.com/cometbft/cometbft/abci/types"
-	"github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/gogoproto/proto"
 )
 
 type EventType byte
@@ -14,7 +14,7 @@ const (
 
 type EventSet struct {
 	AbciEvents    []abci.Event
-	PublishEvents types.PublishEvents
+	PublishEvents []proto.Message
 	TrueOrder     []EventType
 }
 

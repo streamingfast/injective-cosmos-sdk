@@ -16,6 +16,7 @@ import (
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	cmttypes "github.com/cometbft/cometbft/types"
 	dbm "github.com/cosmos/cosmos-db"
+	"github.com/cosmos/gogoproto/proto"
 	"github.com/stretchr/testify/require"
 
 	runtimev1alpha1 "cosmossdk.io/api/cosmos/app/runtime/v1alpha1"
@@ -116,7 +117,7 @@ func (m MsgKeyValueImpl) Set(ctx context.Context, msg *baseapptestutil.MsgKeyVal
 	return &baseapptestutil.MsgCreateKeyValueResponse{}, nil
 }
 
-var _ sdk.PublishEvent = (*TestPublishEvent)(nil)
+var _ proto.Message = (*TestPublishEvent)(nil)
 
 type TestPublishEvent struct {
 	Type       string            `json:"type,omitempty"`
@@ -130,17 +131,15 @@ func NewTestPublishEvent(typ string, attributes map[string]string) *TestPublishE
 	}
 }
 
-func (b *TestPublishEvent) Serialize() ([]byte, error) {
-	bz, err := json.Marshal(b)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal test publish event: %w", err)
-	}
-	return bz, nil
+func (b *TestPublishEvent) Reset() {
+	*b = TestPublishEvent{}
 }
 
-func (b *TestPublishEvent) ToString() string {
+func (b *TestPublishEvent) String() string {
 	return fmt.Sprintf("%s: %s", b.Type, b.Attributes)
 }
+
+func (*TestPublishEvent) ProtoMessage() {}
 
 type CounterServerImplGasMeterOnly struct {
 	gas uint64

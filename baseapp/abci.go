@@ -720,7 +720,7 @@ func (app *BaseApp) VerifyVoteExtension(req *abci.VerifyVoteExtensionRequest) (r
 // must be used.
 func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.FinalizeBlockRequest) (res *abci.FinalizeBlockResponse, err error) {
 	var events []abci.Event
-	var publishEvents sdk.PublishEvents
+	var publishEvents []proto.Message
 
 	if err = app.checkHalt(req.Height, req.Time); err != nil {
 		return nil, err
@@ -919,7 +919,6 @@ func (app *BaseApp) executeTxs(ctx context.Context, txs [][]byte) ([]*abci.ExecT
 		txResults = app.txResultsPostHook(txResults)
 	}
 
-	//return txResults, nil
 	return txResults, txEventSet, nil
 }
 
