@@ -245,7 +245,7 @@ func NewBaseApp(
 		queryGasLimit:    math.MaxUint64,
 		StreamEvents:     make(chan StreamEvents),
 		meter:            metrics.NewNilMeter(),
-		PublishEvents: make(chan PublishEventFlush),
+		PublishEvents:    make(chan PublishEventFlush),
 	}
 
 	for _, option := range options {
