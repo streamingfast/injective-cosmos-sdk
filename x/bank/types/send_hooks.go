@@ -6,7 +6,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-type PostSendHook func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin)
+type PostSendHook func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) error
 
 func (h PostSendHook) Then(second PostSendHook) PostSendHook {
 	if h == nil {
@@ -15,9 +15,11 @@ func (h PostSendHook) Then(second PostSendHook) PostSendHook {
 	if second == nil {
 		return h
 	}
-	return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) {
-		h(ctx, fromAddr, toAddr, amt)
-		second(ctx, fromAddr, toAddr, amt)
+	return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) error {
+		if err := h(ctx, fromAddr, toAddr, amt); err != nil {
+			return err
+		}
+		return second(ctx, fromAddr, toAddr, amt)
 	}
 }
 
@@ -39,22 +41,22 @@ func (r *PostSendHookWrapper) Append(hook PostSendHook) {
 	r.fn = r.fn.Then(hook)
 }
 
-// Prepend adds the provided restriction to this, to be run before the existing function.
+// Prepend adds the provided hook to this, to be run before the existing function.
 func (r *PostSendHookWrapper) Prepend(hook PostSendHook) {
 	r.fn = hook.Then(r.fn)
 }
 
-// Clear removes the send restriction (sets it to nil).
+// Clear removes the post-send hook (sets it to nil).
 func (r *PostSendHookWrapper) Clear() {
 	r.fn = nil
 }
 
 var _ PostSendHook = (*PostSendHookWrapper)(nil).Apply
 
-// Apply applies the send restriction if there is one. If not, it's a no-op.
-func (r *PostSendHookWrapper) Apply(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) {
+// Apply runs the post-send hook if there is one. If not, it's a no-op.
+func (r *PostSendHookWrapper) Apply(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) error {
 	if r == nil || r.fn == nil {
-		return
+		return nil
 	}
-	r.fn(ctx, fromAddr, toAddr, amt)
+	return r.fn(ctx, fromAddr, toAddr, amt)
 }

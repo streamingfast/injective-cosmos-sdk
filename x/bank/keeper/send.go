@@ -207,7 +207,9 @@ func (k BaseSendKeeper) InputOutputCoins(ctx context.Context, input types.Input,
 	for _, out := range outputs {
 		for _, coin := range out.Coins {
 			if k.postSendHook != nil {
-				k.postSendHook.Apply(sdkCtx, inAddress, newToAddresses[cnt], coin)
+				if err := k.postSendHook.Apply(sdkCtx, inAddress, newToAddresses[cnt], coin); err != nil {
+					return err
+				}
 			}
 			cnt++
 		}
@@ -253,7 +255,9 @@ func (k BaseSendKeeper) SendCoins(ctx context.Context, fromAddr, toAddr sdk.AccA
 	// first wait for all coins in the basket to be sent, and only after call post send hook
 	for i, coin := range amt {
 		if k.postSendHook != nil {
-			k.postSendHook.Apply(sdkCtx, fromAddr, newToAddresses[i], coin)
+			if err := k.postSendHook.Apply(sdkCtx, fromAddr, newToAddresses[i], coin); err != nil {
+				return err
+			}
 		}
 	}
 
