@@ -813,6 +813,7 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 		// continue
 	}
 
+	// accumulation of PreBLock and BeginBlock published events
 	publishEvents = append(publishEvents, app.finalizeBlockState.Context().PublishEventManager().Events()...)
 	events = append(events, beginBlock.Events...)
 
@@ -849,6 +850,7 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 		// continue
 	}
 
+	// accumulation of EndBlock published events
 	publishEvents = append(publishEvents, app.finalizeBlockState.Context().PublishEventManager().Events()...)
 
 	events = append(events, endBlock.Events...)
