@@ -77,13 +77,40 @@ jobs:
             core.setOutput('base_remote_ref', `origin/${pullRequest.base.ref}`);
 
       - name: Checkout pull request head
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: refs/pull/${{ steps.pr.outputs.number }}/head
           fetch-depth: 0
-          # Keep checkout authentication just long enough to fetch a private base
-          # branch below. It is removed before Codex runs.
-          persist-credentials: true
+          # Authenticate the private base fetch for that command only; never
+          # leave the repository token available to the unsandboxed review.
+          persist-credentials: false
+
+      - name: Fetch pull request base
+        env:
+          BASE_REF: ${{ steps.pr.outputs.base_ref }}
+          FETCH_TOKEN: ${{ github.token }}
+          SERVER_URL: ${{ github.server_url }}
+        run: |
+          set -euo pipefail
+
+          : "${BASE_REF:?Missing PR base branch}"
+          : "${FETCH_TOKEN:?Missing repository token}"
+          : "${SERVER_URL:?Missing GitHub server URL}"
+
+          auth_header="$(printf 'x-access-token:%s' "${FETCH_TOKEN}" | base64 -w 0)"
+          echo "::add-mask::${auth_header}"
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.${SERVER_URL}/.extraheader" \
+            GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth_header}" \
+            git fetch --no-tags origin \
+              "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          unset auth_header FETCH_TOKEN
+
+          if git config --show-origin --name-only \
+            --get-regexp '^http\..*\.extraheader$' >/dev/null; then
+            echo "Persisted Git HTTP credentials remain after the base fetch." >&2
+            exit 1
+          fi
 
       - name: Resolve review range
         id: review_range
@@ -95,9 +122,6 @@ jobs:
 
           : "${BASE_REF:?Missing PR base branch}"
           : "${EXPECTED_HEAD_SHA:?Missing PR head SHA}"
-
-          git fetch --no-tags origin \
-            "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 
           head_sha="$(git rev-parse HEAD)"
           if [ "${head_sha}" != "${EXPECTED_HEAD_SHA}" ]; then
@@ -114,14 +138,6 @@ jobs:
           echo "review_commit_count=${review_commit_count}" >> "$GITHUB_OUTPUT"
           echo "Reviewing ${review_commit_count} commit(s): ${merge_base_sha}...${head_sha} against ${base_remote_ref} (${base_sha})."
           git diff --stat "${merge_base_sha}...${head_sha}"
-
-      - name: Remove checkout credentials
-        if: always()
-        run: |
-          set -euo pipefail
-          while IFS= read -r key; do
-            git config --local --unset-all "$key"
-          done < <(git config --local --name-only --get-regexp '^http\..*\.extraheader$' || true)
 
       - name: Setup Go with cache
         id: codex-go-cache
