@@ -78,7 +78,6 @@ jobs:
           # with the PR's actual base branch.
           ref: refs/pull/${{ env.PR_NUMBER }}/head
           fetch-depth: 0
-          persist-credentials: false
 
       - name: Resolve review refs
         id: pr-vars
@@ -98,6 +97,13 @@ jobs:
           git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
           git merge-base HEAD "origin/${BASE_REF}" >/dev/null
           echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Remove checkout credentials
+        run: |
+          set -euo pipefail
+          while IFS= read -r key; do
+            git config --local --unset-all "$key"
+          done < <(git config --local --name-only --get-regexp '^http\..*\.extraheader$' || true)
 
       - name: Setup Go with cache
         id: codex-go-cache
