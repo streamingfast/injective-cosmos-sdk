@@ -722,6 +722,7 @@ func (s *E2ETestSuite) TestExecDelegateAuthorization() {
 			"valid txn: (delegate half tokens)",
 			[]string{
 				execMsg.Name(),
+				fmt.Sprintf("--%s=%s", flags.FlagGas, "250000"),
 				fmt.Sprintf("--%s=%s", flags.FlagFrom, grantee.String()),
 				fmt.Sprintf("--%s=%s", flags.FlagBroadcastMode, flags.BroadcastSync),
 				fmt.Sprintf("--%s=%s", flags.FlagFees, sdk.NewCoins(sdk.NewCoin(s.cfg.BondDenom, math.NewInt(10))).String()),
@@ -735,6 +736,7 @@ func (s *E2ETestSuite) TestExecDelegateAuthorization() {
 			"valid txn: (delegate remaining half tokens)",
 			[]string{
 				execMsg.Name(),
+				fmt.Sprintf("--%s=%s", flags.FlagGas, "250000"),
 				fmt.Sprintf("--%s=%s", flags.FlagFrom, grantee.String()),
 				fmt.Sprintf("--%s=%s", flags.FlagBroadcastMode, flags.BroadcastSync),
 				fmt.Sprintf("--%s=%s", flags.FlagFees, sdk.NewCoins(sdk.NewCoin(s.cfg.BondDenom, math.NewInt(10))).String()),
@@ -748,6 +750,7 @@ func (s *E2ETestSuite) TestExecDelegateAuthorization() {
 			"failed with error no authorization found",
 			[]string{
 				execMsg.Name(),
+				fmt.Sprintf("--%s=%s", flags.FlagGas, "250000"),
 				fmt.Sprintf("--%s=%s", flags.FlagFrom, grantee.String()),
 				fmt.Sprintf("--%s=%s", flags.FlagBroadcastMode, flags.BroadcastSync),
 				fmt.Sprintf("--%s=%s", flags.FlagFees, sdk.NewCoins(sdk.NewCoin(s.cfg.BondDenom, math.NewInt(10))).String()),
@@ -815,6 +818,7 @@ func (s *E2ETestSuite) TestExecDelegateAuthorization() {
 			"valid txn",
 			[]string{
 				execMsg.Name(),
+				fmt.Sprintf("--%s=%s", flags.FlagGas, "250000"),
 				fmt.Sprintf("--%s=%s", flags.FlagFrom, grantee.String()),
 				fmt.Sprintf("--%s=%s", flags.FlagBroadcastMode, flags.BroadcastSync),
 				fmt.Sprintf("--%s=%s", flags.FlagFees, sdk.NewCoins(sdk.NewCoin(s.cfg.BondDenom, math.NewInt(10))).String()),
@@ -865,6 +869,7 @@ func (s *E2ETestSuite) TestExecDelegateAuthorization() {
 
 	args := []string{
 		execMsg.Name(),
+		fmt.Sprintf("--%s=%s", flags.FlagGas, "250000"),
 		fmt.Sprintf("--%s=%s", flags.FlagFrom, grantee.String()),
 		fmt.Sprintf("--%s=%s", flags.FlagBroadcastMode, flags.BroadcastSync),
 		fmt.Sprintf("--%s=%s", flags.FlagFees, sdk.NewCoins(sdk.NewCoin(s.cfg.BondDenom, math.NewInt(10))).String()),
