@@ -26,6 +26,7 @@ type SendKeeper interface {
 	AppendSendRestriction(restriction types.SendRestrictionFn)
 	PrependSendRestriction(restriction types.SendRestrictionFn)
 	ClearSendRestriction()
+	AppendPostSendHook(postHook types.PostSendHook)
 
 	InputOutputCoins(ctx context.Context, input types.Input, outputs []types.Output) error
 	SendCoins(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) error
@@ -71,6 +72,7 @@ type BaseSendKeeper struct {
 	authority string
 
 	sendRestriction *sendRestriction
+	postSendHook    *types.PostSendHookWrapper
 }
 
 func NewBaseSendKeeper(
@@ -97,6 +99,7 @@ func NewBaseSendKeeper(
 		authority:       authority,
 		logger:          logger,
 		sendRestriction: newSendRestriction(),
+		postSendHook:    types.NewPostSendHook(),
 	}
 }
 
@@ -113,6 +116,11 @@ func (k BaseSendKeeper) PrependSendRestriction(restriction types.SendRestriction
 // ClearSendRestriction removes the send restriction (if there is one).
 func (k BaseSendKeeper) ClearSendRestriction() {
 	k.sendRestriction.clear()
+}
+
+// AppendPostSendHook adds the provided post send hook to run after every successful send.
+func (k BaseSendKeeper) AppendPostSendHook(postHook types.PostSendHook) {
+	k.postSendHook.Append(postHook)
 }
 
 // GetAuthority returns the x/bank module's authority.
@@ -151,6 +159,8 @@ func (k BaseSendKeeper) SetParams(ctx context.Context, params types.Params) (err
 // InputOutputCoins performs multi-send functionality. It accepts an
 // input that corresponds to a series of outputs. It returns an error if the
 // input and outputs don't line up or if any single transfer of tokens fails.
+// Each transfer and its post-send hook are atomic, but successful earlier
+// transfers are not rolled back by this method when a later transfer fails.
 func (k BaseSendKeeper) InputOutputCoins(ctx context.Context, input types.Input, outputs []types.Output) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	defer k.Meter(ctx).FuncTiming(&sdkCtx, "InputOutputCoins")(&err)
@@ -177,13 +187,7 @@ func (k BaseSendKeeper) InputOutputCoins(ctx context.Context, input types.Input,
 		}
 
 		for _, coin := range out.Coins {
-			newOutAddress, err := k.sendRestriction.apply(sdkCtx, inAddress, outAddress, coin)
-			if err != nil {
-				return err
-			}
-
-			err = k.sendCoins(sdkCtx, inAddress, newOutAddress, sdk.NewCoins(coin))
-			if err != nil {
+			if err = k.sendCoin(sdkCtx, inAddress, outAddress, coin); err != nil {
 				return err
 			}
 		}
@@ -200,7 +204,8 @@ func (k BaseSendKeeper) InputOutputCoins(ctx context.Context, input types.Input,
 }
 
 // SendCoins transfers amt coins from a sending account to a receiving account.
-// An error is returned upon failure.
+// An error is returned upon failure. Each coin and its post-send hook are
+// atomic, but this method does not roll back earlier coins when a later coin fails.
 func (k BaseSendKeeper) SendCoins(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	defer k.Meter(ctx).FuncTiming(&sdkCtx, "SendCoins")(&err)
@@ -210,13 +215,7 @@ func (k BaseSendKeeper) SendCoins(ctx context.Context, fromAddr, toAddr sdk.AccA
 	}
 
 	for _, coin := range amt {
-		newToAddr, err := k.sendRestriction.apply(sdkCtx, fromAddr, toAddr, coin)
-		if err != nil {
-			return err
-		}
-
-		err = k.sendCoins(sdkCtx, fromAddr, newToAddr, sdk.NewCoins(coin))
-		if err != nil {
+		if err = k.sendCoin(sdkCtx, fromAddr, toAddr, coin); err != nil {
 			return err
 		}
 	}
@@ -231,11 +230,39 @@ func (k BaseSendKeeper) SendCoins(ctx context.Context, fromAddr, toAddr sdk.AccA
 	return nil
 }
 
+// sendCoin applies restrictions, moves one coin, and runs its post-send hook
+// atomically. Successful earlier coins remain in the caller's context if a
+// later coin fails.
+func (k BaseSendKeeper) sendCoin(ctx sdk.Context, fromAddr, toAddr sdk.AccAddress, coin sdk.Coin) error {
+	cacheCtx, writeCache := ctx.CacheContext()
+
+	newToAddr, err := k.sendRestriction.apply(cacheCtx, fromAddr, toAddr, coin)
+	if err != nil {
+		return err
+	}
+
+	if err = k.sendCoins(cacheCtx, fromAddr, newToAddr, sdk.NewCoins(coin)); err != nil {
+		return err
+	}
+
+	if k.postSendHook != nil {
+		if err = k.postSendHook.Apply(cacheCtx, fromAddr, newToAddr, coin); err != nil {
+			return err
+		}
+	}
+
+	writeCache()
+	return nil
+}
+
 func (k BaseSendKeeper) sendCoins(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	defer k.Meter(ctx).FuncTiming(&sdkCtx, "sendCoins")(&err)
 
-	err = k.subUnlockedCoins(sdkCtx, fromAddr, amt, true) // only sub this coin
+	// An earlier post-send hook may have changed or locked the sender's
+	// remaining balance, so revalidate against this transfer's cache before
+	// debiting it.
+	err = k.subUnlockedCoins(sdkCtx, fromAddr, amt, false)
 	if err != nil {
 		return err
 	}

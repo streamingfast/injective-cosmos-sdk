@@ -219,8 +219,11 @@ func TestABCI_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 	name := t.Name()
 	db := dbm.NewMemDB()
 	app := baseapp.NewBaseApp(name, log.NewTestLogger(t), db, nil)
+	beginBlockDoNotFailFast := false
+	endBlockDoNotFailFast := false
 
 	app.SetBeginBlocker(func(ctx sdk.Context) (sdk.BeginBlock, error) {
+		beginBlockDoNotFailFast = ctx.Value(baseapp.DoNotFailFastSendContextKey) != nil
 		return sdk.BeginBlock{
 			Events: []abci.Event{
 				{
@@ -237,6 +240,7 @@ func TestABCI_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 	})
 
 	app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
+		endBlockDoNotFailFast = ctx.Value(baseapp.DoNotFailFastSendContextKey) != nil
 		return sdk.EndBlock{
 			Events: []abci.Event{
 				{
@@ -261,6 +265,8 @@ func TestABCI_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 
 	res, err := app.FinalizeBlock(&abci.FinalizeBlockRequest{Height: 1})
 	require.NoError(t, err)
+	require.True(t, beginBlockDoNotFailFast)
+	require.True(t, endBlockDoNotFailFast)
 
 	require.Len(t, res.Events, 2)
 
@@ -2031,6 +2037,7 @@ func TestBaseApp_PreBlocker(t *testing.T) {
 	wasHookCalled := false
 	app.SetPreBlocker(func(ctx sdk.Context, req *abci.FinalizeBlockRequest) (*sdk.ResponsePreBlock, error) {
 		wasHookCalled = true
+		require.NotNil(t, ctx.Value(baseapp.DoNotFailFastSendContextKey))
 
 		event := sdk.NewEvent("preblockertest", sdk.NewAttribute("height", fmt.Sprintf("%d", req.Height)))
 		ctx.EventManager().EmitEvent(event)
