@@ -180,6 +180,7 @@ func (suite *KeeperTestSuite) mockMintCoins(moduleAcc *authtypes.ModuleAccount) 
 func (suite *KeeperTestSuite) mockSendCoinsFromModuleToAccount(moduleAcc *authtypes.ModuleAccount, accAddr sdk.AccAddress) {
 	suite.authKeeper.EXPECT().GetModuleAddress(moduleAcc.Name).Return(moduleAcc.GetAddress())
 	suite.authKeeper.EXPECT().GetAccount(suite.ctx, moduleAcc.GetAddress()).Return(moduleAcc)
+	suite.authKeeper.EXPECT().GetAccount(gomock.Not(suite.ctx), moduleAcc.GetAddress()).Return(moduleAcc).AnyTimes()
 	suite.authKeeper.EXPECT().HasAccount(gomock.Any(), accAddr).Return(true).AnyTimes()
 }
 
@@ -202,17 +203,20 @@ func (suite *KeeperTestSuite) mockSendCoinsFromModuleToModule(sender, receiver *
 	suite.authKeeper.EXPECT().GetModuleAddress(sender.Name).Return(sender.GetAddress())
 	suite.authKeeper.EXPECT().GetModuleAccount(suite.ctx, receiver.Name).Return(receiver)
 	suite.authKeeper.EXPECT().GetAccount(suite.ctx, sender.GetAddress()).Return(sender)
+	suite.authKeeper.EXPECT().GetAccount(gomock.Not(suite.ctx), sender.GetAddress()).Return(sender).AnyTimes()
 	suite.authKeeper.EXPECT().HasAccount(gomock.Any(), receiver.GetAddress()).Return(true)
 }
 
 func (suite *KeeperTestSuite) mockSendCoinsFromAccountToModule(acc *authtypes.BaseAccount, moduleAcc *authtypes.ModuleAccount) {
 	suite.authKeeper.EXPECT().GetModuleAccount(suite.ctx, moduleAcc.Name).Return(moduleAcc)
 	suite.authKeeper.EXPECT().GetAccount(suite.ctx, acc.GetAddress()).Return(acc)
+	suite.authKeeper.EXPECT().GetAccount(gomock.Not(suite.ctx), acc.GetAddress()).Return(acc).AnyTimes()
 	suite.authKeeper.EXPECT().HasAccount(gomock.Any(), moduleAcc.GetAddress()).Return(true)
 }
 
 func (suite *KeeperTestSuite) mockSendCoins(ctx context.Context, sender sdk.AccountI, receiver sdk.AccAddress) {
 	suite.authKeeper.EXPECT().GetAccount(ctx, sender.GetAddress()).Return(sender)
+	suite.authKeeper.EXPECT().GetAccount(gomock.Not(ctx), sender.GetAddress()).Return(sender).AnyTimes()
 	suite.authKeeper.EXPECT().HasAccount(gomock.Any(), receiver).Return(true).AnyTimes()
 }
 
@@ -224,6 +228,7 @@ func (suite *KeeperTestSuite) mockFundAccount(receiver sdk.AccAddress) {
 func (suite *KeeperTestSuite) mockInputOutputCoins(inputs []sdk.AccountI, outputs []sdk.AccAddress) {
 	for _, input := range inputs {
 		suite.authKeeper.EXPECT().GetAccount(suite.ctx, input.GetAddress()).Return(input)
+		suite.authKeeper.EXPECT().GetAccount(gomock.Not(suite.ctx), input.GetAddress()).Return(input).AnyTimes()
 	}
 	for _, output := range outputs {
 		suite.authKeeper.EXPECT().HasAccount(gomock.Any(), output).Return(true).AnyTimes()
@@ -820,6 +825,62 @@ func (suite *KeeperTestSuite) TestInputOutputCoinsPostHookErrorRevertsOnlyFailin
 	suite.Require().Len(sdk.UnwrapSDKContext(ctx).EventManager().Events(), eventsBefore+3)
 }
 
+func (suite *KeeperTestSuite) TestInputOutputCoinsRevalidatesBalanceAfterPostHookDebit() {
+	ctx := suite.ctx
+	fromAddr := accAddrs[0]
+	toAddrs := accAddrs[1:3]
+	hookRecipient := accAddrs[3]
+	initialBalance := sdk.NewCoins(newFooCoin(100))
+	input := banktypes.Input{
+		Address: fromAddr.String(),
+		Coins:   sdk.NewCoins(newFooCoin(25)),
+	}
+	outputs := []banktypes.Output{
+		{Address: toAddrs[0].String(), Coins: sdk.NewCoins(newFooCoin(10))},
+		{Address: toAddrs[1].String(), Coins: sdk.NewCoins(newFooCoin(15))},
+	}
+
+	suite.mockFundAccount(fromAddr)
+	suite.Require().NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, fromAddr, initialBalance))
+
+	fromAccount := authtypes.NewBaseAccountWithAddress(fromAddr)
+	suite.authKeeper.EXPECT().GetAccount(gomock.Any(), fromAddr).Return(fromAccount).AnyTimes()
+	for _, addr := range append(toAddrs, hookRecipient) {
+		suite.authKeeper.EXPECT().HasAccount(gomock.Any(), addr).Return(true).AnyTimes()
+	}
+
+	hookDebitDone := false
+	hookCalls := 0
+	suite.bankKeeper.AppendPostSendHook(func(
+		hookCtx context.Context,
+		hookFromAddr, _ sdk.AccAddress,
+		_ sdk.Coin,
+	) error {
+		hookCalls++
+		if hookDebitDone {
+			return nil
+		}
+		hookDebitDone = true
+		return suite.bankKeeper.SendCoins(
+			hookCtx,
+			hookFromAddr,
+			hookRecipient,
+			sdk.NewCoins(newFooCoin(90)),
+		)
+	})
+
+	var err error
+	suite.Require().NotPanics(func() {
+		err = suite.bankKeeper.InputOutputCoins(ctx, input, outputs)
+	})
+	suite.Require().ErrorIs(err, sdkerrors.ErrInsufficientFunds)
+	suite.Require().Equal(2, hookCalls)
+	suite.Require().Empty(suite.bankKeeper.GetAllBalances(ctx, fromAddr))
+	suite.Require().Equal(sdk.NewCoins(newFooCoin(10)), suite.bankKeeper.GetAllBalances(ctx, toAddrs[0]))
+	suite.Require().Empty(suite.bankKeeper.GetAllBalances(ctx, toAddrs[1]))
+	suite.Require().Equal(sdk.NewCoins(newFooCoin(90)), suite.bankKeeper.GetAllBalances(ctx, hookRecipient))
+}
+
 func (suite *KeeperTestSuite) TestInputOutputCoinsWithRestrictions() {
 	type restrictionArgs struct {
 		ctx      context.Context
@@ -1187,6 +1248,51 @@ func (suite *KeeperTestSuite) TestSendCoinsPostHookErrorRevertsOnlyFailingCoin()
 	_, failedHookStateFound := suite.bankKeeper.GetDenomMetaData(ctx, fooDenom+"-post-hook-state")
 	suite.Require().False(failedHookStateFound)
 	suite.Require().Len(sdk.UnwrapSDKContext(ctx).EventManager().Events(), eventsBefore+3)
+}
+
+func (suite *KeeperTestSuite) TestSendCoinsRevalidatesBalanceAfterPostHookDebit() {
+	ctx := suite.ctx
+	fromAddr := accAddrs[0]
+	toAddr := accAddrs[1]
+	hookRecipient := accAddrs[2]
+	initialBalance := sdk.NewCoins(newBarCoin(100), newFooCoin(100))
+	sendAmount := sdk.NewCoins(newBarCoin(25), newFooCoin(25))
+
+	suite.mockFundAccount(fromAddr)
+	suite.Require().NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, fromAddr, initialBalance))
+
+	fromAccount := authtypes.NewBaseAccountWithAddress(fromAddr)
+	suite.authKeeper.EXPECT().GetAccount(gomock.Any(), fromAddr).Return(fromAccount).AnyTimes()
+	suite.authKeeper.EXPECT().HasAccount(gomock.Any(), toAddr).Return(true).AnyTimes()
+	suite.authKeeper.EXPECT().HasAccount(gomock.Any(), hookRecipient).Return(true).AnyTimes()
+
+	hookCalls := make([]string, 0, len(sendAmount))
+	suite.bankKeeper.AppendPostSendHook(func(
+		hookCtx context.Context,
+		hookFromAddr, _ sdk.AccAddress,
+		coin sdk.Coin,
+	) error {
+		hookCalls = append(hookCalls, coin.Denom)
+		if coin.Denom != barDenom {
+			return nil
+		}
+		return suite.bankKeeper.SendCoins(
+			hookCtx,
+			hookFromAddr,
+			hookRecipient,
+			sdk.NewCoins(newFooCoin(100)),
+		)
+	})
+
+	var err error
+	suite.Require().NotPanics(func() {
+		err = suite.bankKeeper.SendCoins(ctx, fromAddr, toAddr, sendAmount)
+	})
+	suite.Require().ErrorIs(err, sdkerrors.ErrInsufficientFunds)
+	suite.Require().Equal([]string{barDenom, fooDenom}, hookCalls)
+	suite.Require().Equal(sdk.NewCoins(newBarCoin(75)), suite.bankKeeper.GetAllBalances(ctx, fromAddr))
+	suite.Require().Equal(sdk.NewCoins(newBarCoin(25)), suite.bankKeeper.GetAllBalances(ctx, toAddr))
+	suite.Require().Equal(sdk.NewCoins(newFooCoin(100)), suite.bankKeeper.GetAllBalances(ctx, hookRecipient))
 }
 
 func (suite *KeeperTestSuite) TestSendCoinsLaterRestrictionErrorPreservesPriorCoinAndHook() {

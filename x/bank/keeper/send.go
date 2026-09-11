@@ -259,7 +259,10 @@ func (k BaseSendKeeper) sendCoins(ctx context.Context, fromAddr, toAddr sdk.AccA
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	defer k.Meter(ctx).FuncTiming(&sdkCtx, "sendCoins")(&err)
 
-	err = k.subUnlockedCoins(sdkCtx, fromAddr, amt, true) // only sub this coin
+	// An earlier post-send hook may have changed or locked the sender's
+	// remaining balance, so revalidate against this transfer's cache before
+	// debiting it.
+	err = k.subUnlockedCoins(sdkCtx, fromAddr, amt, false)
 	if err != nil {
 		return err
 	}
