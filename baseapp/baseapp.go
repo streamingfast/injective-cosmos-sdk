@@ -755,6 +755,7 @@ func (app *BaseApp) preBlock(req *abci.FinalizeBlockRequest) ([]abci.Event, erro
 			return nil, err
 		}
 		events = rsp.Events
+		events = sdk.MarkEventsToIndex(events, app.indexEvents)
 		// rsp.ConsensusParamsChanged is true from preBlocker means ConsensusParams in store get changed
 		// write the consensus parameters in store to context
 		if rsp.ConsensusParamsChanged {
