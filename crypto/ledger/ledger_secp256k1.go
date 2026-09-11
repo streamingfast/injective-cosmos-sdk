@@ -36,7 +36,7 @@ type (
 		GetAddressPubKeySECP256K1([]uint32, string) ([]byte, string, error)
 		// Signs a message (requires user confirmation)
 		// The last byte denotes the SIGN_MODE to be used by Ledger: 0 for
-		// LEGACY_AMINO_JSON, 1 for TEXTUAL. It corresponds to the P2 value
+		// LEGACY_AMINO_JSON, 1 for TEXTUAL, 2 for EIP712_V2. It corresponds to the P2 value
 		// in https://github.com/cosmos/ledger-cosmos/blob/main/docs/APDUSPEC.md
 		SignSECP256K1([]uint32, []byte, byte) ([]byte, error)
 	}
@@ -154,6 +154,18 @@ func (pkl PrivKeyLedgerSecp256k1) SignLedgerAminoJSON(message []byte) ([]byte, e
 	defer warnIfErrors(device.Close)
 
 	return sign(device, pkl, message, 0)
+}
+
+// SignLedgerEIP712 returns a secp256k1 signature for the corresponding message using
+// SIGN_MODE_EIP712_v2.
+func (pkl PrivKeyLedgerSecp256k1) SignLedgerEIP712(message []byte) ([]byte, error) {
+	device, err := getDevice()
+	if err != nil {
+		return nil, err
+	}
+	defer warnIfErrors(device.Close)
+
+	return sign(device, pkl, message, 2)
 }
 
 // ShowAddress triggers a ledger device to show the corresponding address.
