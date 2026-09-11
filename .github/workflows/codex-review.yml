@@ -1,0 +1,273 @@
+name: Codex Code Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull request number to review"
+        required: true
+        type: number
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+    # Runs when at least one changed file (PR vs merge base) remains included after
+    # the exclusions below. Keep this workflow file itself included so CI changes
+    # here are still reviewed.
+    # If this workflow is a required status check, skipped runs can stay Pending — avoid requiring it or use a separate always-green gate workflow.
+    paths:
+      - "**"
+      - "!**/*_test.go"
+      - "!**/*.pb.go"
+      - "!interchaintest/**"
+      - "!injective-chain/modules/exchange/testexchange/**"
+      - "!**/*.md"
+      - "!go.mod"
+      - "!go.sum"
+      - "!**/*.yaml"
+      - "!**/*.yml"
+      - "!.golangci.yml"
+      - ".github/workflows/codex-review.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  codex:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+      BASE_REF: ${{ github.event.pull_request.base.ref }}
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      GOCACHE: ${{ github.workspace }}/.gocache
+      GOMODCACHE: ${{ github.workspace }}/.gomodcache
+    outputs:
+      final_message_b64: ${{ steps.run_codex.outputs.final_message_b64 }}
+      head_sha: ${{ steps.pr-vars.outputs.head_sha }}
+    steps:
+      - name: Resolve PR metadata (manual trigger)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const prNumber = Number(process.env.PR_NUMBER);
+            if (!Number.isInteger(prNumber) || prNumber <= 0) {
+              core.setFailed(`Invalid PR number: ${process.env.PR_NUMBER}`);
+              return;
+            }
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            core.exportVariable('BASE_REF', pr.base.ref);
+            core.exportVariable('EXPECTED_HEAD_SHA', pr.head.sha);
+
+      - uses: actions/checkout@v5
+        with:
+          # Check out the PR head so /review compares the proposed branch itself
+          # with the PR's actual base branch.
+          ref: refs/pull/${{ env.PR_NUMBER }}/head
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve review refs
+        id: pr-vars
+        run: |
+          set -euo pipefail
+          if [ -z "${BASE_REF}" ]; then
+            echo "Missing PR base branch." >&2
+            exit 1
+          fi
+
+          head_sha="$(git rev-parse HEAD)"
+          if [ -n "${EXPECTED_HEAD_SHA}" ] && [ "${head_sha}" != "${EXPECTED_HEAD_SHA}" ]; then
+            echo "Checked out ${head_sha}, expected PR head ${EXPECTED_HEAD_SHA}." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          git merge-base HEAD "origin/${BASE_REF}" >/dev/null
+          echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Go with cache
+        id: codex-go-cache
+        uses: magnetikonline/action-golang-cache@v5
+        with:
+          go-version-file: go.mod
+          cache-key-suffix: codex-review
+
+      - name: Pre-fetch Go module cache
+        run: |
+          set -euo pipefail
+          go mod download
+        env:
+          GOCACHE: ${{ env.GOCACHE }}
+          GOMODCACHE: ${{ env.GOMODCACHE }}
+
+      # codex-action securely configures the CLI and API-key proxy. The review
+      # command is run separately because the action's prompt input maps to
+      # `codex exec`, while /review maps to `codex exec review --base`.
+      - name: Set up Codex
+        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56 # v1.11
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          codex-version: 0.154.0
+          codex-home: ${{ runner.temp }}/codex-review-home
+
+      - name: Run Codex review
+        id: run_codex
+        env:
+          CODEX_HOME: ${{ runner.temp }}/codex-review-home
+        run: |
+          set -euo pipefail
+          output_file="${RUNNER_TEMP}/codex-review.json"
+
+          codex exec \
+            --cd "$GITHUB_WORKSPACE" \
+            --model gpt-5.6-sol \
+            --config 'review_model="gpt-5.6-sol"' \
+            --config 'model_reasoning_effort="max"' \
+            --sandbox read-only \
+            --output-last-message "$output_file" \
+            review \
+            --base "origin/${BASE_REF}"
+
+          if [ ! -s "$output_file" ]; then
+            echo "Codex produced no final review message." >&2
+            exit 1
+          fi
+
+          echo "final_message_b64=$(base64 -w 0 "$output_file")" >> "$GITHUB_OUTPUT"
+
+      - name: Save Golang cache
+        if: always()
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ${{ steps.codex-go-cache.outputs.build-cache-path }}
+            ${{ steps.codex-go-cache.outputs.module-cache-path }}
+          key: ${{ steps.codex-go-cache.outputs.cache-key }}
+
+  post_feedback:
+    runs-on: ubuntu-latest
+    needs: codex
+    if: needs.codex.outputs.final_message_b64 != ''
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Report Codex feedback
+        uses: actions/github-script@v7
+        env:
+          CODEX_FINAL_MESSAGE_B64: ${{ needs.codex.outputs.final_message_b64 }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+          HEAD_SHA: ${{ needs.codex.outputs.head_sha }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const prNumber = Number(process.env.PR_NUMBER);
+            if (!Number.isInteger(prNumber) || prNumber <= 0) {
+              core.setFailed(`Invalid PR number: ${process.env.PR_NUMBER}`);
+              return;
+            }
+
+            const headSha = (process.env.HEAD_SHA || '').trim();
+            if (!headSha) {
+              core.setFailed('Missing HEAD_SHA for link generation.');
+              return;
+            }
+
+            const repoFull = `${context.repo.owner}/${context.repo.repo}`;
+            const rawMessage = Buffer.from(
+              process.env.CODEX_FINAL_MESSAGE_B64 || '',
+              'base64',
+            ).toString('utf8').trim();
+
+            const { data: currentPR } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            if (currentPR.head.sha !== headSha) {
+              core.info(`Skipping superseded review of ${headSha}; current PR head is ${currentPR.head.sha}.`);
+              return;
+            }
+
+            const repoPath = (absolutePath) => {
+              const normalized = String(absolutePath || '').replace(/\\/g, '/');
+              const workspace = (process.env.GITHUB_WORKSPACE || '').replace(/\\/g, '/');
+              if (workspace && normalized.startsWith(`${workspace}/`)) {
+                return normalized.slice(workspace.length + 1);
+              }
+              const marker = `/${context.repo.repo}/`;
+              const markerIndex = normalized.lastIndexOf(marker);
+              if (markerIndex >= 0) {
+                return normalized.slice(markerIndex + marker.length);
+              }
+              return normalized.replace(/^\/+/, '');
+            };
+
+            const locationLink = (location) => {
+              if (!location || !location.absolute_file_path || !location.line_range) {
+                return '';
+              }
+              const path = repoPath(location.absolute_file_path);
+              const start = Number(location.line_range.start);
+              const end = Number(location.line_range.end);
+              if (!path || !Number.isInteger(start) || start <= 0) {
+                return '';
+              }
+              const endSuffix = Number.isInteger(end) && end > start ? `-L${end}` : '';
+              const labelSuffix = Number.isInteger(end) && end > start ? `-${end}` : '';
+              return `[${path}:${start}${labelSuffix}](/${repoFull}/blob/${headSha}/${path}#L${start}${endSuffix})`;
+            };
+
+            let message;
+            try {
+              const review = JSON.parse(rawMessage);
+              const findings = Array.isArray(review.findings) ? review.findings : [];
+              if (findings.length === 0) {
+                message = `🟢 LGTM. ${review.overall_explanation || 'Codex found no actionable issues.'}`;
+              } else {
+                const priorityEmoji = ['🔴', '🔴', '🟠', '🔵'];
+                const sections = findings.map((finding) => {
+                  const priority = Number(finding.priority);
+                  const emoji = Number.isInteger(priority) && priority >= 0 && priority <= 3
+                    ? priorityEmoji[priority]
+                    : '⚪';
+                  const location = locationLink(finding.code_location);
+                  return [
+                    `### ${emoji} ${finding.title || 'Review finding'}`,
+                    '',
+                    finding.body || '',
+                    location ? `\n${location}` : '',
+                  ].join('\n').trim();
+                });
+                message = sections.join('\n\n');
+                if (review.overall_explanation) {
+                  message += `\n\n**Overall:** ${review.overall_explanation}`;
+                }
+              }
+            } catch (error) {
+              core.warning(`Could not parse Codex review JSON: ${error.message}`);
+              message = rawMessage;
+            }
+
+            message = `Reviewed commit: [\`${headSha}\`](/${repoFull}/commit/${headSha})\n\n${message}`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: message,
+            });
