@@ -42,18 +42,20 @@ jobs:
       contents: read
       pull-requests: read
     env:
-      PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
-      BASE_REF: ${{ github.event.pull_request.base.ref }}
-      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       GOCACHE: ${{ github.workspace }}/.gocache
       GOMODCACHE: ${{ github.workspace }}/.gomodcache
     outputs:
       final_message_b64: ${{ steps.run_codex.outputs.final_message_b64 }}
-      head_sha: ${{ steps.pr-vars.outputs.head_sha }}
+      head_sha: ${{ steps.pr.outputs.head_sha }}
+      base_ref: ${{ steps.pr.outputs.base_ref }}
+      merge_base_sha: ${{ steps.review_range.outputs.merge_base_sha }}
+      review_commit_count: ${{ steps.review_range.outputs.review_commit_count }}
     steps:
-      - name: Resolve PR metadata (manual trigger)
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+      - name: Resolve pull request metadata
+        id: pr
         uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
         with:
           github-token: ${{ github.token }}
           script: |
@@ -63,42 +65,58 @@ jobs:
               return;
             }
 
-            const { data: pr } = await github.rest.pulls.get({
+            const { data: pullRequest } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: prNumber,
             });
 
-            core.exportVariable('BASE_REF', pr.base.ref);
-            core.exportVariable('EXPECTED_HEAD_SHA', pr.head.sha);
+            core.setOutput('number', String(pullRequest.number));
+            core.setOutput('head_sha', pullRequest.head.sha);
+            core.setOutput('base_ref', pullRequest.base.ref);
+            core.setOutput('base_remote_ref', `origin/${pullRequest.base.ref}`);
 
-      - uses: actions/checkout@v5
+      - name: Checkout pull request head
+        uses: actions/checkout@v5
         with:
-          # Check out the PR head so /review compares the proposed branch itself
-          # with the PR's actual base branch.
-          ref: refs/pull/${{ env.PR_NUMBER }}/head
+          ref: refs/pull/${{ steps.pr.outputs.number }}/head
           fetch-depth: 0
+          # Keep checkout authentication just long enough to fetch a private base
+          # branch below. It is removed before Codex runs.
+          persist-credentials: true
 
-      - name: Resolve review refs
-        id: pr-vars
+      - name: Resolve review range
+        id: review_range
+        env:
+          BASE_REF: ${{ steps.pr.outputs.base_ref }}
+          EXPECTED_HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
           set -euo pipefail
-          if [ -z "${BASE_REF}" ]; then
-            echo "Missing PR base branch." >&2
-            exit 1
-          fi
+
+          : "${BASE_REF:?Missing PR base branch}"
+          : "${EXPECTED_HEAD_SHA:?Missing PR head SHA}"
+
+          git fetch --no-tags origin \
+            "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 
           head_sha="$(git rev-parse HEAD)"
-          if [ -n "${EXPECTED_HEAD_SHA}" ] && [ "${head_sha}" != "${EXPECTED_HEAD_SHA}" ]; then
+          if [ "${head_sha}" != "${EXPECTED_HEAD_SHA}" ]; then
             echo "Checked out ${head_sha}, expected PR head ${EXPECTED_HEAD_SHA}." >&2
             exit 1
           fi
 
-          git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
-          git merge-base HEAD "origin/${BASE_REF}" >/dev/null
-          echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
+          base_remote_ref="origin/${BASE_REF}"
+          base_sha="$(git rev-parse --verify "${base_remote_ref}^{commit}")"
+          merge_base_sha="$(git merge-base "${head_sha}" "${base_sha}")"
+          review_commit_count="$(git rev-list --count "${merge_base_sha}..${head_sha}")"
+
+          echo "merge_base_sha=${merge_base_sha}" >> "$GITHUB_OUTPUT"
+          echo "review_commit_count=${review_commit_count}" >> "$GITHUB_OUTPUT"
+          echo "Reviewing ${review_commit_count} commit(s): ${merge_base_sha}...${head_sha} against ${base_remote_ref} (${base_sha})."
+          git diff --stat "${merge_base_sha}...${head_sha}"
 
       - name: Remove checkout credentials
+        if: always()
         run: |
           set -euo pipefail
           while IFS= read -r key; do
@@ -133,20 +151,20 @@ jobs:
       - name: Run Codex review
         id: run_codex
         env:
+          BASE_REMOTE_REF: ${{ steps.pr.outputs.base_remote_ref }}
           CODEX_HOME: ${{ runner.temp }}/codex-review-home
         run: |
           set -euo pipefail
           output_file="${RUNNER_TEMP}/codex-review.json"
 
-          codex exec \
-            --cd "$GITHUB_WORKSPACE" \
+          codex exec review \
+            --base "$BASE_REMOTE_REF" \
             --model gpt-5.6-sol \
             --config 'review_model="gpt-5.6-sol"' \
             --config 'model_reasoning_effort="max"' \
+            --ephemeral \
             --dangerously-bypass-approvals-and-sandbox \
-            --output-last-message "$output_file" \
-            review \
-            --base "origin/${BASE_REF}"
+            --output-last-message "$output_file"
 
           if [ ! -s "$output_file" ]; then
             echo "Codex produced no final review message." >&2
@@ -175,9 +193,12 @@ jobs:
       - name: Report Codex feedback
         uses: actions/github-script@v7
         env:
+          BASE_REF: ${{ needs.codex.outputs.base_ref }}
           CODEX_FINAL_MESSAGE_B64: ${{ needs.codex.outputs.final_message_b64 }}
+          MERGE_BASE_SHA: ${{ needs.codex.outputs.merge_base_sha }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           HEAD_SHA: ${{ needs.codex.outputs.head_sha }}
+          REVIEW_COMMIT_COUNT: ${{ needs.codex.outputs.review_commit_count }}
         with:
           github-token: ${{ github.token }}
           script: |
@@ -188,8 +209,17 @@ jobs:
             }
 
             const headSha = (process.env.HEAD_SHA || '').trim();
-            if (!headSha) {
-              core.setFailed('Missing HEAD_SHA for link generation.');
+            const mergeBaseSha = (process.env.MERGE_BASE_SHA || '').trim();
+            const reviewCommitCount = Number(process.env.REVIEW_COMMIT_COUNT);
+            const baseRef = (process.env.BASE_REF || '').trim();
+            if (
+              !/^[0-9a-f]{40}$/i.test(headSha) ||
+              !/^[0-9a-f]{40}$/i.test(mergeBaseSha) ||
+              !Number.isInteger(reviewCommitCount) ||
+              reviewCommitCount < 1 ||
+              !baseRef
+            ) {
+              core.setFailed('Missing or invalid review range metadata.');
               return;
             }
 
@@ -269,7 +299,12 @@ jobs:
               message = rawMessage;
             }
 
-            message = `Reviewed commit: [\`${headSha}\`](/${repoFull}/commit/${headSha})\n\n${message}`;
+            const commitLabel = reviewCommitCount === 1 ? 'commit' : 'commits';
+            message = [
+              `Reviewed PR diff against \`${baseRef}\`: [\`${mergeBaseSha.slice(0, 10)}...${headSha.slice(0, 10)}\`](/${repoFull}/compare/${mergeBaseSha}...${headSha})`,
+              `Review range: ${reviewCommitCount} ${commitLabel}; head snapshot: [\`${headSha}\`](/${repoFull}/commit/${headSha})`,
+              message,
+            ].join('\n\n');
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
