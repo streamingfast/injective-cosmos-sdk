@@ -243,7 +243,6 @@ replace (
 )
 
 replace (
-	// Use CometBFT rollback build
-	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.v1.19.0-rollback
-	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.1-inj.v1.19.0-rollback
+	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.9
+	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.0-inj.4
 )

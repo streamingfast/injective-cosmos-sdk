@@ -38,6 +38,9 @@ type LedgerPrivKeyAminoJSON interface {
 	// SignLedgerAminoJSON signs a messages on the Ledger device using
 	// SIGN_MODE_LEGACY_AMINO_JSON.
 	SignLedgerAminoJSON(msg []byte) ([]byte, error)
+
+	// SignLedgerEIP712 signs a message on the Ledger device using SIGN_MODE_EIP712_V2 (see injective-core for impl)
+	SignLedgerEIP712(msg []byte) ([]byte, error)
 }
 
 // PrivKey defines a private key and extends proto.Message. For now, it extends

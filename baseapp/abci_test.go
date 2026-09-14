@@ -43,6 +43,18 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth/signing"
 )
 
+type mockABCIListener struct {
+	ListenCommitFn func(context.Context, abci.CommitResponse, []*storetypes.StoreKVPair) error
+}
+
+func (m mockABCIListener) ListenFinalizeBlock(_ context.Context, _ abci.FinalizeBlockRequest, _ abci.FinalizeBlockResponse) error {
+	return nil
+}
+
+func (m *mockABCIListener) ListenCommit(ctx context.Context, commit abci.CommitResponse, pairs []*storetypes.StoreKVPair) error {
+	return m.ListenCommitFn(ctx, commit, pairs)
+}
+
 func TestABCI_Info(t *testing.T) {
 	suite := NewBaseAppSuite(t)
 
@@ -219,8 +231,11 @@ func TestABCI_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 	name := t.Name()
 	db := dbm.NewMemDB()
 	app := baseapp.NewBaseApp(name, log.NewTestLogger(t), db, nil)
+	beginBlockDoNotFailFast := false
+	endBlockDoNotFailFast := false
 
 	app.SetBeginBlocker(func(ctx sdk.Context) (sdk.BeginBlock, error) {
+		beginBlockDoNotFailFast = ctx.Value(baseapp.DoNotFailFastSendContextKey) != nil
 		return sdk.BeginBlock{
 			Events: []abci.Event{
 				{
@@ -237,6 +252,7 @@ func TestABCI_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 	})
 
 	app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
+		endBlockDoNotFailFast = ctx.Value(baseapp.DoNotFailFastSendContextKey) != nil
 		return sdk.EndBlock{
 			Events: []abci.Event{
 				{
@@ -261,6 +277,8 @@ func TestABCI_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 
 	res, err := app.FinalizeBlock(&abci.FinalizeBlockRequest{Height: 1})
 	require.NoError(t, err)
+	require.True(t, beginBlockDoNotFailFast)
+	require.True(t, endBlockDoNotFailFast)
 
 	require.Len(t, res.Events, 2)
 
@@ -2031,6 +2049,7 @@ func TestBaseApp_PreBlocker(t *testing.T) {
 	wasHookCalled := false
 	app.SetPreBlocker(func(ctx sdk.Context, req *abci.FinalizeBlockRequest) (*sdk.ResponsePreBlock, error) {
 		wasHookCalled = true
+		require.NotNil(t, ctx.Value(baseapp.DoNotFailFastSendContextKey))
 
 		event := sdk.NewEvent("preblockertest", sdk.NewAttribute("height", fmt.Sprintf("%d", req.Height)))
 		ctx.EventManager().EmitEvent(event)
@@ -2494,4 +2513,19 @@ func TestABCI_Proposal_FailReCheckTx(t *testing.T) {
 
 	require.NotEmpty(t, res.TxResults[0].Events)
 	require.True(t, res.TxResults[0].IsOK(), fmt.Sprintf("%v", res))
+}
+
+func TestFinalizeBlockDeferResponseHandle(t *testing.T) {
+	suite := NewBaseAppSuite(t, baseapp.SetHaltHeight(1))
+	suite.baseApp.SetStreamingManager(storetypes.StreamingManager{
+		ABCIListeners: []storetypes.ABCIListener{
+			&mockABCIListener{},
+		},
+	})
+
+	res, err := suite.baseApp.FinalizeBlock(&abci.FinalizeBlockRequest{
+		Height: 2,
+	})
+	require.Empty(t, res)
+	require.NotEmpty(t, err)
 }
