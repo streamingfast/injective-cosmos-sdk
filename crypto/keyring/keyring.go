@@ -637,6 +637,12 @@ func SignWithLedger(k *Record, msg []byte, signMode signing.SignMode) (sig []byt
 		if err != nil {
 			return nil, nil, err
 		}
+	case signing.SignMode_SIGN_MODE_EIP712_V2:
+		// adding eip712 v2 here is fine because the injective-core impl understands the type
+		sig, err = priv.SignLedgerEIP712(msg)
+		if err != nil {
+			return nil, nil, err
+		}
 	default:
 		return nil, nil, errorsmod.Wrap(ErrInvalidSignMode, fmt.Sprintf("%v", signMode))
 	}

@@ -294,11 +294,11 @@ func readTxCommandFlags(clientCtx Context, flagSet *pflag.FlagSet) (Context, err
 		// SIGN_MODE_AMINO_JSON, because ledger doesn't support proto yet.
 		// ref: https://github.com/cosmos/cosmos-sdk/issues/8109
 		if keyType == keyring.TypeLedger &&
-			clientCtx.SignModeStr != flags.SignModeLegacyAminoJSON &&
+			clientCtx.SignModeStr != flags.SignModeEIP712 &&
 			clientCtx.SignModeStr != flags.SignModeTextual &&
 			!clientCtx.LedgerHasProtobuf {
-			fmt.Println("Default sign-mode 'direct' not supported by Ledger, using sign-mode 'amino-json'.")
-			clientCtx = clientCtx.WithSignModeStr(flags.SignModeLegacyAminoJSON)
+			fmt.Println("Switching to sign-mode 'eip-712' for Ledger, since 'amino-json' is deprecated")
+			clientCtx = clientCtx.WithSignModeStr(flags.SignModeEIP712)
 		}
 	}
 
