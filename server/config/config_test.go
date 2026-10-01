@@ -52,12 +52,6 @@ func TestStreamingConfig(t *testing.T) {
 				Plugin:        "plugin-A",
 				StopNodeOnErr: false,
 			},
-			MQPub: MQPubConfig{
-				Enabled:     false,
-				SeedBrokers: []string{},
-				TopicName:   "",
-				ControlPort: 0,
-			},
 		},
 	}
 
@@ -74,11 +68,8 @@ func TestStreamingConfig(t *testing.T) {
 		`keys = ["one", "two", ]`,
 		`plugin = "plugin-A"`,
 		`stop-node-on-err = false`,
-		`enabled = false`,
-		`seed-brokers = []`,
-		`topic-name = ""`,
-		`control-port = 0`,
 	}
+
 	for _, line := range expectedLines {
 		assert.Contains(t, cfgFileContents, line+"\n", "config file contents")
 	}

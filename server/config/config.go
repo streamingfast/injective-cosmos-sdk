@@ -173,21 +173,12 @@ type (
 	// StreamingConfig defines application configuration for external streaming services
 	StreamingConfig struct {
 		ABCI ABCIListenerConfig `mapstructure:"abci"`
-		MQPub MQPubConfig `mapstructure:"mqpub"`
 	}
 	// ABCIListenerConfig defines application configuration for ABCIListener streaming service
 	ABCIListenerConfig struct {
 		Keys          []string `mapstructure:"keys"`
 		Plugin        string   `mapstructure:"plugin"`
 		StopNodeOnErr bool     `mapstructure:"stop-node-on-err"`
-	}
-
-	// MQPubConfig defines application configuration for MessageQueue publish service
-	MQPubConfig struct {
-		Enabled     bool     `mapstructure:"enabled"`
-		SeedBrokers []string `mapstructure:"seed-brokers"`
-		TopicName   string   `mapstructure:"topic-name"`
-		ControlPort int      `mapstructure:"control-port"`
 	}
 )
 
@@ -269,12 +260,6 @@ func DefaultConfig() *Config {
 			ABCI: ABCIListenerConfig{
 				Keys:          []string{},
 				StopNodeOnErr: true,
-			},
-			MQPub: MQPubConfig{
-				Enabled:     false,
-				SeedBrokers: []string{},
-				TopicName:   "",
-				ControlPort: 0,
 			},
 		},
 		Mempool: MempoolConfig{
