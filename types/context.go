@@ -320,6 +320,12 @@ func (c Context) WithPublishEventManager(sem PublishEventManagerI) Context {
 	return c
 }
 
+// ForwardPublishEvents appends publish events without emitting new placeholders.
+// The caller must preserve their existing placeholders in the regular events.
+func (c Context) ForwardPublishEvents(events []proto.Message) {
+	c.publishEventManager.EmitEvents(events)
+}
+
 // WithPriority returns a Context with an updated tx priority
 func (c Context) WithPriority(p int64) Context {
 	c.priority = p
@@ -414,15 +420,7 @@ func (c Context) CacheContext() (cc Context, writeCache func()) {
 	writeCache = func() {
 		c.EventManager().EmitEvents(cc.EventManager().Events())
 
-		pem := c.PublishEventManager()
-		// pem contains EventPlaceholderManager within the interface and by the time this callback is called
-		// it already put placeholder events in the regular EventManager whenever a published event was emitted.
-		// We just need to forward the published events to the original context (see PublishEventManager method of sdk Context)
-		if pem.(*EventPlaceholderManager) != nil {
-			pem = pem.(*EventPlaceholderManager).publishEventManager
-		}
-
-		pem.EmitEvents(cc.PublishEventManager().Events())
+		c.ForwardPublishEvents(cc.PublishEventManager().Events())
 
 		cms.Write()
 	}

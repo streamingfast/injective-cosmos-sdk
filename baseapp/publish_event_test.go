@@ -205,3 +205,50 @@ func TestPublishEvent_FinalizeBlock_DeliverTx(t *testing.T) {
 		lastAppHash = res.AppHash
 	}
 }
+
+func TestPublishEvent_FinalizeBlock_FailedMessageDiscardsPublishEvents(t *testing.T) {
+	anteKey := []byte("ante-key")
+	deliverKey := []byte("deliver-key")
+	suite := NewBaseAppSuite(t, func(app *baseapp.BaseApp) {
+		app.SetAnteHandler(anteHandlerTxTestWithCustomEventEmit(t, capKey1, anteKey, true))
+	})
+	app := suite.baseApp
+	app.EnablePublish = true
+	app.PublishEvents = make(chan baseapp.PublishEventFlush, 1)
+
+	_, err := app.InitChain(&abci.InitChainRequest{
+		ConsensusParams: &cmtproto.ConsensusParams{},
+	})
+	require.NoError(t, err)
+	baseapptestutil.RegisterCounterServer(app.MsgServiceRouter(), CounterServerImpl{t, capKey1, deliverKey, true})
+
+	tx := newTxCounter(t, suite.txConfig, 0, 0, 1)
+	msgs := tx.GetMsgs()
+	msgs[1].(*baseapptestutil.MsgCounter).FailOnHandler = true
+	builder := suite.txConfig.NewTxBuilder()
+	require.NoError(t, builder.SetMsgs(msgs...))
+	builder.SetMemo(tx.GetMemo())
+	setTxSignature(t, builder, 0)
+	txBytes, err := suite.txConfig.TxEncoder()(builder.GetTx())
+	require.NoError(t, err)
+
+	res, err := app.FinalizeBlock(&abci.FinalizeBlockRequest{Height: 1, Txs: [][]byte{txBytes}})
+	require.NoError(t, err)
+	require.Len(t, res.TxResults, 1)
+	require.False(t, res.TxResults[0].IsOK())
+
+	store := app.GetContextForFinalizeBlock(nil).KVStore(capKey1)
+	require.Equal(t, int64(1), getIntFromStore(t, store, anteKey), "ante state remains committed")
+	require.Equal(t, int64(0), getIntFromStore(t, store, deliverKey), "message state is rolled back")
+
+	_, err = app.Commit()
+	require.NoError(t, err)
+	flush := <-app.PublishEvents
+	require.Len(t, flush.TxEvents, 1)
+	require.Equal(t, []proto.Message{
+		NewTestPublishEvent("ante_handler", map[string]string{"counter": "0"}),
+	}, flush.TxEvents[0].PublishEvents, "only committed ante events are published")
+	require.Equal(t, []baseapp.EventType{
+		baseapp.EventTypeAbci, baseapp.EventTypePublish,
+	}, flush.TxEvents[0].TrueOrder)
+}

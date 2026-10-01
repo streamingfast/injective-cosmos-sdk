@@ -1038,6 +1038,7 @@ func (app *BaseApp) runTxWithMultiStore(
 	// in case message processing fails. At this point, the MultiStore
 	// is a branch of a branch.
 	runMsgCtx, msCache := app.cacheTxContext(ctx, txBytes)
+	runMsgCtx = runMsgCtx.WithPublishEventManager(sdk.NewPublishEventManager())
 
 	// Attempt to execute all messages and only update state if all messages pass
 	// and we're in DeliverTx. Note, runMsgs will never return a reference to a
@@ -1074,6 +1075,7 @@ func (app *BaseApp) runTxWithMultiStore(
 			consumeBlockGas()
 
 			msCache.Write()
+			ctx.ForwardPublishEvents(runMsgCtx.PublishEventManager().Events())
 		}
 
 		if len(anteEvents) > 0 && (mode == execModeFinalize || mode == execModeSimulate) {
