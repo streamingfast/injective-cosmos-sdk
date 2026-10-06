@@ -60,6 +60,7 @@ type Context struct {
 	minGasPrice          DecCoins
 	consParams           cmtproto.ConsensusParams
 	eventManager         EventManagerI
+	publishEventManager  PublishEventManagerI
 	priority             int64 // The tx priority, only relevant in CheckTx
 	kvGasConfig          storetypes.GasConfig
 	transientKVGasConfig storetypes.GasConfig
@@ -103,6 +104,12 @@ func (c Context) CometInfo() comet.BlockInfo                    { return c.comet
 func (c Context) HeaderInfo() header.Info                       { return c.headerInfo }
 func (c Context) TxIndex() int                                  { return c.txIndex }
 func (c Context) MsgIndex() int                                 { return c.msgIndex }
+func (c Context) PublishEventManager() PublishEventManagerI {
+	return &EventPlaceholderManager{
+		c.eventManager,
+		c.publishEventManager,
+	}
+}
 
 // clone the header before returning
 func (c Context) BlockHeader() cmtproto.Header {
@@ -149,6 +156,7 @@ func NewContext(ms storetypes.MultiStore, header cmtproto.Header, isCheckTx bool
 		gasMeter:             storetypes.NewInfiniteGasMeter(),
 		minGasPrice:          DecCoins{},
 		eventManager:         NewEventManager(),
+		publishEventManager:  NewPublishEventManager(),
 		kvGasConfig:          storetypes.KVGasConfig(),
 		transientKVGasConfig: storetypes.TransientGasConfig(),
 		txIndex:              -1,
@@ -306,6 +314,18 @@ func (c Context) WithEventManager(em EventManagerI) Context {
 	return c
 }
 
+// WithPublishEventManager returns a Context with an updated publish event manager
+func (c Context) WithPublishEventManager(sem PublishEventManagerI) Context {
+	c.publishEventManager = sem
+	return c
+}
+
+// ForwardPublishEvents appends publish events without emitting new placeholders.
+// The caller must preserve their existing placeholders in the regular events.
+func (c Context) ForwardPublishEvents(events []proto.Message) {
+	c.publishEventManager.EmitEvents(events)
+}
+
 // WithPriority returns a Context with an updated tx priority
 func (c Context) WithPriority(p int64) Context {
 	c.priority = p
@@ -395,9 +415,13 @@ func (c Context) ObjectStore(key storetypes.StoreKey) storetypes.ObjKVStore {
 func (c Context) CacheContext() (cc Context, writeCache func()) {
 	cms := c.ms.CacheMultiStore()
 	cc = c.WithMultiStore(cms).WithEventManager(NewEventManager())
+	cc = cc.WithPublishEventManager(NewPublishEventManager())
 
 	writeCache = func() {
 		c.EventManager().EmitEvents(cc.EventManager().Events())
+
+		c.ForwardPublishEvents(cc.PublishEventManager().Events())
+
 		cms.Write()
 	}
 

@@ -720,6 +720,7 @@ func (app *BaseApp) VerifyVoteExtension(req *abci.VerifyVoteExtensionRequest) (r
 // must be used.
 func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.FinalizeBlockRequest) (res *abci.FinalizeBlockResponse, err error) {
 	var events []abci.Event
+	var publishEvents []proto.Message
 
 	if err = app.checkHalt(req.Height, req.Time); err != nil {
 		return nil, err
@@ -812,6 +813,8 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 		// continue
 	}
 
+	// accumulation of PreBLock and BeginBlock published events
+	publishEvents = append(publishEvents, app.finalizeBlockState.Context().PublishEventManager().Events()...)
 	events = append(events, beginBlock.Events...)
 
 	// Reset the gas meter so that the AnteHandlers aren't required to
@@ -823,7 +826,7 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 	//
 	// NOTE: Not all raw transactions may adhere to the sdk.Tx interface, e.g.
 	// vote extensions, so skip those.
-	txResults, err := app.executeTxs(ctx, req.Txs)
+	txResults, txEventSet, err := app.executeTxs(ctx, req.Txs)
 	if err != nil {
 		return nil, err
 	}
@@ -831,6 +834,8 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 	if app.finalizeBlockState.ms.TracingEnabled() {
 		app.finalizeBlockState.ms = app.finalizeBlockState.ms.SetTracingContext(nil).(storetypes.CacheMultiStore)
 	}
+
+	app.finalizeBlockState.SetContext(app.finalizeBlockState.Context().WithPublishEventManager(sdk.NewPublishEventManager()))
 
 	endBlock, err := app.endBlock(app.finalizeBlockState.Context())
 	if err != nil {
@@ -845,8 +850,23 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 		// continue
 	}
 
+	// accumulation of EndBlock published events
+	publishEvents = append(publishEvents, app.finalizeBlockState.Context().PublishEventManager().Events()...)
+
 	events = append(events, endBlock.Events...)
 	cp := app.GetConsensusParams(app.finalizeBlockState.Context())
+
+	events, trueOrder := filterOutPublishEvents(events)
+	app.flushData = PublishEventFlush{
+		Height:      header.Height,
+		PrevAppHash: header.AppHash,
+		BlockEvents: EventSet{
+			AbciEvents:    events,
+			PublishEvents: publishEvents,
+			TrueOrder:     trueOrder,
+		},
+		TxEvents: txEventSet,
+	}
 
 	return &abci.FinalizeBlockResponse{
 		Events:                events,
@@ -856,10 +876,14 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 	}, nil
 }
 
-func (app *BaseApp) executeTxs(ctx context.Context, txs [][]byte) (res []*abci.ExecTxResult, err error) {
+func (app *BaseApp) executeTxs(ctx context.Context, txs [][]byte) ([]*abci.ExecTxResult, []EventSet, error) {
 	txResults := make([]*abci.ExecTxResult, 0, len(txs))
+	txEventSet := make([]EventSet, 0)
+
 	for txIdx, rawTx := range txs {
 		var response *abci.ExecTxResult
+
+		app.finalizeBlockState.SetContext(app.finalizeBlockState.Context().WithPublishEventManager(sdk.NewPublishEventManager()))
 
 		if memTx, err := app.txDecoder(rawTx); err == nil {
 			response = app.deliverTx(rawTx, memTx, txIdx)
@@ -879,19 +903,44 @@ func (app *BaseApp) executeTxs(ctx context.Context, txs [][]byte) (res []*abci.E
 		// check after every tx if we should abort
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, nil, ctx.Err()
 		default:
 			// continue
 		}
-
+		filtered, order := filterOutPublishEvents(response.Events)
+		response.Events = filtered
 		txResults = append(txResults, response)
+		txEventSet = append(txEventSet, EventSet{
+			AbciEvents:    response.Events,
+			PublishEvents: app.finalizeBlockState.Context().PublishEventManager().Events(),
+			TrueOrder:     order,
+		})
 	}
 
 	if app.txResultsPostHook != nil {
 		txResults = app.txResultsPostHook(txResults)
 	}
 
-	return txResults, nil
+	return txResults, txEventSet, nil
+}
+
+func filterOutPublishEvents(events []abci.Event) ([]abci.Event, []EventType) {
+	var (
+		abciEvents = make([]abci.Event, 0, len(events))
+		ordering   = make([]EventType, 0, len(events))
+	)
+
+	for _, e := range events {
+		if e.Type == sdk.PlaceholderEventType {
+			ordering = append(ordering, EventTypePublish)
+			continue
+		}
+
+		abciEvents = append(abciEvents, e)
+		ordering = append(ordering, EventTypeAbci)
+	}
+
+	return abciEvents, ordering
 }
 
 // FinalizeBlock will execute the block proposal provided by RequestFinalizeBlock.
@@ -984,7 +1033,9 @@ func (app *BaseApp) Commit() (*abci.CommitResponse, error) {
 		rms.SetCommitHeader(header)
 	}
 
-	app.cms.Commit()
+	commitId := app.cms.Commit()
+
+	app.publishEvents(commitId.Hash)
 
 	resp := &abci.CommitResponse{
 		RetainHeight: retainHeight,

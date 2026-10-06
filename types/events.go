@@ -341,3 +341,62 @@ func MarkEventsToIndex(events []abci.Event, indexSet map[string]struct{}) []abci
 
 	return updatedEvents
 }
+
+type PublishEventManagerI interface {
+	Events() []proto.Message
+	EmitEvent(event proto.Message)
+	EmitEvents(events []proto.Message)
+}
+
+var _ PublishEventManagerI = (*PublishEventManager)(nil)
+
+// PublishEventManager implements a simple wrapper around a slice of proto messages that can be used to publish events.
+type PublishEventManager struct {
+	events []proto.Message
+}
+
+func NewPublishEventManager() *PublishEventManager {
+	return &PublishEventManager{make([]proto.Message, 0)}
+}
+
+func (em *PublishEventManager) Events() []proto.Message { return em.events }
+
+func (em *PublishEventManager) EmitEvent(event proto.Message) {
+	em.events = append(em.events, event)
+}
+
+func (em *PublishEventManager) EmitEvents(events []proto.Message) {
+	em.events = append(em.events, events...)
+}
+
+const PlaceholderEventType = "publish event placeholder"
+
+var _ PublishEventManagerI = (*EventPlaceholderManager)(nil)
+
+// EventPlaceholderManager is used to preserve event emission order between regular and published events.
+// Since published events go into a different pipeline than regular events empty placeholders are put into
+// the regular EventManager and later stripped during block finalization (see abci.go for more details).
+type EventPlaceholderManager struct {
+	eventManager        EventManagerI
+	publishEventManager PublishEventManagerI
+}
+
+func (e *EventPlaceholderManager) Events() []proto.Message {
+	return e.publishEventManager.Events()
+}
+
+func (e *EventPlaceholderManager) EmitEvent(event proto.Message) {
+	e.publishEventManager.EmitEvent(event)
+	e.eventManager.EmitEvent(NewEvent(PlaceholderEventType))
+}
+
+func (e *EventPlaceholderManager) EmitEvents(events []proto.Message) {
+	e.publishEventManager.EmitEvents(events)
+
+	placeholders := make(Events, 0, len(events))
+	for _, _ = range events {
+		placeholders = append(placeholders, NewEvent(PlaceholderEventType))
+	}
+
+	e.eventManager.EmitEvents(placeholders)
+}
