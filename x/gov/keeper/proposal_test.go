@@ -11,6 +11,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/testutil/testdata"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	"github.com/cosmos/cosmos-sdk/x/gov/types"
 	v1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	"github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
@@ -161,8 +162,8 @@ func (suite *KeeperTestSuite) TestSubmitProposal() {
 		{&tp, govAcct, strings.Repeat("a", 100001), true, types.ErrMetadataTooLong},
 		// error when signer is not gov acct
 		{&tp, randomAddr.String(), "", false, types.ErrInvalidSigner},
-		// error only when invalid route
-		{&invalidProposalRoute{}, govAcct, "", false, types.ErrNoProposalHandlerExists},
+		// Legacy content routes are checked during execution.
+		{&invalidProposalRoute{}, govAcct, "", false, nil},
 	}
 
 	for i, tc := range testCases {
@@ -171,6 +172,33 @@ func (suite *KeeperTestSuite) TestSubmitProposal() {
 		_, err = suite.govKeeper.SubmitProposal(suite.ctx, []sdk.Msg{prop}, tc.metadata, "title", "", suite.addrs[0], tc.expedited)
 		suite.Require().True(errors.Is(tc.expectedErr, err), "tc #%d; got: %v, expected: %v", i, err, tc.expectedErr)
 	}
+}
+
+func TestSubmitProposalDoesNotExecuteLegacyContent(t *testing.T) {
+	t.Parallel()
+
+	govKeeper, _, _, _, _, _, ctx := setupGovKeeper(t)
+	executionErr := errors.New("legacy handler execution failed")
+	calls := 0
+	govKeeper.SetLegacyRouter(v1beta1.NewRouter().AddRoute(types.RouterKey, func(sdk.Context, v1beta1.Content) error {
+		calls++
+		return executionErr
+	}))
+
+	msg, err := v1.NewLegacyContent(v1beta1.NewTextProposal("title", "description"), govAcct.String())
+	require.NoError(t, err)
+
+	proposal, err := govKeeper.SubmitProposal(ctx, []sdk.Msg{msg}, "", "title", "summary", addr, false)
+	require.NoError(t, err)
+	require.Zero(t, calls)
+
+	stored, err := govKeeper.Proposals.Get(ctx, proposal.Id)
+	require.NoError(t, err)
+	require.Equal(t, proposal, stored)
+
+	_, err = keeper.NewMsgServerImpl(govKeeper).ExecLegacyContent(ctx, msg)
+	require.ErrorContains(t, err, executionErr.Error())
+	require.Equal(t, 1, calls)
 }
 
 func (suite *KeeperTestSuite) TestCancelProposal() {
