@@ -21,8 +21,10 @@ func (c coinType) NewValue(*context.Context, *Builder) Value {
 	return &coinValue{}
 }
 
+// DefaultValue is empty: an unset coin flag has no default to show. pflag
+// >= 1.0.6 prints any non-empty DefValue in help as "(default ...)".
 func (c coinType) DefaultValue() string {
-	return "zero"
+	return ""
 }
 
 func (c *coinValue) Get(protoreflect.Value) (protoreflect.Value, error) {

@@ -48,6 +48,21 @@ jobs:
           flavor: |
             latest=false
 
+      # The image builds (cgo, two platforms) exhaust the hosted runner's disk.
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.2"
+
+      # The Dockerfile reads private InjectiveLabs modules from .modcache, a file
+      # module proxy staged here with GH_TOKEN; no credentials enter the image.
+      - name: Prepare private Go modules for Docker
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/prepare-docker-go-modules.sh
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -62,7 +77,11 @@ jobs:
       - name: Publish to GitHub Packages
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/amd64,linux/arm64
+          # Build from the workspace: the default git context would not include
+          # the .modcache staged above.
+          context: .
+          # Pull requests only check that the image builds; nothing is pushed.
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha

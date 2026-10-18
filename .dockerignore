@@ -3,3 +3,4 @@ Vagrantfile
 
 build/
 coverage.txt
+.modcache.tmp.*

@@ -16,6 +16,8 @@ on:
 jobs:
   Gosec:
     permissions:
+      contents: read # Checkout of this internal repository
+      actions: read # upload-sarif reads the workflow run on private repositories
       security-events: write
 
     runs-on: ubuntu-latest
@@ -23,16 +25,27 @@ jobs:
       GO111MODULE: on
     steps:
       - name: Checkout Source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Run Gosec Security Scanner
-        uses: securego/gosec@master
+      - uses: actions/setup-go@v5
         with:
+          go-version: "1.27.2"
+
+      - name: Download Go modules
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh .
+
+      # securego/gosec@master is a Docker action with a prebuilt Go toolchain;
+      # build the pinned release with this repository's Go instead.
+      - name: Run Gosec Security Scanner
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
           # we let the report trigger content trigger a failure using the GitHub Security features.
-          args: "-exclude=G101,G107 -no-fail -fmt sarif -out results.sarif ./..."
+          "$(go env GOPATH)/bin/gosec" -exclude=G101,G107 -no-fail -fmt sarif -out results.sarif ./...
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: results.sarif

@@ -12,4 +12,8 @@ jobs:
       - uses: gaurav-nelson/github-action-markdown-link-check@1.0.15
         with:
           folder-path: "docs"
+          # Only check Markdown files this PR changes: the docs carry many
+          # long-dead upstream links that would fail every docs change.
+          check-modified-files-only: "yes"
+          base-branch: ${{ github.base_ref }}
       - run: cd docs && sh ./post.sh

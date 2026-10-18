@@ -1,49 +1,30 @@
 name: Lint
+# Runs golangci-lint on the modules a pull request touches and reports only
+# issues introduced since the merge base with the PR's base branch, so
+# pre-existing findings in fork code don't fail unrelated changes.
+# Locally: `make lint` (LINT_BASE defaults to origin/v0.50.x-inj).
 on:
-  push:
-    branches:
-      - main
-      - release/**
   pull_request:
-  merge_group:
 permissions:
   contents: read
 jobs:
   golangci:
     name: golangci-lint
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v4
         with:
-          go-version: "1.26.2"
-          check-latest: true
-      - uses: technote-space/get-diff-action@v6.1.2
-        id: git_diff
+          # The merge base with the PR's base branch needs full history.
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
         with:
-          PATTERNS: |
-            Makefile
-            **/Makefile
-            .golangci.yml
-      - name: run linting (long)
-        if: env.GIT_DIFF
-        id: lint_long
-        run: |
-          make lint
-      - uses: technote-space/get-diff-action@v6.1.2
-        if: steps.lint_long.outcome == 'skipped'
-        id: git_diff_all
-        with:
-          PATTERNS: |
-            **/*.go
-            go.mod
-            go.sum
-            **/go.mod
-            **/go.sum
-      - name: run linting (short)
-        if: steps.lint_long.outcome == 'skipped' && env.GIT_DIFF
-        run: |
-          make lint
+          go-version: "1.27.2"
+      - name: Download Go modules
         env:
-          GIT_DIFF: ${{ env.GIT_DIFF }}
-          LINT_DIFF: 1
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh
+      - name: Lint
+        env:
+          LINT_BASE: origin/${{ github.base_ref }}
+        run: make lint

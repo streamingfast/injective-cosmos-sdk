@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths: ["**/*.go"]
 permissions:
+  contents: read # Checkout of this internal repository
   pull-requests: write
 jobs:
   remind:
