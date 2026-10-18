@@ -25,9 +25,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: ./scripts/go-mod-download.sh .
       # orijtech/consensuswarn@main is a Docker action built with Go 1.23, which
-      # can't load this repository. Build it from the pinned tools module.
+      # can't load this repository, and it fetches the PR diff from a github.com
+      # URL that 404s for private repositories. Build the patched copy vendored
+      # in scripts/consensuswarn instead.
       - name: Build consensuswarn
-        run: GOWORK=off go build -C scripts/consensuswarn -o bin/consensuswarn github.com/orijtech/consensuswarn
+        run: GOWORK=off go build -C scripts/consensuswarn -o bin/consensuswarn .
       - name: Warn about consensus code changes
         env:
           GITHUB_TOKEN: ${{ github.token }}

@@ -82,7 +82,7 @@ require (
 	github.com/cosmos/go-bip39 v1.0.0 // indirect
 	github.com/cosmos/gogogateway v1.2.0 // indirect
 	github.com/cosmos/gogoproto v1.7.0 // indirect
-	github.com/cosmos/iavl v1.2.6 // indirect
+	github.com/cosmos/iavl v1.2.8 // indirect
 	github.com/cosmos/ics23/go v0.11.0 // indirect
 	github.com/cosmos/ledger-cosmos-go v0.14.0 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
@@ -237,6 +237,8 @@ replace cosmossdk.io/x/upgrade => ../../x/upgrade
 replace github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.9
 
 replace github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.0-inj.4
+
+replace github.com/cosmos/iavl => github.com/InjectiveLabs/iavl v1.2.8-inj.1
 
 replace github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
 

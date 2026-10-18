@@ -10,7 +10,7 @@ require (
 	github.com/cometbft/cometbft/api v1.0.0
 	github.com/cosmos/cosmos-db v1.0.2
 	github.com/cosmos/gogoproto v1.7.0
-	github.com/cosmos/iavl v1.2.6
+	github.com/cosmos/iavl v1.2.8
 	github.com/cosmos/ics23/go v0.11.0
 	github.com/golang/mock v1.6.0
 	github.com/hashicorp/go-hclog v1.6.3
@@ -76,3 +76,5 @@ replace (
 	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.9
 	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.0-inj.4
 )
+
+replace github.com/cosmos/iavl => github.com/InjectiveLabs/iavl v1.2.8-inj.1

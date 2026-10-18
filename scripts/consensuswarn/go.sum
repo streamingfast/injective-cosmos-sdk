@@ -5,8 +5,6 @@ github.com/google/go-github v17.0.0+incompatible h1:N0LgJ1j65A7kfXrZnUDaYCs/Sf4r
 github.com/google/go-github v17.0.0+incompatible/go.mod h1:zLgOLi98H3fifZn+44m+umXrS52loVEgC2AApnigrVQ=
 github.com/google/go-querystring v1.2.0 h1:yhqkPbu2/OH+V9BfpCVPZkNmUXhb2gBxJArfhIxNtP0=
 github.com/google/go-querystring v1.2.0/go.mod h1:8IFJqpSRITyJ8QhQ13bmbeMBDfmeEJZD5A0egEOmkqU=
-github.com/orijtech/consensuswarn v0.0.0-20240815223224-84343282daee h1:sjB8Wzt8Fe8O5Rn0cJYcunP9CuaoUb6xx37f+GKL7yI=
-github.com/orijtech/consensuswarn v0.0.0-20240815223224-84343282daee/go.mod h1:0i7WRrU83ojt7x+vy7ECEp7E6/e46vQVU6QiCJ3y6VM=
 github.com/sourcegraph/go-diff v0.9.0 h1:7xcVsayWHhvxZGrqt1o89vvBApCa4nyCgO7tNxDHJ+Q=
 github.com/sourcegraph/go-diff v0.9.0/go.mod h1:hWlcO7Al+UZStZAP8rBumHpCK5ZHQ5BXsMls8p4+F5E=
 golang.org/x/mod v0.42.0 h1:ICeL3t2L30ljSPHHxDnR4fqVcBt/zR2zJAb9juavmQg=

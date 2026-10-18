@@ -39,6 +39,10 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ## [Unreleased]
 
+### Bug Fixes
+
+* [#126](https://github.com/InjectiveLabs/cosmos-sdk/pull/126) Fix data races between `Commit` and concurrent queries of the latest version: `rootmulti.Store.lastCommitInfo` is published atomically, and IAVL is pinned to `InjectiveLabs/iavl` v1.2.8-inj.1 (v1.2.8 plus cosmos/iavl#1166).
+
 ## v1.1.1 (September 06, 2024)
 
 ### Improvements
