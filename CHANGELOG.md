@@ -44,6 +44,7 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ### Bug Fixes
 
+* (baseapp) Omit internal publish-event placeholders from simulation responses while preserving finalization ordering.
 * (store) [#126](https://github.com/InjectiveLabs/cosmos-sdk/pull/126) Fix data races between `Commit` and concurrent gRPC queries in `rootmulti` and IAVL (pinned to `InjectiveLabs/iavl` v1.2.8-inj.1).
 * (baseapp) [#25642](https://github.com/cosmos/cosmos-sdk/pull/25642) Mark pre-block events for indexing based on local configuration.
 * (baseapp) [#23879](https://github.com/cosmos/cosmos-sdk/pull/23879) Ensure finalize block response is not empty in the defer check of FinalizeBlock to avoid panic by nil pointer.

@@ -1,13 +1,16 @@
 package baseapp_test
 
 import (
+	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"cosmossdk.io/log"
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	dbm "github.com/cosmos/cosmos-db"
+	"github.com/cosmos/gogoproto/jsonpb"
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/stretchr/testify/require"
 
@@ -16,6 +19,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
+
+const counterAttributeKey = "counter"
 
 var _ proto.Message = StringPublishEvent{}
 
@@ -206,6 +211,74 @@ func TestPublishEvent_FinalizeBlock_DeliverTx(t *testing.T) {
 	}
 }
 
+func TestPublishEvent_SimulateFiltersPlaceholders(t *testing.T) {
+	anteKey := []byte("ante-key")
+	deliverKey := []byte("deliver-key")
+	suite := NewBaseAppSuite(t, func(app *baseapp.BaseApp) {
+		app.SetAnteHandler(anteHandlerTxTestWithCustomEventEmit(t, capKey1, anteKey, true))
+	})
+	app := suite.baseApp
+	app.EnablePublish = true
+	app.PublishEvents = make(chan baseapp.PublishEventFlush, 1)
+	_, err := app.InitChain(&abci.InitChainRequest{ConsensusParams: &cmtproto.ConsensusParams{}})
+	require.NoError(t, err)
+	baseapptestutil.RegisterCounterServer(app.MsgServiceRouter(), CounterServerImpl{t, capKey1, deliverKey, true})
+	txBytes, err := suite.txConfig.TxEncoder()(newTxCounter(t, suite.txConfig, 0, 0))
+	require.NoError(t, err)
+
+	gasInfo, result, err := app.Simulate(txBytes)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, result.Events, 3, "only the ante event, message action, and counter event should be returned")
+	for _, event := range result.Events {
+		require.NotEqual(t, sdk.PlaceholderEventType, event.Type)
+	}
+
+	// Repeated simulations must preserve ordinary events and gas without committing state.
+	repeatedGas, repeatedResult, err := app.Simulate(txBytes)
+	require.NoError(t, err)
+	require.Equal(t, gasInfo, repeatedGas)
+	require.Equal(t, result, repeatedResult)
+	queryResult, err := app.Query(context.Background(), &abci.QueryRequest{Path: "/app/simulate", Data: txBytes})
+	require.NoError(t, err)
+	require.True(t, queryResult.IsOK(), queryResult.Log)
+	var querySimulation sdk.SimulationResponse
+	require.NoError(t, jsonpb.Unmarshal(strings.NewReader(string(queryResult.Value)), &querySimulation))
+	require.Equal(t, gasInfo, querySimulation.GasInfo)
+	require.Equal(t, result.Events, querySimulation.Result.Events)
+	require.Equal(t, result.Data, querySimulation.Result.Data)
+	require.Equal(t, result.Log, querySimulation.Result.Log)
+	require.Empty(t, app.PublishEvents, "simulation must not flush published events")
+
+	// Executing the same transaction later must still reconstruct both publish positions.
+	finalized, err := app.FinalizeBlock(&abci.FinalizeBlockRequest{Height: 1, Txs: [][]byte{txBytes}})
+	require.NoError(t, err)
+	require.Len(t, finalized.TxResults, 1)
+	require.True(t, finalized.TxResults[0].IsOK(), finalized.TxResults[0].Log)
+	require.Equal(t, int64(gasInfo.GasUsed), finalized.TxResults[0].GasUsed)
+	_, err = app.Commit()
+	require.NoError(t, err)
+	flush := <-app.PublishEvents
+	require.Len(t, flush.TxEvents, 1)
+	require.Equal(t, []proto.Message{
+		NewTestPublishEvent("ante_handler", map[string]string{counterAttributeKey: "0"}),
+		NewTestPublishEvent("message", map[string]string{counterAttributeKey: "0"}),
+	}, flush.TxEvents[0].PublishEvents)
+	require.Equal(t, []baseapp.EventType{
+		baseapp.EventTypeAbci, baseapp.EventTypePublish,
+		baseapp.EventTypeAbci, baseapp.EventTypeAbci, baseapp.EventTypePublish,
+	}, flush.TxEvents[0].TrueOrder)
+}
+
+func TestPublishEvent_SimulateInvalidTransaction(t *testing.T) {
+	suite := NewBaseAppSuite(t)
+	_, err := suite.baseApp.InitChain(&abci.InitChainRequest{ConsensusParams: &cmtproto.ConsensusParams{}})
+	require.NoError(t, err)
+	_, result, err := suite.baseApp.Simulate([]byte("malformed transaction"))
+	require.Error(t, err)
+	require.Nil(t, result)
+}
+
 func TestPublishEvent_FinalizeBlock_FailedMessageDiscardsPublishEvents(t *testing.T) {
 	anteKey := []byte("ante-key")
 	deliverKey := []byte("deliver-key")
@@ -246,7 +319,7 @@ func TestPublishEvent_FinalizeBlock_FailedMessageDiscardsPublishEvents(t *testin
 	flush := <-app.PublishEvents
 	require.Len(t, flush.TxEvents, 1)
 	require.Equal(t, []proto.Message{
-		NewTestPublishEvent("ante_handler", map[string]string{"counter": "0"}),
+		NewTestPublishEvent("ante_handler", map[string]string{counterAttributeKey: "0"}),
 	}, flush.TxEvents[0].PublishEvents, "only committed ante events are published")
 	require.Equal(t, []baseapp.EventType{
 		baseapp.EventTypeAbci, baseapp.EventTypePublish,
