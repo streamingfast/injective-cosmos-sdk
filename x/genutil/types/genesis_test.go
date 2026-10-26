@@ -101,3 +101,44 @@ func TestAppGenesis_SaveAsRoundTrip(t *testing.T) {
 	assert.NilError(t, json.Compact(&wantState, genesis.AppState))
 	assert.Equal(t, loadedState.String(), wantState.String())
 }
+
+// Genesis files on existing networks were written by encoding/json SaveAs
+// (numeric initial_height) or are CometBFT genesis files. Both must still load
+// unchanged, and app_state must come back byte for byte: the genesis checksum
+// that CometBFT compares against the stored genesisDocHash is taken over it.
+func TestAppGenesis_LegacyFilesLoad(t *testing.T) {
+	cmtGenesis, err := types.AppGenesisFromFile("testdata/cmt_genesis.json")
+	assert.NilError(t, err)
+	cmtAppName := cmtGenesis.AppName
+	cmtGenesis.AppName = "simapp"
+	cmtGenesis.AppVersion = "0.1.0"
+
+	// Byte layout of SaveAs before it switched to cmtjson.
+	jsonGenesis, err := json.MarshalIndent(cmtGenesis, "", "  ")
+	assert.NilError(t, err)
+	jsonFile := filepath.Join(t.TempDir(), "genesis.json")
+	assert.NilError(t, os.WriteFile(jsonFile, jsonGenesis, 0o600))
+
+	for name, tc := range map[string]struct {
+		file    string
+		appName string
+	}{
+		"encoding/json SaveAs": {file: jsonFile, appName: cmtGenesis.AppName},
+		"CometBFT genesis":     {file: "testdata/cmt_genesis.json", appName: cmtAppName},
+	} {
+		t.Run(name, func(t *testing.T) {
+			raw, err := os.ReadFile(tc.file)
+			assert.NilError(t, err)
+			var fields map[string]json.RawMessage
+			assert.NilError(t, json.Unmarshal(raw, &fields))
+
+			loaded, err := types.AppGenesisFromFile(tc.file)
+			assert.NilError(t, err)
+			assert.Equal(t, loaded.AppName, tc.appName)
+			assert.Equal(t, loaded.ChainID, "demo")
+			assert.Equal(t, loaded.InitialHeight, int64(48))
+			assert.DeepEqual(t, loaded.Consensus, cmtGenesis.Consensus)
+			assert.Equal(t, string(loaded.AppState), string(fields["app_state"]))
+		})
+	}
+}
