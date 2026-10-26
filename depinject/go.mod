@@ -1,6 +1,6 @@
 module cosmossdk.io/depinject
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/cockroachdb/errors v1.14.0
@@ -11,13 +11,13 @@ require (
 )
 
 require (
-	github.com/bmatcuk/doublestar/v4 v4.6.1 // indirect
+	github.com/bmatcuk/doublestar/v4 v4.10.4 // indirect
 	github.com/cockroachdb/apd/v3 v3.2.3 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20241215232642-bb51bb14a506 // indirect
 	github.com/cockroachdb/redact v1.1.8 // indirect
 	github.com/cucumber/gherkin/go/v27 v27.0.0 // indirect
 	github.com/cucumber/messages/go/v22 v22.0.0 // indirect
-	github.com/cucumber/tag-expressions/go/v6 v6.1.0 // indirect
+	github.com/cucumber/tag-expressions/go/v6 v6.2.0 // indirect
 	github.com/getsentry/sentry-go v0.50.0 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect

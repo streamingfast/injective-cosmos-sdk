@@ -1,5 +1,5 @@
-github.com/bmatcuk/doublestar/v4 v4.6.1 h1:FH9SifrbvJhnlQpztAx++wlkk70QBf0iBWDwNy7PA4I=
-github.com/bmatcuk/doublestar/v4 v4.6.1/go.mod h1:xBQ8jztBU6kakFMg+8WGxn0c6z1fTSPVIjEY1Wr7jzc=
+github.com/bmatcuk/doublestar/v4 v4.10.4 h1:oTKkRmRuOsKMqFe1AQazd9gGBFNEpOmgKp/xzB97dnA=
+github.com/bmatcuk/doublestar/v4 v4.10.4/go.mod h1:xBQ8jztBU6kakFMg+8WGxn0c6z1fTSPVIjEY1Wr7jzc=
 github.com/cockroachdb/apd/v3 v3.2.3 h1:4Zx+I3R35bFXMnltzmjP79i2cravE4jTRL6ps9Aux80=
 github.com/cockroachdb/apd/v3 v3.2.3/go.mod h1:klXJcjp+FffLTHlhIG69tezTDvdP065naDsHzKhYSqc=
 github.com/cockroachdb/errors v1.14.0 h1:EfdVEJpN3z8rPMo43Yit59LxoiIa470fSXpZXuEs+ZI=
@@ -13,8 +13,8 @@ github.com/cucumber/gherkin/go/v27 v27.0.0 h1:waJh5eeq7rrKn5Gf3/FI4G34ypduPRaV8e
 github.com/cucumber/gherkin/go/v27 v27.0.0/go.mod h1:2JxwYskO0sO4kumc/Nv1g6bMncT5w0lShuKZnmUIhhk=
 github.com/cucumber/messages/go/v22 v22.0.0 h1:hk3ITpEWQ+KWDe619zYcqtaLOfcu9jgClSeps3DlNWI=
 github.com/cucumber/messages/go/v22 v22.0.0/go.mod h1:aZipXTKc0JnjCsXrJnuZpWhtay93k7Rn3Dee7iyPJjs=
-github.com/cucumber/tag-expressions/go/v6 v6.1.0 h1:YOhnlISh/lyPZrLojFbJVzocv7TGhzOhB9aULN8A7Sg=
-github.com/cucumber/tag-expressions/go/v6 v6.1.0/go.mod h1:6scGHUy3RLnbNq8un7XNoopF2qR/0RMgqolQH/TkycY=
+github.com/cucumber/tag-expressions/go/v6 v6.2.0 h1:lhrOHBBhlAooQ8uHXdB6a0NqI2y/TNwOqY6Tf7+ewCk=
+github.com/cucumber/tag-expressions/go/v6 v6.2.0/go.mod h1:HVmg9Js2L1/JM2DEwsWl67BWW5AMms3y17WgzUItq7k=
 github.com/getsentry/sentry-go v0.50.0 h1:gkO59rn/i0RCAXUUTflC5QVbTQGPXbaFabs2olVzc9g=
 github.com/getsentry/sentry-go v0.50.0/go.mod h1:+xsDuN+SoRN/xfs1hdq78wnrE3omIZf+FCuh9FOW1C8=
 github.com/go-errors/errors v1.4.2 h1:J6MZopCL4uSllY1OfXM374weqZFFItUbrImctkmUxIA=

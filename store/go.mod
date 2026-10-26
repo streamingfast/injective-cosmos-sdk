@@ -1,6 +1,6 @@
 module cosmossdk.io/store
 
-go 1.27.2
+go 1.27.3
 
 require (
 	cosmossdk.io/errors v1.0.0
@@ -8,8 +8,8 @@ require (
 	cosmossdk.io/math v1.5.3
 	github.com/cometbft/cometbft v1.0.1
 	github.com/cometbft/cometbft/api v1.0.0
-	github.com/cosmos/cosmos-db v1.0.2
-	github.com/cosmos/gogoproto v1.7.0
+	github.com/cosmos/cosmos-db v1.1.3
+	github.com/cosmos/gogoproto v1.7.2
 	github.com/cosmos/iavl v1.2.8
 	github.com/cosmos/ics23/go v0.11.0
 	github.com/golang/mock v1.6.0
@@ -59,7 +59,7 @@ require (
 	github.com/prometheus/client_golang v1.25.0 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect
 	github.com/prometheus/common v0.72.1 // indirect
-	github.com/prometheus/procfs v0.22.0 // indirect
+	github.com/prometheus/procfs v0.23.0 // indirect
 	github.com/rogpeppe/go-internal v1.16.0 // indirect
 	github.com/rs/zerolog v1.35.1 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
@@ -69,7 +69,7 @@ require (
 	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20261012220534-4341edf3f941 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20261026165753-2ffab32bce7e // indirect
 )
 
 replace (

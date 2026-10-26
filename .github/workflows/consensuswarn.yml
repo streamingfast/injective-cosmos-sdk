@@ -16,10 +16,10 @@ jobs:
     steps:
       # pull_request_target: this checks out the base branch, never PR code, so
       # the tool and scripts below are trusted while the token can comment.
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
       - name: Download Go modules
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}

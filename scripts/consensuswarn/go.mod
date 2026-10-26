@@ -1,6 +1,6 @@
 module github.com/cosmos/cosmos-sdk/scripts/consensuswarn
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/google/go-github v17.0.0+incompatible

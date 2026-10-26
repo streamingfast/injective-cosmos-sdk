@@ -17,10 +17,10 @@ jobs:
   split-test-files:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
       - name: Download Go modules
         env:
@@ -30,19 +30,19 @@ jobs:
         run: go list ./... > pkgs.txt
       - name: Split pkgs into 4 files
         run: split -d -n l/4 pkgs.txt pkgs.txt.part.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: "${{ github.sha }}-00"
           path: ./pkgs.txt.part.00
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: "${{ github.sha }}-01"
           path: ./pkgs.txt.part.01
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: "${{ github.sha }}-02"
           path: ./pkgs.txt.part.02
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: "${{ github.sha }}-03"
           path: ./pkgs.txt.part.03
@@ -55,10 +55,10 @@ jobs:
       matrix:
         part: ["00", "01", "02", "03"]
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: go.sum
@@ -73,7 +73,7 @@ jobs:
             **/go.sum
             **/Makefile
             Makefile
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: "${{ github.sha }}-${{ matrix.part }}"
       - name: Download Go modules
@@ -85,7 +85,7 @@ jobs:
         if: env.GIT_DIFF
         run: |
           cat pkgs.txt.part.${{ matrix.part }} | xargs go test -mod=readonly -race -timeout 30m -coverprofile=${{ matrix.part }}profile.out -covermode=atomic -tags='ledger test_ledger_mock'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: env.GIT_DIFF
         with:
           name: "${{ github.sha }}-${{ matrix.part }}-coverage"
@@ -94,10 +94,10 @@ jobs:
   test-integration:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: go.sum
@@ -121,7 +121,7 @@ jobs:
         if: env.GIT_DIFF
         run: |
           make test-integration-cov
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: env.GIT_DIFF
         with:
           name: "${{ github.sha }}-integration-coverage"
@@ -130,10 +130,10 @@ jobs:
   test-e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: go.sum
@@ -157,7 +157,7 @@ jobs:
         if: env.GIT_DIFF
         run: |
           make test-e2e-cov
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: env.GIT_DIFF
         with:
           name: "${{ github.sha }}-e2e-coverage"
@@ -167,10 +167,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: go.sum
@@ -205,10 +205,10 @@ jobs:
   test-sim-nondeterminism:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: go.sum
@@ -243,10 +243,10 @@ jobs:
   test-clientv2:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: client/v2/go.sum
@@ -270,10 +270,10 @@ jobs:
   test-core:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: core/go.sum
@@ -297,10 +297,10 @@ jobs:
   test-depinject:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: depinject/go.sum
@@ -324,10 +324,10 @@ jobs:
   test-errors:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: errors/go.sum
@@ -351,10 +351,10 @@ jobs:
   test-math:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: math/go.sum
@@ -378,10 +378,10 @@ jobs:
   test-simapp:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: simapp/go.sum
@@ -411,10 +411,10 @@ jobs:
   test-collections:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: collections/go.sum
@@ -438,10 +438,10 @@ jobs:
   test-cosmovisor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: tools/cosmovisor/go.sum
@@ -465,10 +465,10 @@ jobs:
   test-confix:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: tools/confix/go.sum
@@ -492,10 +492,10 @@ jobs:
   test-hubl:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: tools/hubl/go.sum
@@ -519,10 +519,10 @@ jobs:
   test-store:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: store/go.sum
@@ -546,10 +546,10 @@ jobs:
   test-log:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: log/go.sum
@@ -573,10 +573,10 @@ jobs:
   test-x-tx:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: x/tx/go.sum
@@ -600,10 +600,10 @@ jobs:
   test-x-nft:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: x/nft/go.sum
@@ -627,10 +627,10 @@ jobs:
   test-x-circuit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: x/circuit/go.sum
@@ -654,10 +654,10 @@ jobs:
   test-x-feegrant:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: x/feegrant/go.sum
@@ -681,10 +681,10 @@ jobs:
   test-x-evidence:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: x/evidence/go.sum
@@ -708,10 +708,10 @@ jobs:
   test-x-upgrade:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: x/upgrade/go.sum
