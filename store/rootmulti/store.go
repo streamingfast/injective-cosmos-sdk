@@ -107,6 +107,59 @@ func NewStore(db dbm.DB, logger log.Logger, metricGatherer metrics.StoreMetrics)
 	}
 }
 
+// Copy copies the whole root store via store loader and in-memory stores. Mainly used to allow parallel reads (for CheckTx)
+// and writes (for block execution).
+func (rs *Store) Copy(storeLoader func(ms types.CommitMultiStore) error) (*Store, error) {
+	copyRs := &Store{
+		db:                  rs.db,
+		logger:              rs.logger,
+		iavlCacheSize:       rs.iavlCacheSize,
+		iavlDisableFastNode: rs.iavlDisableFastNode,
+		iavlSyncPruning:     true, // copies never commit and have no close lifecycle, so they must not start pruning workers.
+		storesParams:        rs.storesParams,
+		stores:              make(map[types.StoreKey]types.CommitStore),
+		keysByName:          rs.keysByName,
+		removalMap:          make(map[types.StoreKey]bool),
+		pruningManager:      pruning.NewManager(rs.db, rs.logger),
+		metrics:             rs.metrics,
+	}
+
+	// Historical loads bypass the application loader, which may load the latest version.
+	if version := rs.LastCommitID().Version; version != GetLatestVersion(rs.db) {
+		storeLoader = func(ms types.CommitMultiStore) error { return ms.LoadVersion(version) }
+	}
+	if err := storeLoader(copyRs); err != nil {
+		return nil, err
+	}
+
+	// storeLoader only loads disk-backed stores, so we need to copy Mem- / ObjectStores manually
+
+	for key, src := range rs.stores {
+		if src.GetStoreType() == types.StoreTypeMemory {
+			srcKV := src.(types.KVStore)
+			dstKV := copyRs.stores[key].(types.KVStore)
+			copyStore(srcKV, dstKV)
+		}
+
+		if src.GetStoreType() == types.StoreTypeObject {
+			srcKV := src.(types.ObjKVStore)
+			dstKV := copyRs.stores[key].(types.ObjKVStore)
+			copyStore(srcKV, dstKV)
+		}
+	}
+
+	return copyRs, nil
+}
+
+func copyStore[E any](src, dst types.GKVStore[E]) {
+	iter := src.Iterator(nil, nil)
+	defer iter.Close()
+
+	for ; iter.Valid(); iter.Next() {
+		dst.Set(iter.Key(), iter.Value())
+	}
+}
+
 // GetPruning fetches the pruning strategy from the root store.
 func (rs *Store) GetPruning() pruningtypes.PruningOptions {
 	return rs.pruningManager.GetOptions()

@@ -61,6 +61,10 @@ func TestStakingMsgs(t *testing.T) {
 		),
 		startupCfg, &bankKeeper, &stakingKeeper)
 	require.NoError(t, err)
+	// Simulate runs on a copy of the last committed state, so commit genesis first.
+	_, err = app.Commit()
+	require.NoError(t, err)
+
 	ctxCheck := app.BaseApp.NewContext(true)
 
 	require.True(t, sdk.Coins{genCoin}.Equal(bankKeeper.GetAllBalances(ctxCheck, addr1)))

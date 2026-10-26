@@ -73,8 +73,8 @@ require (
 )
 
 replace (
-	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.9
-	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.0-inj.4
+	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.10
+	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.0-inj.5
 )
 
 replace github.com/cosmos/iavl => github.com/InjectiveLabs/iavl v1.2.8-inj.1

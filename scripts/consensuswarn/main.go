@@ -13,7 +13,9 @@
 // Vendored from github.com/orijtech/consensuswarn@84343282daee (Apache-2.0, see LICENSE), modified to:
 //   - fetch the PR diff through the GitHub API instead of the github.com diff URL, which returns 404 for
 //     private repositories;
-//   - honor the -apiurl flag, which upstream parsed but never used.
+//   - honor the -apiurl flag, which upstream parsed but never used;
+//   - post review comments on the hunk's base-side lines (side LEFT), which the analysis covers, instead of
+//     one line past them on the head side, which GitHub rejects with 422 "line could not be resolved".
 package main
 
 import (
@@ -106,7 +108,16 @@ func main() {
 	}
 	for _, hunk := range hunks {
 		path := hunk.relFile
-		line := int(hunk.hunk.OrigStartLine + hunk.hunk.OrigLines)
+		// The analysis runs on the base checkout, so anchor the comment to the
+		// hunk's lines in the base file. A pure addition has none; use the new ones.
+		side := "LEFT"
+		startLine := int(hunk.hunk.OrigStartLine)
+		line := int(hunk.hunk.OrigStartLine+hunk.hunk.OrigLines) - 1
+		if hunk.hunk.OrigLines == 0 {
+			side = "RIGHT"
+			startLine = int(hunk.hunk.NewStartLine)
+			line = int(hunk.hunk.NewStartLine+hunk.hunk.NewLines) - 1
+		}
 		if comments[commentKey{path, line}] {
 			continue
 		}
@@ -119,13 +130,19 @@ func main() {
 			fmt.Fprintf(comment, "%s (%s:%d)\n", e.fun.FullName(), hunk.relFile, pos.Line)
 		}
 		fmt.Fprintf(comment, "```\n")
-		err := postReviewComment(ctx, gh, owner, repo, &reviewComment{
-			CommitID:  *pr.Head.SHA,
-			StartLine: int(hunk.hunk.OrigStartLine),
-			Line:      line,
-			Path:      path,
-			Body:      comment.String(),
-		})
+		rc := &reviewComment{
+			CommitID: *pr.Head.SHA,
+			Line:     line,
+			Side:     side,
+			Path:     path,
+			Body:     comment.String(),
+		}
+		// GitHub requires start_line to precede line.
+		if startLine < line {
+			rc.StartLine = startLine
+			rc.StartSide = side
+		}
+		err := postReviewComment(ctx, gh, owner, repo, rc)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "consensuswarn: %v\n", err)
 			os.Exit(2)
@@ -135,8 +152,10 @@ func main() {
 
 type reviewComment struct {
 	CommitID  string `json:"commit_id"`
-	StartLine int    `json:"start_line"`
+	StartLine int    `json:"start_line,omitempty"`
+	StartSide string `json:"start_side,omitempty"`
 	Line      int    `json:"line"`
+	Side      string `json:"side,omitempty"`
 	Path      string `json:"path"`
 	Body      string `json:"body"`
 }

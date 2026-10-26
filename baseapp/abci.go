@@ -39,6 +39,9 @@ const (
 )
 
 func (app *BaseApp) InitChain(req *abci.InitChainRequest) (*abci.InitChainResponse, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if req.ChainId != app.chainID {
 		return nil, fmt.Errorf("invalid chain-id on InitChain; expected: %s, got: %s", app.chainID, req.ChainId)
 	}
@@ -137,6 +140,9 @@ func (app *BaseApp) InitChain(req *abci.InitChainRequest) (*abci.InitChainRespon
 }
 
 func (app *BaseApp) Info(_ *abci.InfoRequest) (*abci.InfoResponse, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	lastCommitID := app.cms.LastCommitID()
 
 	return &abci.InfoResponse{
@@ -174,10 +180,18 @@ func (app *BaseApp) Query(_ context.Context, req *abci.QueryRequest) (resp *abci
 	}
 
 	// handle gRPC routes first rather than calling splitPath because '/' characters
-	// are used as part of gRPC paths
+	// are used as part of gRPC paths.
+	//
+	// gRPC queries run on a branch of a committed version (CreateQueryContext),
+	// like queries from the gRPC server, so they don't take app.mtx. Taking it
+	// would also deadlock: handlers such as cmtservice ABCIQuery call Query
+	// again, and app.mtx is not reentrant.
 	if grpcHandler := app.grpcQueryRouter.Route(req.Path); grpcHandler != nil {
 		return app.handleQueryGRPC(grpcHandler, req), nil
 	}
+
+	app.mtx.RLock()
+	defer app.mtx.RUnlock()
 
 	path := SplitABCIQueryPath(req.Path)
 	if len(path) == 0 {
@@ -204,7 +218,11 @@ func (app *BaseApp) Query(_ context.Context, req *abci.QueryRequest) (resp *abci
 
 // ListSnapshots implements the ABCI interface. It delegates to app.snapshotManager if set.
 func (app *BaseApp) ListSnapshots(req *abci.ListSnapshotsRequest) (*abci.ListSnapshotsResponse, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	resp := &abci.ListSnapshotsResponse{Snapshots: []*abci.Snapshot{}}
+
 	if app.snapshotManager == nil {
 		return resp, nil
 	}
@@ -230,6 +248,9 @@ func (app *BaseApp) ListSnapshots(req *abci.ListSnapshotsRequest) (*abci.ListSna
 
 // LoadSnapshotChunk implements the ABCI interface. It delegates to app.snapshotManager if set.
 func (app *BaseApp) LoadSnapshotChunk(req *abci.LoadSnapshotChunkRequest) (*abci.LoadSnapshotChunkResponse, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if app.snapshotManager == nil {
 		return &abci.LoadSnapshotChunkResponse{}, nil
 	}
@@ -251,6 +272,9 @@ func (app *BaseApp) LoadSnapshotChunk(req *abci.LoadSnapshotChunkRequest) (*abci
 
 // OfferSnapshot implements the ABCI interface. It delegates to app.snapshotManager if set.
 func (app *BaseApp) OfferSnapshot(req *abci.OfferSnapshotRequest) (*abci.OfferSnapshotResponse, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if app.snapshotManager == nil {
 		app.logger.Error("snapshot manager not configured")
 		return &abci.OfferSnapshotResponse{Result: abci.OFFER_SNAPSHOT_RESULT_ABORT}, nil
@@ -300,6 +324,9 @@ func (app *BaseApp) OfferSnapshot(req *abci.OfferSnapshotRequest) (*abci.OfferSn
 
 // ApplySnapshotChunk implements the ABCI interface. It delegates to app.snapshotManager if set.
 func (app *BaseApp) ApplySnapshotChunk(req *abci.ApplySnapshotChunkRequest) (*abci.ApplySnapshotChunkResponse, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if app.snapshotManager == nil {
 		app.logger.Error("snapshot manager not configured")
 		return &abci.ApplySnapshotChunkResponse{Result: abci.APPLY_SNAPSHOT_CHUNK_RESULT_ABORT}, nil
@@ -335,6 +362,8 @@ func (app *BaseApp) ApplySnapshotChunk(req *abci.ApplySnapshotChunkRequest) (*ab
 // internal CheckTx state if the AnteHandler passes. Otherwise, the CheckTxResponse
 // will contain relevant error information. Regardless of tx execution outcome,
 // the CheckTxResponse will contain relevant gas execution context.
+//
+// We do not hold any lock here since CheckTx and Commit are synchronized via mempool mutex
 func (app *BaseApp) CheckTx(req *abci.CheckTxRequest) (*abci.CheckTxResponse, error) {
 	var mode execMode
 
@@ -386,6 +415,9 @@ func (app *BaseApp) CheckTx(req *abci.CheckTxRequest) (*abci.CheckTxResponse, er
 // Ref: https://github.com/cosmos/cosmos-sdk/blob/main/docs/architecture/adr-060-abci-1.0.md
 // Ref: https://github.com/cometbft/cometbft/blob/main/spec/abci/abci%2B%2B_basic_concepts.md
 func (app *BaseApp) PrepareProposal(req *abci.PrepareProposalRequest) (resp *abci.PrepareProposalResponse, err error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if app.prepareProposal == nil {
 		return nil, errors.New("PrepareProposal handler not set")
 	}
@@ -473,6 +505,9 @@ func (app *BaseApp) PrepareProposal(req *abci.PrepareProposalRequest) (resp *abc
 // Ref: https://github.com/cosmos/cosmos-sdk/blob/main/docs/architecture/adr-060-abci-1.0.md
 // Ref: https://github.com/cometbft/cometbft/blob/main/spec/abci/abci%2B%2B_basic_concepts.md
 func (app *BaseApp) ProcessProposal(req *abci.ProcessProposalRequest) (resp *abci.ProcessProposalResponse, err error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if app.processProposal == nil {
 		return nil, errors.New("ProcessProposal handler not set")
 	}
@@ -578,6 +613,9 @@ func (app *BaseApp) ProcessProposal(req *abci.ProcessProposalRequest) (resp *abc
 // height and are committed in the subsequent height, i.e. H+2. An error is
 // returned if vote extensions are not enabled or if extendVote fails or panics.
 func (app *BaseApp) ExtendVote(_ context.Context, req *abci.ExtendVoteRequest) (resp *abci.ExtendVoteResponse, err error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	// Always reset state given that ExtendVote and VerifyVoteExtension can timeout
 	// and be called again in a subsequent round.
 	var ctx sdk.Context
@@ -651,6 +689,9 @@ func (app *BaseApp) ExtendVote(_ context.Context, req *abci.ExtendVoteRequest) (
 // phase. The response MUST be deterministic. An error is returned if vote
 // extensions are not enabled or if verifyVoteExt fails or panics.
 func (app *BaseApp) VerifyVoteExtension(req *abci.VerifyVoteExtensionRequest) (resp *abci.VerifyVoteExtensionResponse, err error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if app.verifyVoteExt == nil {
 		return nil, errors.New("application VerifyVoteExtension handler not set")
 	}
@@ -954,6 +995,9 @@ func filterOutPublishEvents(events []abci.Event) ([]abci.Event, []EventType) {
 // extensions into the proposal, which should not themselves be executed in cases
 // where they adhere to the sdk.Tx interface.
 func (app *BaseApp) FinalizeBlock(req *abci.FinalizeBlockRequest) (res *abci.FinalizeBlockResponse, err error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	defer func() {
 		if res == nil {
 			return
@@ -1021,6 +1065,9 @@ func (app *BaseApp) checkHalt(height int64, time time.Time) error {
 // against that height and gracefully halt if it matches the latest committed
 // height.
 func (app *BaseApp) Commit() (*abci.CommitResponse, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	header := app.finalizeBlockState.Context().BlockHeader()
 	retainHeight := app.GetBlockRetentionHeight(header.Height)
 
@@ -1336,8 +1383,10 @@ func (app *BaseApp) CreateQueryContext(height int64, prove bool) (sdk.Context, e
 			)
 	}
 
-	// branch the commit multi-store for safety
+	// gRPC queries bypass the ABCI lock, but Commit replaces checkState under it.
+	app.mtx.RLock()
 	header := app.checkState.Context().BlockHeader()
+	app.mtx.RUnlock()
 	ctx := sdk.NewContext(cacheMS, header, true, app.logger).
 		WithMinGasPrices(app.minGasPrices).
 		WithGasMeter(storetypes.NewGasMeter(app.queryGasLimit)).

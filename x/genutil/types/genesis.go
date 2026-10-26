@@ -80,7 +80,7 @@ func (ag *AppGenesis) ValidateAndComplete() error {
 
 // SaveAs is a utility method for saving AppGenesis as a JSON file.
 func (ag *AppGenesis) SaveAs(file string) error {
-	appGenesisBytes, err := json.MarshalIndent(ag, "", "  ")
+	appGenesisBytes, err := cmtjson.MarshalIndent(ag, "", " ")
 	if err != nil {
 		return err
 	}
@@ -97,6 +97,20 @@ func AppGenesisFromReader(reader io.Reader) (*AppGenesis, error) {
 
 	var appGenesis AppGenesis
 	if err := json.Unmarshal(jsonBlob, &appGenesis); err != nil {
+		// SaveAs writes with cmtjson, which encodes 64-bit integers such as
+		// initial_height as strings that encoding/json rejects. Decode such a
+		// file with cmtjson as well; the "consensus" key tells it apart from a
+		// CometBFT genesis, which cmtjson would also accept, minus validators
+		// and consensus params.
+		var fields map[string]json.RawMessage
+		if json.Unmarshal(jsonBlob, &fields) == nil && fields["consensus"] != nil {
+			var cmtAppGenesis AppGenesis
+			if errCmt := cmtjson.Unmarshal(jsonBlob, &cmtAppGenesis); errCmt != nil {
+				return nil, fmt.Errorf("error unmarshalling AppGenesis: %w", errors.Join(err, errCmt))
+			}
+			return &cmtAppGenesis, nil
+		}
+
 		// fallback to CometBFT genesis
 		var ctmGenesis cmttypes.GenesisDoc
 		if err2 := cmtjson.Unmarshal(jsonBlob, &ctmGenesis); err2 != nil {

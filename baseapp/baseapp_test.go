@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -49,7 +50,7 @@ type (
 		baseApp   *baseapp.BaseApp
 		cdc       *codec.ProtoCodec
 		txConfig  client.TxConfig
-		logBuffer *bytes.Buffer
+		logBuffer *syncBuffer
 	}
 
 	SnapshotsConfig struct {
@@ -61,13 +62,33 @@ type (
 	}
 )
 
+// syncBuffer is a bytes.Buffer that is safe for concurrent writes. The
+// snapshot manager logs from its own goroutine while FinalizeBlock and Commit
+// log from the caller's.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
 func NewBaseAppSuite(t *testing.T, opts ...func(*baseapp.BaseApp)) *BaseAppSuite {
 	cdc := codectestutil.CodecOptions{}.NewCodec()
 	baseapptestutil.RegisterInterfaces(cdc.InterfaceRegistry())
 
 	txConfig := authtx.NewTxConfig(cdc, authtx.DefaultSignModes)
 	db := dbm.NewMemDB()
-	logBuffer := new(bytes.Buffer)
+	logBuffer := new(syncBuffer)
 	logger := log.NewLogger(logBuffer, log.ColorOption(false))
 
 	app := baseapp.NewBaseApp(t.Name(), logger, db, txConfig.TxDecoder(), opts...)
@@ -286,6 +307,33 @@ func TestLoadVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	testLoadVersionHelper(t, app, int64(2), commitID2)
+}
+
+func TestLoadVersionCheckState(t *testing.T) {
+	db := dbm.NewMemDB()
+	store := rootmulti.NewStore(db, log.NewNopLogger(), metrics.NewNoOpMetrics())
+	store.SetIAVLSyncPruning(true)
+	store.MountStoreWithDB(capKey1, storetypes.StoreTypeIAVL, nil)
+	require.NoError(t, store.LoadLatestVersion())
+	key := []byte("version")
+	for version := int64(1); version <= 2; version++ {
+		store.GetKVStore(capKey1).Set(key, []byte(fmt.Sprint(version)))
+		store.Commit()
+	}
+
+	for _, version := range []int64{1, 2} {
+		t.Run(fmt.Sprint(version), func(t *testing.T) {
+			app := baseapp.NewBaseApp(t.Name(), log.NewNopLogger(), db, nil, baseapp.SetIAVLSyncPruning(true))
+			app.MountStores(capKey1)
+			require.NoError(t, app.LoadVersion(version))
+			require.Equal(t, version, app.LastBlockHeight())
+			want := []byte(fmt.Sprint(version))
+			require.Equal(t, want, app.CommitMultiStore().GetKVStore(capKey1).Get(key))
+			require.Equal(t, want, app.GetContextForCheckTx(nil).KVStore(capKey1).Get(key))
+			require.Equal(t, want, app.NewContextLegacy(true, cmtproto.Header{}).KVStore(capKey1).Get(key))
+			require.Equal(t, int64(2), rootmulti.GetLatestVersion(db))
+		})
+	}
 }
 
 func TestSetLoader(t *testing.T) {

@@ -141,10 +141,9 @@ func TestExportCmd_Output(t *testing.T) {
 			cmd.SetArgs(args)
 			assert.NilError(t, cmd.ExecuteContext(ctx))
 
-			var exportedAppGenesis genutiltypes.AppGenesis
-			f, err := os.ReadFile(tc.outputDocument)
+			// --output-document is written by AppGenesis.SaveAs, in cmtjson.
+			_, err := genutiltypes.AppGenesisFromFile(tc.outputDocument)
 			assert.NilError(t, err)
-			assert.NilError(t, json.Unmarshal(f, &exportedAppGenesis))
 
 			// Cleanup
 			assert.NilError(t, os.Remove(tc.outputDocument))

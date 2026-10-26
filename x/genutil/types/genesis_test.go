@@ -1,8 +1,11 @@
 package types_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	cmttypes "github.com/cometbft/cometbft/types"
@@ -66,4 +69,35 @@ func TestAppGenesis_ValidGenesis(t *testing.T) {
 	rawAppGenesis, err = json.Marshal(&appGenesis)
 	assert.NilError(t, err)
 	golden.Assert(t, string(rawAppGenesis), "app_genesis.json")
+}
+
+func TestAppGenesis_SaveAsRoundTrip(t *testing.T) {
+	genesis, err := types.AppGenesisFromFile("testdata/cmt_genesis.json")
+	assert.NilError(t, err)
+	genesis.AppName = "simapp"
+	genesis.AppVersion = "0.1.0"
+	genesis.InitialHeight = 5
+
+	file := filepath.Join(t.TempDir(), "genesis.json")
+	assert.NilError(t, genesis.SaveAs(file))
+
+	// SaveAs uses cmtjson, which writes 64-bit integers as strings.
+	raw, err := os.ReadFile(file)
+	assert.NilError(t, err)
+	assert.Assert(t, strings.Contains(string(raw), `"initial_height": "5"`), string(raw))
+
+	loaded, err := types.AppGenesisFromFile(file)
+	assert.NilError(t, err)
+	assert.Equal(t, loaded.AppName, genesis.AppName)
+	assert.Equal(t, loaded.AppVersion, genesis.AppVersion)
+	assert.Equal(t, loaded.ChainID, genesis.ChainID)
+	assert.Equal(t, loaded.InitialHeight, genesis.InitialHeight)
+	assert.Assert(t, loaded.GenesisTime.Equal(genesis.GenesisTime))
+	assert.DeepEqual(t, loaded.Consensus, genesis.Consensus)
+
+	// SaveAs indents app_state, so compare it compacted.
+	var loadedState, wantState bytes.Buffer
+	assert.NilError(t, json.Compact(&loadedState, loaded.AppState))
+	assert.NilError(t, json.Compact(&wantState, genesis.AppState))
+	assert.Equal(t, loadedState.String(), wantState.String())
 }

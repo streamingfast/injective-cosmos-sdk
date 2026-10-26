@@ -57,10 +57,10 @@ github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/cloudmock v0
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/cloudmock v0.57.0/go.mod h1:dzcEjy1WJ0Q4u9twNR3LcLhNoYMRCrMCMafpxa0TjPQ=
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.57.0 h1:RoO5+d7uCmDqovLrHCr2/BuViUXvdcrNxyNM1pN9dDQ=
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.57.0/go.mod h1:YqwkQPrWSC7+byyc1VlKbWLBF5JsW5IoL6xUkemYSXk=
-github.com/InjectiveLabs/cometbft v1.0.1-inj.9 h1:j83caQ90XKyU9ojs7F6CyR7Ds8uZkamTxR38v1ovB2Y=
-github.com/InjectiveLabs/cometbft v1.0.1-inj.9/go.mod h1:GjHzF+48UzwdWUUG4uUD+e52h2L6Pq9rK4eL+oYIyBU=
-github.com/InjectiveLabs/cometbft/api v1.0.0-inj.4 h1:XibZsTaU2GGq4v07yS3saajY45Abx/m8y8vUq0uRRPE=
-github.com/InjectiveLabs/cometbft/api v1.0.0-inj.4/go.mod h1:rr73UKPAv9CIvQBxZZ3KEVGIl2BUpOncx1krVXmOg1g=
+github.com/InjectiveLabs/cometbft v1.0.1-inj.10 h1:dHJdBWT5ZLb38dIS0tchfK6EoJO4elp3L2jNkoilmLA=
+github.com/InjectiveLabs/cometbft v1.0.1-inj.10/go.mod h1:PtimyL049fG3QnE4Q8fTGfc13c4cwfB3SUmzb7KQAy4=
+github.com/InjectiveLabs/cometbft/api v1.0.0-inj.5 h1:2nk31kkzaVv3z9vqFOiYgNLNhBxF6BFZK2Zq4z2j6fw=
+github.com/InjectiveLabs/cometbft/api v1.0.0-inj.5/go.mod h1:Jx8kgUM408FesehuTRPezs4bU4JvAynzkAuCSAE0kCU=
 github.com/InjectiveLabs/iavl v1.2.8-inj.1 h1:Mvoep6SxtrEIVnFWlPlQ9EJke0u+n2/cfGPDvMTAjtw=
 github.com/InjectiveLabs/iavl v1.2.8-inj.1/go.mod h1:FRHN4tO+6crf0p2zsqye+nAbsMgiwdkxpWm18DyP6+Y=
 github.com/InjectiveLabs/metrics/v2 v2.0.0-beta.8 h1:zvIV7ifNcH2Dvl0RrXd2qYRkaDSc+iP0hqaAhfS85MY=
