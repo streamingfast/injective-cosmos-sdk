@@ -20,7 +20,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/tidwall/btree v1.8.2
 	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e
-	google.golang.org/grpc v1.84.0
+	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
 	gotest.tools/v3 v3.5.2
 )
@@ -73,7 +73,7 @@ require (
 )
 
 replace (
-	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.10
+	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj.11
 	github.com/cometbft/cometbft/api => github.com/InjectiveLabs/cometbft/api v1.0.0-inj.5
 )
 
