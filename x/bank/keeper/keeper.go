@@ -198,6 +198,9 @@ func (k BaseKeeper) UndelegateCoins(ctx context.Context, moduleAccAddr, delegato
 		return errorsmod.Wrap(sdkerrors.ErrInvalidCoins, amt.String())
 	}
 
+	// Keep the pool debit, vesting tracking, and recipient credit atomic.
+	sdkCtx, writeCache := sdkCtx.CacheContext()
+
 	err = k.subUnlockedCoins(sdkCtx, moduleAccAddr, amt, false)
 	if err != nil {
 		return err
@@ -212,6 +215,7 @@ func (k BaseKeeper) UndelegateCoins(ctx context.Context, moduleAccAddr, delegato
 		return err
 	}
 
+	writeCache()
 	return nil
 }
 

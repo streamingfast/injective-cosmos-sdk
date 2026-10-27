@@ -1283,6 +1283,9 @@ func (k Keeper) CompleteUnbonding(ctx context.Context, delAddr sdk.AccAddress, v
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	defer k.Meter(ctx).FuncTiming(&sdkCtx, "CompleteUnbonding")(&err)
 
+	// Commit payouts, entry removal, and index deletion together.
+	sdkCtx, writeCache := sdkCtx.CacheContext()
+
 	ubd, err := k.GetUnbondingDelegation(sdkCtx, delAddr, valAddr)
 	if err != nil {
 		return nil, err
@@ -1314,13 +1317,18 @@ func (k Keeper) CompleteUnbonding(ctx context.Context, delAddr sdk.AccAddress, v
 			// track undelegation only when remaining or truncated shares are non-zero
 			if !entry.Balance.IsZero() {
 				amt := sdk.NewCoin(bondDenom, entry.Balance)
-				if err = k.bankKeeper.UndelegateCoinsFromModuleToAccount(
-					sdkCtx, types.NotBondedPoolName, delegatorAddress, sdk.NewCoins(amt),
-				); err != nil {
+				discarded, err := k.completeUnbondingEntry(sdkCtx, delegatorAddress, sdk.NewCoins(amt))
+				if err != nil {
 					return nil, err
 				}
 
-				balances = balances.Add(amt)
+				if discarded {
+					if err = k.storeService.OpenKVStore(sdkCtx).Delete(types.GetUnbondingTypeKey(entry.UnbondingId)); err != nil {
+						return nil, err
+					}
+				} else {
+					balances = balances.Add(amt)
+				}
 			}
 		}
 	}
@@ -1336,6 +1344,7 @@ func (k Keeper) CompleteUnbonding(ctx context.Context, delAddr sdk.AccAddress, v
 		return nil, err
 	}
 
+	writeCache()
 	return balances, nil
 }
 

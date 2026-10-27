@@ -3,6 +3,7 @@ package keeper
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -47,7 +48,15 @@ func (k Keeper) BlockValidatorUpdates(ctx context.Context) (meterResult []abci.V
 		return nil, err
 	}
 
+	// CompleteUnbonding processes every mature entry for a pair. Queue pairs
+	// can be duplicated by merged undelegations or multiple mature timeslices.
+	seenUnbonds := make(map[types.DVPair]struct{}, len(matureUnbonds))
 	for _, dvPair := range matureUnbonds {
+		if _, seen := seenUnbonds[dvPair]; seen {
+			continue
+		}
+		seenUnbonds[dvPair] = struct{}{}
+
 		addr, err := k.validatorAddressCodec.StringToBytes(dvPair.ValidatorAddress)
 		if err != nil {
 			return nil, err
@@ -59,6 +68,12 @@ func (k Keeper) BlockValidatorUpdates(ctx context.Context) (meterResult []abci.V
 
 		balances, err := k.CompleteUnbonding(sdkCtx, delegatorAddress, addr)
 		if err != nil {
+			if !errors.Is(err, types.ErrNoUnbondingDelegation) {
+				// Keep the claim and its backing without creating recurring
+				// EndBlock work. Recovery requires a new completion trigger.
+				k.Logger(sdkCtx).Error("failed to complete unbonding delegation; claim retained",
+					"delegator", dvPair.DelegatorAddress, "validator", dvPair.ValidatorAddress, "error", err)
+			}
 			continue
 		}
 
