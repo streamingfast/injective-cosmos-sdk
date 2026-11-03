@@ -1,37 +1,46 @@
 #!/usr/bin/env bash
+#
+# Lint every Go module touched since the merge base with LINT_BASE (default
+# origin/v0.50.x-inj), reporting only issues introduced since that merge base.
+# Pre-existing findings in fork code don't fail unrelated changes. When the
+# lint configuration or a Makefile changes, every module is linted.
 
 set -e -o pipefail
 
 REPO_ROOT="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." &> /dev/null && pwd )"
-export REPO_ROOT
+LINT_BASE="${LINT_BASE:-origin/v0.50.x-inj}"
 
-lint_module() {
-  local root="$1"
-  shift
-  cd "$(dirname "$root")" &&
-    echo "linting $(grep "^module" go.mod) [$(date -Iseconds -u)]" &&
-    golangci-lint run ./... -c "${REPO_ROOT}/.golangci.yml" "$@"
-}
-export -f lint_module
+cd "${REPO_ROOT}"
+merge_base="$(git merge-base "${LINT_BASE}" HEAD)"
 
-# if LINT_DIFF env is set, only lint the files in the current commit otherwise lint all files
-if [[ -z "${LINT_DIFF:-}" ]]; then
-  find "${REPO_ROOT}" -type f -name go.mod -print0 |
-    xargs -0 -I{} bash -c 'lint_module "$@"' _ {} "$@"
+# scripts/* modules only pin CI tools (behind the "tools" build tag) and have
+# no packages to lint.
+all_modules="$(git ls-files '*go.mod' | xargs -n1 dirname | grep -v '^scripts/' | LC_ALL=C sort)"
+changed_files="$(git diff --name-only "${merge_base}" -- ; git ls-files --others --exclude-standard)"
+
+if echo "${changed_files}" | grep -qE '(^|/)(\.golangci\.yml|Makefile)$'; then
+  modules="${all_modules}"
 else
-  if [[ -z $GIT_DIFF ]]; then
-    GIT_DIFF=$(git diff --name-only --diff-filter=d | grep \.go$ | grep -v \.pb\.go$) || true
-  fi
-
-  if [[ -z "$GIT_DIFF" ]]; then
-    echo "no files to lint"
-    exit 0
-  fi
-
-  for f in $(dirname $(echo "$GIT_DIFF" | tr -d "'") | uniq); do
-    echo "linting $f [$(date -Iseconds -u)]" &&
-    cd $f &&
-    golangci-lint run ./... -c "${REPO_ROOT}/.golangci.yml" "$@" &&
-    cd $REPO_ROOT
-  done
+  # Map each changed file to the innermost module that contains it.
+  modules="$(
+    echo "${changed_files}" | grep -E '\.go$|(^|/)go\.(mod|sum)$' | while IFS= read -r file; do
+      dir="$(dirname "${file}")"
+      while [[ "${dir}" != "." && ! -f "${dir}/go.mod" ]]; do
+        dir="$(dirname "${dir}")"
+      done
+      echo "${dir}"
+    done | grep -v '^scripts/' | LC_ALL=C sort -u
+  )"
 fi
+
+if [[ -z "${modules}" ]]; then
+  echo "no Go modules changed since ${LINT_BASE}"
+  exit 0
+fi
+
+for module in ${modules}; do
+  echo "linting ${module} [$(date -Iseconds -u)]"
+  (cd "${REPO_ROOT}/${module}" &&
+    golangci-lint run ./... -c "${REPO_ROOT}/.golangci.yml" \
+      --new-from-merge-base="${merge_base}" "$@")
+done

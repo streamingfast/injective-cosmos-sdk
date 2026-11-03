@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	cmtcrypto "github.com/cometbft/cometbft/crypto"
@@ -257,4 +258,39 @@ func TestBcryptLegacyEncryption(t *testing.T) {
 	_, _, err := crypto.UnarmorDecryptPrivKey(crypto.EncodeArmor("TENDERMINT PRIVATE KEY", headerWithoutKdf, encBytesBcryptXsalsa20symetric), "passphrase")
 	require.Error(t, err)
 	require.Equal(t, "unrecognized KDF type: wrongKdf", err.Error())
+}
+
+// DecodeArmor verifies the optional CRC-24 checksum line like the previous
+// golang.org/x/crypto/openpgp/armor decoder did.
+func TestDecodeArmorChecksum(t *testing.T) {
+	data := []byte("some key bytes that get armored")
+	armored := crypto.EncodeArmor("TENDERMINT PRIVATE KEY", map[string]string{"kdf": "bcrypt", "type": "secp256k1"}, data)
+
+	lines := strings.Split(armored, "\n")
+	checksumIdx := -1
+	for i, line := range lines {
+		if len(line) == 5 && line[0] == '=' {
+			checksumIdx = i
+		}
+	}
+	require.NotEqual(t, -1, checksumIdx, "EncodeArmor must write a checksum line")
+
+	// Valid checksum.
+	blockType, headers, got, err := crypto.DecodeArmor(armored)
+	require.NoError(t, err)
+	require.Equal(t, "TENDERMINT PRIVATE KEY", blockType)
+	require.Equal(t, map[string]string{"kdf": "bcrypt", "type": "secp256k1"}, headers)
+	require.Equal(t, data, got)
+
+	// The checksum line is optional.
+	withoutChecksum := strings.Join(append(append([]string{}, lines[:checksumIdx]...), lines[checksumIdx+1:]...), "\n")
+	_, _, got, err = crypto.DecodeArmor(withoutChecksum)
+	require.NoError(t, err)
+	require.Equal(t, data, got)
+
+	// A checksum that doesn't match the body is rejected.
+	corrupted := append([]string{}, lines...)
+	corrupted[checksumIdx] = "=AAAA"
+	_, _, _, err = crypto.DecodeArmor(strings.Join(corrupted, "\n"))
+	require.EqualError(t, err, "openpgp: invalid data: armor invalid")
 }

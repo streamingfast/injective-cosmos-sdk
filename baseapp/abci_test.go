@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -582,7 +583,7 @@ func TestABCI_CheckTx(t *testing.T) {
 	anteOpt := func(bapp *baseapp.BaseApp) { bapp.SetAnteHandler(anteHandlerTxTest(t, capKey1, counterKey)) }
 	suite := NewBaseAppSuite(t, anteOpt)
 
-	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, counterKey})
+	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, counterKey, false})
 
 	nTxs := int64(5)
 	_, err := suite.baseApp.InitChain(&abci.InitChainRequest{
@@ -606,6 +607,8 @@ func TestABCI_CheckTx(t *testing.T) {
 
 	// ensure AnteHandler ran
 	require.Equal(t, nTxs, storedCounter)
+	legacyCheckStore := suite.baseApp.NewContextLegacy(true, cmtproto.Header{}).KVStore(capKey1)
+	require.Equal(t, nTxs, getIntFromStore(t, legacyCheckStore, counterKey))
 
 	// if a block is committed, CheckTx state should be reset
 	_, err = suite.baseApp.FinalizeBlock(&abci.FinalizeBlockRequest{
@@ -623,6 +626,7 @@ func TestABCI_CheckTx(t *testing.T) {
 	checkStateStore = getCheckStateCtx(suite.baseApp).KVStore(capKey1)
 	storedBytes := checkStateStore.Get(counterKey)
 	require.Nil(t, storedBytes)
+	require.Nil(t, suite.baseApp.NewContextLegacy(true, cmtproto.Header{}).KVStore(capKey1).Get(counterKey))
 }
 
 func TestABCI_FinalizeBlock_DeliverTx(t *testing.T) {
@@ -636,7 +640,7 @@ func TestABCI_FinalizeBlock_DeliverTx(t *testing.T) {
 	require.NoError(t, err)
 
 	deliverKey := []byte("deliver-key")
-	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, deliverKey})
+	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, deliverKey, false})
 
 	nBlocks := 3
 	txPerHeight := 5
@@ -686,10 +690,10 @@ func TestABCI_FinalizeBlock_MultiMsg(t *testing.T) {
 	require.NoError(t, err)
 
 	deliverKey := []byte("deliver-key")
-	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, deliverKey})
+	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, deliverKey, false})
 
 	deliverKey2 := []byte("deliver-key2")
-	baseapptestutil.RegisterCounter2Server(suite.baseApp.MsgServiceRouter(), Counter2ServerImpl{t, capKey1, deliverKey2})
+	baseapptestutil.RegisterCounter2Server(suite.baseApp.MsgServiceRouter(), Counter2ServerImpl{t, capKey1, deliverKey2, false})
 
 	// run a multi-msg tx
 	// with all msgs the same route
@@ -810,6 +814,52 @@ func TestABCI_Query_SimulateTx(t *testing.T) {
 		_, err = suite.baseApp.Commit()
 		require.NoError(t, err)
 	}
+}
+
+func TestABCI_Query_ConcurrentSimulation(t *testing.T) {
+	key := []byte("simulation-key")
+	entered, unblock := make(chan struct{}, 2), make(chan struct{})
+	release := sync.OnceFunc(func() { close(unblock) })
+	defer release()
+	suite := NewBaseAppSuite(t, func(app *baseapp.BaseApp) {
+		app.SetAnteHandler(func(ctx sdk.Context, _ sdk.Tx, _ bool) (sdk.Context, error) {
+			ctx.KVStore(capKey1).Set(key, []byte("simulated"))
+			entered <- struct{}{}
+			<-unblock
+			return ctx, nil
+		})
+	})
+	_, err := suite.baseApp.InitChain(&abci.InitChainRequest{ConsensusParams: &cmtproto.ConsensusParams{}})
+	require.NoError(t, err)
+	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImplGasMeterOnly{5})
+	checkStore := suite.baseApp.GetContextForCheckTx(nil).KVStore(capKey1)
+	checkStore.Set(key, []byte("original"))
+	txBytes, err := suite.txConfig.TxEncoder()(newTxCounter(t, suite.txConfig, 0, 1))
+	require.NoError(t, err)
+
+	results := make(chan error, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			resp, err := suite.baseApp.Query(context.Background(), &abci.QueryRequest{Path: "/app/simulate", Data: txBytes})
+			if err == nil && !resp.IsOK() {
+				err = fmt.Errorf("simulation failed: %s", resp.Log)
+			}
+			results <- err
+		}()
+	}
+	timeout := time.After(5 * time.Second)
+	for i := 0; i < 2; i++ {
+		select {
+		case <-entered:
+		case <-timeout:
+			t.Fatal("simulations did not run concurrently")
+		}
+	}
+	release()
+	for i := 0; i < 2; i++ {
+		require.NoError(t, <-results)
+	}
+	require.Equal(t, []byte("original"), checkStore.Get(key))
 }
 
 func TestABCI_InvalidTransaction(t *testing.T) {

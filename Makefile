@@ -374,11 +374,15 @@ benchmark:
 ###                                Linting                                  ###
 ###############################################################################
 
-golangci_version=v1.51.2
+golangci_version=v2.14.0
+
+# Lint reports only issues introduced since the merge base with LINT_BASE.
+LINT_BASE ?= origin/v0.50.x-inj
+export LINT_BASE
 
 lint-install:
 	@echo "--> Installing golangci-lint $(golangci_version)"
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(golangci_version)
+	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(golangci_version)
 
 lint:
 	@echo "--> Running linter"

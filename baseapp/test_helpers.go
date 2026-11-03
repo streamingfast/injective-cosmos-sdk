@@ -24,8 +24,12 @@ func (app *BaseApp) SimCheck(txEncoder sdk.TxEncoder, tx sdk.Tx) (sdk.GasInfo, *
 }
 
 // Simulate executes a tx in simulate mode to get result and gas info.
+// Internal publish-event placeholders are omitted from the returned events.
 func (app *BaseApp) Simulate(txBytes []byte) (sdk.GasInfo, *sdk.Result, error) {
 	gasInfo, result, _, err := app.runTx(execModeSimulate, txBytes, nil)
+	if result != nil && len(result.Events) > 0 {
+		result.Events, _ = filterOutPublishEvents(result.Events)
+	}
 	return gasInfo, result, err
 }
 

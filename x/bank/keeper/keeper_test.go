@@ -265,11 +265,11 @@ func (suite *KeeperTestSuite) mockDelegateCoins(ctx context.Context, acc, mAcc s
 func (suite *KeeperTestSuite) mockUnDelegateCoins(ctx context.Context, acc, mAcc sdk.AccountI) {
 	vacc, ok := acc.(banktypes.VestingAccount)
 	if ok {
-		suite.authKeeper.EXPECT().SetAccount(ctx, vacc)
+		suite.authKeeper.EXPECT().SetAccount(gomock.Not(ctx), vacc)
 	}
-	suite.authKeeper.EXPECT().GetAccount(ctx, acc.GetAddress()).Return(acc)
+	suite.authKeeper.EXPECT().GetAccount(gomock.Not(ctx), acc.GetAddress()).Return(acc)
 	suite.authKeeper.EXPECT().GetAccount(ctx, mAcc.GetAddress()).Return(mAcc)
-	suite.authKeeper.EXPECT().GetAccount(ctx, mAcc.GetAddress()).Return(mAcc)
+	suite.authKeeper.EXPECT().GetAccount(gomock.Not(ctx), mAcc.GetAddress()).Return(mAcc).MaxTimes(1)
 }
 
 func (suite *KeeperTestSuite) TestAppendSendRestriction() {
@@ -2090,12 +2090,12 @@ func (suite *KeeperTestSuite) TestUndelegateCoins_Invalid() {
 	require.NoError(suite.bankKeeper.DelegateCoins(ctx, accAddrs[0], holderAcc.GetAddress(), delCoins))
 
 	suite.authKeeper.EXPECT().GetAccount(ctx, holderAcc.GetAddress()).Return(holderAcc)
-	suite.authKeeper.EXPECT().GetAccount(ctx, holderAcc.GetAddress()).Return(holderAcc)
-	suite.authKeeper.EXPECT().GetAccount(ctx, acc0.GetAddress()).Return(nil)
+	suite.authKeeper.EXPECT().GetAccount(gomock.Not(ctx), holderAcc.GetAddress()).Return(holderAcc)
+	suite.authKeeper.EXPECT().GetAccount(gomock.Not(ctx), acc0.GetAddress()).Return(nil)
 	require.Error(suite.bankKeeper.UndelegateCoins(ctx, holderAcc.GetAddress(), accAddrs[0], delCoins))
 
 	suite.authKeeper.EXPECT().GetAccount(ctx, holderAcc.GetAddress()).Return(holderAcc)
-	suite.authKeeper.EXPECT().GetAccount(ctx, holderAcc.GetAddress()).Return(holderAcc)
+	suite.authKeeper.EXPECT().GetAccount(gomock.Not(ctx), holderAcc.GetAddress()).Return(holderAcc)
 	require.Error(suite.bankKeeper.UndelegateCoins(ctx, holderAcc.GetAddress(), accAddrs[0], origCoins))
 }
 

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	dbm "github.com/cosmos/cosmos-db"
@@ -56,9 +57,12 @@ func keysFromStoreKeyMap[V any](m map[types.StoreKey]V) []types.StoreKey {
 // cacheMultiStore which is used for branching other MultiStores. It implements
 // the CommitMultiStore interface.
 type Store struct {
-	db                  dbm.DB
-	logger              log.Logger
-	lastCommitInfo      *types.CommitInfo
+	db     dbm.DB
+	logger log.Logger
+	// lastCommitInfo is written by Commit and loadVersion and read concurrently
+	// by queries (LastCommitID, Query). A published CommitInfo is never
+	// modified; Commit builds a new one and swaps it in.
+	lastCommitInfo      atomic.Pointer[types.CommitInfo]
 	pruningManager      *pruning.Manager
 	iavlCacheSize       int
 	iavlDisableFastNode bool
@@ -100,6 +104,59 @@ func NewStore(db dbm.DB, logger log.Logger, metricGatherer metrics.StoreMetrics)
 		removalMap:          make(map[types.StoreKey]bool),
 		pruningManager:      pruning.NewManager(db, logger),
 		metrics:             metricGatherer,
+	}
+}
+
+// Copy copies the whole root store via store loader and in-memory stores. Mainly used to allow parallel reads (for CheckTx)
+// and writes (for block execution).
+func (rs *Store) Copy(storeLoader func(ms types.CommitMultiStore) error) (*Store, error) {
+	copyRs := &Store{
+		db:                  rs.db,
+		logger:              rs.logger,
+		iavlCacheSize:       rs.iavlCacheSize,
+		iavlDisableFastNode: rs.iavlDisableFastNode,
+		iavlSyncPruning:     true, // copies never commit and have no close lifecycle, so they must not start pruning workers.
+		storesParams:        rs.storesParams,
+		stores:              make(map[types.StoreKey]types.CommitStore),
+		keysByName:          rs.keysByName,
+		removalMap:          make(map[types.StoreKey]bool),
+		pruningManager:      pruning.NewManager(rs.db, rs.logger),
+		metrics:             rs.metrics,
+	}
+
+	// Historical loads bypass the application loader, which may load the latest version.
+	if version := rs.LastCommitID().Version; version != GetLatestVersion(rs.db) {
+		storeLoader = func(ms types.CommitMultiStore) error { return ms.LoadVersion(version) }
+	}
+	if err := storeLoader(copyRs); err != nil {
+		return nil, err
+	}
+
+	// storeLoader only loads disk-backed stores, so we need to copy Mem- / ObjectStores manually
+
+	for key, src := range rs.stores {
+		if src.GetStoreType() == types.StoreTypeMemory {
+			srcKV := src.(types.KVStore)
+			dstKV := copyRs.stores[key].(types.KVStore)
+			copyStore(srcKV, dstKV)
+		}
+
+		if src.GetStoreType() == types.StoreTypeObject {
+			srcKV := src.(types.ObjKVStore)
+			dstKV := copyRs.stores[key].(types.ObjKVStore)
+			copyStore(srcKV, dstKV)
+		}
+	}
+
+	return copyRs, nil
+}
+
+func copyStore[E any](src, dst types.GKVStore[E]) {
+	iter := src.Iterator(nil, nil)
+	defer iter.Close()
+
+	for ; iter.Valid(); iter.Next() {
+		dst.Set(iter.Key(), iter.Value())
 	}
 }
 
@@ -304,7 +361,7 @@ func (rs *Store) loadVersion(ver int64, upgrades *types.StoreUpgrades) error {
 		}
 	}
 
-	rs.lastCommitInfo = cInfo
+	rs.lastCommitInfo.Store(cInfo)
 	rs.stores = newStores
 
 	// load any snapshot heights we missed from disk to be pruned on the next run
@@ -455,7 +512,8 @@ func (rs *Store) LatestVersion() int64 {
 
 // LastCommitID implements Committer/CommitStore.
 func (rs *Store) LastCommitID() types.CommitID {
-	if rs.lastCommitInfo == nil {
+	lastCommitInfo := rs.lastCommitInfo.Load()
+	if lastCommitInfo == nil {
 		emptyHash := sha256.Sum256([]byte{})
 		appHash := emptyHash[:]
 		return types.CommitID{
@@ -463,16 +521,17 @@ func (rs *Store) LastCommitID() types.CommitID {
 			Hash:    appHash, // set empty apphash to sha256([]byte{}) if info is nil
 		}
 	}
-	if len(rs.lastCommitInfo.CommitID().Hash) == 0 {
+	commitID := lastCommitInfo.CommitID()
+	if len(commitID.Hash) == 0 {
 		emptyHash := sha256.Sum256([]byte{})
 		appHash := emptyHash[:]
 		return types.CommitID{
-			Version: rs.lastCommitInfo.Version,
+			Version: lastCommitInfo.Version,
 			Hash:    appHash, // set empty apphash to sha256([]byte{}) if hash is nil
 		}
 	}
 
-	return rs.lastCommitInfo.CommitID()
+	return commitID
 }
 
 // PausePruning temporarily pauses the pruning of all individual stores which implement
@@ -488,7 +547,8 @@ func (rs *Store) PausePruning(pause bool) {
 // Commit implements Committer/CommitStore.
 func (rs *Store) Commit() types.CommitID {
 	var previousHeight, version int64
-	if rs.lastCommitInfo.GetVersion() == 0 && rs.initialVersion > 1 {
+	lastCommitInfo := rs.lastCommitInfo.Load()
+	if lastCommitInfo.GetVersion() == 0 && rs.initialVersion > 1 {
 		// This case means that no commit has been made in the store, we
 		// start from initialVersion.
 		version = rs.initialVersion
@@ -498,7 +558,7 @@ func (rs *Store) Commit() types.CommitID {
 		// case we increment the version from there,
 		// - or there was no previous commit, and initial version was not set,
 		// in which case we start at version 1.
-		previousHeight = rs.lastCommitInfo.GetVersion()
+		previousHeight = lastCommitInfo.GetVersion()
 		version = previousHeight + 1
 	}
 
@@ -506,16 +566,20 @@ func (rs *Store) Commit() types.CommitID {
 		rs.logger.Debug("commit header and version mismatch", "header_height", rs.commitHeader.Height, "version", version)
 	}
 
+	var commitInfo *types.CommitInfo
 	func() { // ensure unpause
 		// set the committing flag on all stores to block the pruning
 		rs.PausePruning(true)
 		// unset the committing flag on all stores to continue the pruning
 		defer rs.PausePruning(false)
-		rs.lastCommitInfo = commitStores(version, rs.stores, rs.removalMap)
+		commitInfo = commitStores(version, rs.stores, rs.removalMap)
 	}()
 
-	rs.lastCommitInfo.Timestamp = rs.commitHeader.Time
-	defer rs.flushMetadata(rs.db, version, rs.lastCommitInfo)
+	// Complete the commit info before publishing it: concurrent queries read
+	// it as soon as it is stored.
+	commitInfo.Timestamp = rs.commitHeader.Time
+	rs.lastCommitInfo.Store(commitInfo)
+	defer rs.flushMetadata(rs.db, version, commitInfo)
 
 	// remove remnants of removed stores
 	for sk := range rs.removalMap {
@@ -538,7 +602,7 @@ func (rs *Store) Commit() types.CommitID {
 
 	return types.CommitID{
 		Version: version,
-		Hash:    rs.lastCommitInfo.Hash(),
+		Hash:    commitInfo.Hash(),
 	}
 }
 
@@ -814,8 +878,8 @@ func (rs *Store) Query(req *types.RequestQuery) (*types.ResponseQuery, error) {
 	// Otherwise, we query for the commit info from disk.
 	var commitInfo *types.CommitInfo
 
-	if res.Height == rs.lastCommitInfo.Version {
-		commitInfo = rs.lastCommitInfo
+	if lastCommitInfo := rs.lastCommitInfo.Load(); lastCommitInfo != nil && res.Height == lastCommitInfo.Version {
+		commitInfo = lastCommitInfo
 	} else {
 		commitInfo, err = rs.GetCommitInfo(res.Height)
 		if err != nil {

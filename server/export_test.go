@@ -1,8 +1,8 @@
 package server_test
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -338,12 +338,12 @@ func TestExportCLI(t *testing.T) {
 	})
 }
 
-// CheckExportedGenesis fails t if j cannot be unmarshaled into a valid AppGenesis.
+// CheckExportedGenesis fails t if j cannot be read as a valid AppGenesis.
 func CheckExportedGenesis(t *testing.T, j []byte) {
 	t.Helper()
 
-	var ag genutiltypes.AppGenesis
-	require.NoError(t, json.Unmarshal(j, &ag))
+	ag, err := genutiltypes.AppGenesisFromReader(bytes.NewReader(j))
+	require.NoError(t, err)
 
 	require.NotEmpty(t, ag.AppName)
 	require.NotZero(t, ag.GenesisTime)

@@ -21,10 +21,10 @@ jobs:
       matrix:
         go-arch: ["amd64", "arm", "arm64"]
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
       - uses: technote-space/get-diff-action@v6.1.2
         id: git_diff
@@ -40,6 +40,11 @@ jobs:
         ###################
         #### Build App ####
         ###################
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh .
       - name: Build
         if: env.GIT_DIFF
         run: GOARCH=${{ matrix.go-arch }} make build

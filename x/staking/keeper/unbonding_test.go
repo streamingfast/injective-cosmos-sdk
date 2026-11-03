@@ -3,6 +3,8 @@ package keeper_test
 import (
 	"time"
 
+	"github.com/golang/mock/gomock"
+
 	"cosmossdk.io/math"
 
 	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
@@ -300,7 +302,7 @@ func (s *KeeperTestSuite) TestUnbondingCanComplete() {
 
 	err = s.stakingKeeper.PutUnbondingOnHold(s.ctx, unbondingID)
 	require.NoError(err)
-	s.bankKeeper.EXPECT().UndelegateCoinsFromModuleToAccount(s.ctx, types.NotBondedPoolName, delAddrs[0], sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(5)))).Return(nil)
+	s.bankKeeper.EXPECT().UndelegateCoinsFromModuleToAccount(gomock.Not(s.ctx), types.NotBondedPoolName, delAddrs[0], sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(5)))).Return(nil)
 	err = s.stakingKeeper.UnbondingCanComplete(s.ctx, unbondingID)
 	require.NoError(err)
 

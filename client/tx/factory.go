@@ -64,6 +64,12 @@ func NewFactoryCLI(clientCtx client.Context, flagSet *pflag.FlagSet) (Factory, e
 		signMode = signing.SignMode_SIGN_MODE_EIP_191
 	case flags.SignModeEIP712:
 		signMode = signing.SignMode_SIGN_MODE_EIP712_V2
+	case flags.SignModeEIP712V3:
+		signMode = signing.SignMode_SIGN_MODE_EIP712_V3
+	case "":
+		// unset: the tx config default sign mode is used
+	default:
+		return Factory{}, fmt.Errorf("unsupported sign mode %q", clientCtx.SignModeStr)
 	}
 
 	var accNum, accSeq uint64

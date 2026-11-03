@@ -45,6 +45,10 @@ enum SignMode {
   // Signature verification is implemented in injective core
   SIGN_MODE_EIP712_V2 = 128;
 
+  // SIGN_MODE_EIP712_V3 uses the V2 transaction payload with a bytes32 zero salt.
+  // Signature verification is implemented in injective core.
+  SIGN_MODE_EIP712_V3 = 129;
+
   // SIGN_MODE_EIP_191 specifies the sign mode for EIP 191 signing on the Cosmos
   // SDK. Ref: https://eips.ethereum.org/EIPS/eip-191
   //

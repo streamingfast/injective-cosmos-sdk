@@ -1,7 +1,9 @@
 package snapshots_test
 
 import (
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"testing"
 
 	db "github.com/cosmos/cosmos-db"
@@ -98,7 +100,10 @@ func TestManager_Take(t *testing.T) {
 		Height: 5,
 		Format: snapshotter.SnapshotFormat(),
 		Chunks: 1,
-		Hash:   []uint8{0xc5, 0xf7, 0xfe, 0xea, 0xd3, 0x4d, 0x3e, 0x87, 0xff, 0x41, 0xa2, 0x27, 0xfa, 0xcb, 0x38, 0x17, 0xa, 0x5, 0xeb, 0x27, 0x4e, 0x16, 0x5e, 0xf3, 0xb2, 0x8b, 0x47, 0xd1, 0xe6, 0x94, 0x7e, 0x8b},
+		// The snapshot hash covers the zlib-compressed chunk bytes, which differ
+		// between Go versions, so derive it from the expected chunks instead of
+		// hard-coding it. TestMultistoreSnapshot_Checksum guards the exact bytes.
+		Hash: snapshotHash(expectChunks),
 		Metadata: types.Metadata{
 			ChunkHashes: checksums(expectChunks),
 		},
@@ -255,4 +260,51 @@ func TestManager_TakeError(t *testing.T) {
 
 	_, err = manager.Create(1)
 	require.Error(t, err)
+}
+
+// snapshotHash returns the snapshot hash for the given chunks: the SHA-256 of
+// all chunk bytes in order, as computed by Store.Save.
+func snapshotHash(chunks [][]byte) []byte {
+	hasher := sha256.New()
+	for _, chunk := range chunks {
+		hasher.Write(chunk)
+	}
+	return hasher.Sum(nil)
+}
+
+// Snapshots taken in format 3 by Go <= 1.26 builds can still be restored; unknown
+// formats are rejected.
+func TestManager_RestoreFormats(t *testing.T) {
+	for _, tc := range []struct {
+		format uint32
+		ok     bool
+	}{
+		{types.CurrentFormat, true},
+		{3, true},
+		{2, false},
+		{types.CurrentFormat + 1, false},
+	} {
+		t.Run(fmt.Sprintf("format %d", tc.format), func(t *testing.T) {
+			store := setupStore(t)
+			target := &mockSnapshotter{prunedHeights: make(map[int64]struct{})}
+			manager := snapshots.NewManager(store, opts, target, nil, log.NewNopLogger())
+			require.NoError(t, manager.RegisterExtensions(newExtSnapshotter(0)))
+
+			chunks := snapshotItems([][]byte{{1, 2, 3}}, newExtSnapshotter(10))
+			err := manager.Restore(types.Snapshot{
+				Height:   3,
+				Format:   tc.format,
+				Hash:     []byte{1, 2, 3},
+				Chunks:   1,
+				Metadata: types.Metadata{ChunkHashes: checksums(chunks)},
+			})
+			if tc.ok {
+				require.NoError(t, err)
+				require.NoError(t, snapshots.ValidRestoreHeight(tc.format, 3))
+			} else {
+				require.ErrorIs(t, err, types.ErrUnknownFormat)
+				require.ErrorIs(t, snapshots.ValidRestoreHeight(tc.format, 3), types.ErrUnknownFormat)
+			}
+		})
+	}
 }

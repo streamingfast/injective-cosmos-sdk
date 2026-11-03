@@ -7,6 +7,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/InjectiveLabs/metrics/v2"
 	"github.com/InjectiveLabs/metrics/v2/flightrecorder"
@@ -17,6 +18,7 @@ import (
 	comettypes "github.com/cometbft/cometbft/types"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/gogoproto/proto"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/exp/maps"
 	protov2 "google.golang.org/protobuf/proto"
 
@@ -25,6 +27,7 @@ import (
 	"cosmossdk.io/log"
 	"cosmossdk.io/store"
 	storemetrics "cosmossdk.io/store/metrics"
+	"cosmossdk.io/store/rootmulti"
 	"cosmossdk.io/store/snapshots"
 	storetypes "cosmossdk.io/store/types"
 
@@ -64,6 +67,7 @@ const (
 	execModeFinalize                            // Finalize a block proposal
 
 	DoNotFailFastSendContextKey contextKeyT = "DoNotFailFast"
+	AnteMutexes                 contextKeyT = "AnteMutexes"
 )
 
 var _ servertypes.ABCI = (*BaseApp)(nil)
@@ -75,6 +79,7 @@ type BaseApp struct {
 	name              string                      // application name from abci.BlockInfo
 	db                dbm.DB                      // common DB backend
 	cms               storetypes.CommitMultiStore // Main (uncached) state
+	mtx               sync.RWMutex                // global ABCI mutex to handle concurrency in app (after switching to Comet unsync ABCI client)
 	qms               storetypes.RootMultiStore   // Optional alternative multistore for querying only.
 	storeLoader       StoreLoader                 // function to handle store loading, may be overridden with SetStoreLoader()
 	grpcQueryRouter   *GRPCQueryRouter            // router for redirecting gRPC query calls
@@ -210,6 +215,10 @@ type BaseApp struct {
 	EnableStreamer bool
 	StreamEvents   chan StreamEvents
 
+	EnablePublish bool
+	PublishEvents chan PublishEventFlush
+	flushData     PublishEventFlush
+
 	traceFlightRecorder flightrecorder.TraceFlightRecorder
 
 	// Optional alternative to set an sdk context on the BaseApp
@@ -244,6 +253,7 @@ func NewBaseApp(
 		queryGasLimit:    math.MaxUint64,
 		StreamEvents:     make(chan StreamEvents),
 		meter:            metrics.NewNilMeter(),
+		PublishEvents:    make(chan PublishEventFlush),
 	}
 
 	for _, option := range options {
@@ -538,7 +548,20 @@ func (app *BaseApp) setState(mode execMode, h cmtproto.Header) {
 
 	switch mode {
 	case execModeCheck:
-		baseState.SetContext(baseState.Context().WithIsCheckTx(true).WithMinGasPrices(app.minGasPrices))
+		// load new IAVL MutableTree with the same version as app.cms to allow parallel reads and writes of block execution and CheckTx
+		copyMs, err := app.cms.(*rootmulti.Store).Copy(app.storeLoader)
+		if err != nil {
+			panic(err)
+		}
+		cms := copyMs.CacheMultiStore()
+		baseState.ms = cms
+		baseState.SetContext(
+			baseState.Context().
+				WithIsCheckTx(true).
+				WithMinGasPrices(app.minGasPrices).
+				WithValue(AnteMutexes, &sync.Map{}).
+				WithMultiStore(cms),
+		)
 		app.checkState = baseState
 
 	case execModePrepareProposal:
@@ -910,20 +933,25 @@ func (app *BaseApp) runTxWithMultiStore(
 	if txMultiStore != nil {
 		ctx = ctx.WithMultiStore(txMultiStore)
 	}
-	ms := ctx.MultiStore()
 
 	txHash := hex.EncodeToString(comettypes.Tx(txBytes).Hash())
 	defer ctx.Meter().FuncTiming(&ctx, "runTx", metrics.Tag("mode", int64(mode)), metrics.TraceTag("tx_hash", txHash))(&err)
+	metricsRunTxSpan := trace.SpanFromContext(ctx)
 
 	// only run the tx if there is block gas remaining
 	if mode == execModeFinalize && ctx.BlockGasMeter().IsOutOfGas() {
 		return gInfo, nil, nil, errorsmod.Wrap(sdkerrors.ErrOutOfGas, "no block gas left to run tx")
 	}
 
+	// we need to commit and unlock after antehandlers by ourselves during CheckTx
+	unlock := func() {}
+	commit := func() {}
+
 	defer func() {
 		if r := recover(); r != nil {
 			recoveryMW := newOutOfGasRecoveryMiddleware(gasWanted, ctx, app.runTxRecoveryMiddleware)
 			err, result = processRecovery(r, recoveryMW), nil
+			unlock()
 			ctx.Logger().Debug("panic recovered in runTx", "err", err)
 		}
 
@@ -954,6 +982,15 @@ func (app *BaseApp) runTxWithMultiStore(
 		defer consumeBlockGas()
 	}
 
+	if mode == execModeFinalize {
+		defer func() {
+			if mempoolErr := app.mempool.Remove(tx); mempoolErr != nil && !errors.Is(mempoolErr, mempool.ErrTxNotFound) {
+				// Local mempool cleanup must not change the transaction result.
+				app.logger.Error("failed to remove transaction from mempool", "err", mempoolErr, "tx_hash", txHash)
+			}
+		}()
+	}
+
 	// if the transaction is not decoded, decode it here
 	if tx == nil {
 		tx, err = app.txDecoder(txBytes)
@@ -979,40 +1016,51 @@ func (app *BaseApp) runTxWithMultiStore(
 	}
 
 	if app.anteHandler != nil {
+		// we replace the event manager for anteCtx in all modes
+		// and also branch the store for DeliverTx here. CheckTx and ReCheckTx store branching is done inside antehandler themselves since it must support
+		// parallel execution, also many ante handlers work differently in DeliverTx mode. Since tx delivery is sequential, it is easier to just branch here.
+		// For CheckTx mode we can't commit ante changes inside ante handlers, since we need to wait for mempool.Insert() to succeed, thus the call to ante
+		// handlers returns the context with commit() and unlock() callback values that we must call after mempool.Insert() succeeds.
 		var (
 			anteCtx sdk.Context
+			ms      = ctx.MultiStore()
 			msCache storetypes.CacheMultiStore
 		)
+		isDeliverTx := mode != execModeCheck && mode != execModeReCheck
 
-		// Branch context before AnteHandler call in case it aborts.
-		// This is required for both CheckTx and DeliverTx.
-		// Ref: https://github.com/cosmos/cosmos-sdk/issues/2772
-		//
-		// NOTE: Alternatively, we could require that AnteHandler ensures that
-		// writes do not happen if aborted/failed.  This may have some
-		// performance benefits, but it'll be more difficult to get right.
-		anteCtx, msCache = app.cacheTxContext(ctx, txBytes)
+		if isDeliverTx {
+			anteCtx, msCache = app.cacheTxContext(ctx, txBytes)
+		} else {
+			anteCtx = ctx
+		}
 		anteCtx = anteCtx.WithEventManager(sdk.NewEventManager())
-		newCtx, err := app.anteHandler(anteCtx, tx, mode == execModeSimulate)
 
+		newCtx, err := app.anteHandler(anteCtx, tx, mode == execModeSimulate)
+		// returned anteCtx is re-assigned to main ctx
 		if !newCtx.IsZero() {
-			// At this point, newCtx.MultiStore() is a store branch, or something else
-			// replaced by the AnteHandler. We want the original multistore.
-			//
-			// Also, in the case of the tx aborting, we need to track gas consumed via
-			// the instantiated gas meter in the AnteHandler, so we update the context
-			// prior to returning.
-			ctx = newCtx.WithMultiStore(ms)
+			ctx = newCtx.WithMultiStore(ms) // in DeliverTx mode we replaced ctx.MultiStore with CacheMultiStore, so need to replace back
 		}
 
-		events := ctx.EventManager().Events()
+		if mode == execModeCheck {
+			// these should be set in CheckTx
+			if unlockAny := ctx.Value(sdk.UnlockCbCtxKey); unlockAny != nil {
+				unlock = sync.OnceFunc(unlockAny.(func()))
+			}
+			if commitAny := ctx.Value(sdk.CommitCbCtxKey); commitAny != nil {
+				commit = commitAny.(func())
+			}
+		}
 
-		// GasMeter expected to be set in AnteHandler
 		gasWanted = ctx.GasMeter().Limit()
 
 		if err != nil {
-			if mode == execModeReCheck {
-				// if the ante handler fails on recheck, we want to remove the tx from the mempool
+			// on error we just unlock without committing ante changes
+			unlock()
+
+			if mode == execModeReCheck && !errors.Is(err, sdkerrors.ErrWrongSequence) && !errors.Is(err, sdkerrors.ErrInvalidSequence) {
+				// if the ante handler fails on recheck, we want to remove the tx from the mempool, unless it is ErrWrongSequence,
+				// due to the fact that it can be optimistic recheck. If it is a valid ErrWrongSequence,
+				// it will be removed by parity CheckTx anyway
 				if mempoolErr := app.mempool.Remove(tx); mempoolErr != nil {
 					return gInfo, nil, anteEvents, errors.Join(err, mempoolErr)
 				}
@@ -1020,27 +1068,33 @@ func (app *BaseApp) runTxWithMultiStore(
 			return gInfo, nil, nil, err
 		}
 
-		msCache.Write()
-		anteEvents = events.ToABCIEvents()
+		if msCache != nil {
+			msCache.Write() // commit during DeliverTx
+		}
+
+		anteEvents = ctx.EventManager().Events().ToABCIEvents()
 	}
 
 	if mode == execModeCheck {
 		err = app.mempool.Insert(ctx, tx)
 		if err != nil {
+			unlock()
 			return gInfo, nil, anteEvents, err
 		}
-	} else if mode == execModeFinalize {
-		err = app.mempool.Remove(tx)
-		if err != nil && !errors.Is(err, mempool.ErrTxNotFound) {
-			return gInfo, nil, anteEvents,
-				fmt.Errorf("failed to remove tx from mempool: %w", err)
-		}
+		// commit ante changes and unlock ante mutexes
+		commit()
+		unlock()
 	}
 
 	// Create a new Context based off of the existing Context with a MultiStore branch
 	// in case message processing fails. At this point, the MultiStore
 	// is a branch of a branch.
 	runMsgCtx, msCache := app.cacheTxContext(ctx, txBytes)
+	runMsgCtx = runMsgCtx.WithPublishEventManager(sdk.NewPublishEventManager())
+
+	// replace tracing span with initial runTx span since ctx now has the span of last ante handler
+	spanCtx := runMsgCtx.ContextPtr()
+	*spanCtx = trace.ContextWithSpan(*spanCtx, metricsRunTxSpan)
 
 	// Attempt to execute all messages and only update state if all messages pass
 	// and we're in DeliverTx. Note, runMsgs will never return a reference to a
@@ -1077,6 +1131,7 @@ func (app *BaseApp) runTxWithMultiStore(
 			consumeBlockGas()
 
 			msCache.Write()
+			ctx.ForwardPublishEvents(runMsgCtx.PublishEventManager().Events())
 		}
 
 		if len(anteEvents) > 0 && (mode == execModeFinalize || mode == execModeSimulate) {

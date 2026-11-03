@@ -17,28 +17,32 @@ jobs:
   split-test-files:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
+      - name: Download Go modules
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh .
       - name: Create a file with all core Cosmos SDK pkgs
         run: go list ./... > pkgs.txt
       - name: Split pkgs into 4 files
         run: split -d -n l/4 pkgs.txt pkgs.txt.part.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: "${{ github.sha }}-00"
           path: ./pkgs.txt.part.00
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: "${{ github.sha }}-01"
           path: ./pkgs.txt.part.01
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: "${{ github.sha }}-02"
           path: ./pkgs.txt.part.02
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: "${{ github.sha }}-03"
           path: ./pkgs.txt.part.03
@@ -51,10 +55,10 @@ jobs:
       matrix:
         part: ["00", "01", "02", "03"]
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: go.sum
@@ -69,14 +73,19 @@ jobs:
             **/go.sum
             **/Makefile
             Makefile
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: "${{ github.sha }}-${{ matrix.part }}"
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh .
       - name: test & coverage report creation
         if: env.GIT_DIFF
         run: |
           cat pkgs.txt.part.${{ matrix.part }} | xargs go test -mod=readonly -race -timeout 30m -coverprofile=${{ matrix.part }}profile.out -covermode=atomic -tags='ledger test_ledger_mock'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: env.GIT_DIFF
         with:
           name: "${{ github.sha }}-${{ matrix.part }}-coverage"
@@ -85,10 +94,10 @@ jobs:
   test-integration:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: go.sum
@@ -103,11 +112,16 @@ jobs:
             **/go.sum
             **/Makefile
             Makefile
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh tests
       - name: integration tests
         if: env.GIT_DIFF
         run: |
           make test-integration-cov
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: env.GIT_DIFF
         with:
           name: "${{ github.sha }}-integration-coverage"
@@ -116,10 +130,10 @@ jobs:
   test-e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: go.sum
@@ -134,70 +148,29 @@ jobs:
             **/go.sum
             **/Makefile
             Makefile
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh tests
       - name: e2e tests
         if: env.GIT_DIFF
         run: |
           make test-e2e-cov
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: env.GIT_DIFF
         with:
           name: "${{ github.sha }}-e2e-coverage"
           path: ./tests/e2e-profile.out
 
-  repo-analysis:
-    runs-on: ubuntu-latest
-    needs: [tests, test-integration, test-e2e]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: technote-space/get-diff-action@v6.1.2
-        id: git_diff
-        with:
-          PATTERNS: |
-            **/*.go
-            go.mod
-            go.sum
-            **/go.mod
-            **/go.sum
-      - uses: actions/download-artifact@v4
-        if: env.GIT_DIFF
-        with:
-          name: "${{ github.sha }}-00-coverage"
-      - uses: actions/download-artifact@v4
-        if: env.GIT_DIFF
-        with:
-          name: "${{ github.sha }}-01-coverage"
-      - uses: actions/download-artifact@v4
-        if: env.GIT_DIFF
-        with:
-          name: "${{ github.sha }}-02-coverage"
-      - uses: actions/download-artifact@v4
-        if: env.GIT_DIFF
-        with:
-          name: "${{ github.sha }}-03-coverage"
-      - uses: actions/download-artifact@v4
-        if: env.GIT_DIFF
-        with:
-          name: "${{ github.sha }}-integration-coverage"
-      - uses: actions/download-artifact@v4
-        if: env.GIT_DIFF
-        with:
-          name: "${{ github.sha }}-e2e-coverage"
-        continue-on-error: true
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
   liveness-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: go.sum
@@ -212,8 +185,16 @@ jobs:
             **/go.sum
             **/Makefile
             Makefile
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh .
       - name: start localnet
         if: env.GIT_DIFF
+        env:
+          # Stages private InjectiveLabs modules for the Docker image build.
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           make clean localnet-start
       - name: test liveness
@@ -224,10 +205,10 @@ jobs:
   test-sim-nondeterminism:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: go.sum
@@ -242,6 +223,11 @@ jobs:
             **/go.sum
             **/Makefile
             Makefile
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh simapp
       - name: test-sim-nondeterminism
         if: env.GIT_DIFF
         run: |
@@ -257,10 +243,10 @@ jobs:
   test-clientv2:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: client/v2/go.sum
@@ -271,27 +257,23 @@ jobs:
             client/v2/**/*.go
             client/v2/go.mod
             client/v2/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh client/v2
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd client/v2
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: client/v2/
-
   test-core:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: core/go.sum
@@ -302,27 +284,23 @@ jobs:
             core/**/*.go
             core/go.mod
             core/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh core
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd core
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: core/
-
   test-depinject:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: depinject/go.sum
@@ -333,25 +311,23 @@ jobs:
             depinject/**/*.go
             depinject/go.mod
             depinject/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh depinject
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd depinject
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
   test-errors:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: errors/go.sum
@@ -362,27 +338,23 @@ jobs:
             errors/**/*.go
             errors/go.mod
             errors/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh errors
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd errors
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: errors/
-
   test-math:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: math/go.sum
@@ -393,27 +365,23 @@ jobs:
             math/**/*.go
             math/go.mod
             math/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh math
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd math
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: math/
-
   test-simapp:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: simapp/go.sum
@@ -424,6 +392,11 @@ jobs:
             **/*.go
             simapp/go.mod
             simapp/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh simapp
       - name: tests simapp
         if: env.GIT_DIFF
         run: |
@@ -438,10 +411,10 @@ jobs:
   test-collections:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: collections/go.sum
@@ -452,27 +425,23 @@ jobs:
             collections/**/*.go
             collections/go.mod
             collections/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh collections
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd collections
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: collections/
-
   test-cosmovisor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: tools/cosmovisor/go.sum
@@ -483,27 +452,23 @@ jobs:
             tools/cosmovisor/**/*.go
             tools/cosmovisor/go.mod
             tools/cosmovisor/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh tools/cosmovisor
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd tools/cosmovisor
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: tools/cosmovisor/
-
   test-confix:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: tools/confix/go.sum
@@ -514,27 +479,23 @@ jobs:
             tools/confix/**/*.go
             tools/confix/go.mod
             tools/confix/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh tools/confix
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd tools/confix
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: tools/confix/
-
   test-hubl:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: tools/hubl/go.sum
@@ -545,27 +506,23 @@ jobs:
             tools/hubl/**/*.go
             tools/hubl/go.mod
             tools/hubl/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh tools/hubl
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd tools/hubl
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: tools/hubl/
-
   test-store:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: store/go.sum
@@ -576,27 +533,23 @@ jobs:
             store/**/*.go
             store/go.mod
             store/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh store
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd store
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: store/
-
   test-log:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: log/go.sum
@@ -607,34 +560,23 @@ jobs:
             log/*.go
             log/go.mod
             log/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh log
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd log
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: log/
-
-  #############################
-  ### Cosmos SDK x/{module} ###
-  #############################
-
-  # NOTE: The following jobs are used to test the Cosmos SDK Go submodules present under x/{module}.
-  # They run when there is a diff in their respective directories.
-
   test-x-tx:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: x/tx/go.sum
@@ -645,27 +587,23 @@ jobs:
             x/tx/**/*.go
             x/tx/go.mod
             x/tx/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh x/tx
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd x/tx
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: x/tx/
-
   test-x-nft:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: x/nft/go.sum
@@ -676,27 +614,23 @@ jobs:
             x/nft/**/*.go
             x/nft/go.mod
             x/nft/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh x/nft
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd x/nft
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: x/nft/
-
   test-x-circuit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: x/circuit/go.sum
@@ -707,27 +641,23 @@ jobs:
             x/circuit/**/*.go
             x/circuit/go.mod
             x/circuit/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh x/circuit
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd x/circuit
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: x/circuit/
-
   test-x-feegrant:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: x/feegrant/go.sum
@@ -738,27 +668,23 @@ jobs:
             x/feegrant/**/*.go
             x/feegrant/go.mod
             x/feegrant/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh x/feegrant
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd x/feegrant
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: x/feegrant/
-
   test-x-evidence:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: x/evidence/go.sum
@@ -769,26 +695,23 @@ jobs:
             x/evidence/**/*.go
             x/evidence/go.mod
             x/evidence/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh x/evidence
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd x/evidence
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: x/evidence/
   test-x-upgrade:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.26.2"
+          go-version: "1.27.3"
           check-latest: true
           cache: true
           cache-dependency-path: x/upgrade/go.sum
@@ -799,23 +722,16 @@ jobs:
             x/upgrade/**/*.go
             x/upgrade/go.mod
             x/upgrade/go.sum
+      - name: Download Go modules
+        if: env.GIT_DIFF
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/go-mod-download.sh x/upgrade
       - name: tests
         if: env.GIT_DIFF
         run: |
           cd x/upgrade
           go test -mod=readonly -timeout 30m -coverprofile=coverage.out -covermode=atomic -tags='norace ledger test_ledger_mock rocksdb_build' ./...
-      - name: sonarcloud
-        if: ${{ env.GIT_DIFF && !github.event.pull_request.draft && env.SONAR_TOKEN != null }}
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: x/upgrade/
-
-  test-system: # no system tests in v0.50, set to match required job
-    runs-on: ubuntu-latest
-    steps:
       - name: do nothing
         run: echo "no system tests in v0.50"
 

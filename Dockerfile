@@ -12,7 +12,7 @@
 #
 # This image is pushed to the GHCR as https://ghcr.io/cosmos/simapp
 
-FROM golang:1.26.2-alpine AS build-env
+FROM golang:1.27.3-alpine AS build-env
 
 # Install minimum necessary dependencies
 ENV PACKAGES curl make git libc-dev bash gcc linux-headers eudev-dev
@@ -24,9 +24,21 @@ WORKDIR /go/src/github.com/cosmos/cosmos-sdk
 # optimization: if go.sum didn't change, docker will use cached image
 COPY go.mod go.sum ./
 COPY collections/go.mod collections/go.sum ./collections/
-COPY store/go.mod store/go.sum ./store/
 COPY log/go.mod log/go.sum ./log/
+# Every module the root go.mod replaces with a local directory.
+COPY api/go.mod api/go.sum ./api/
+COPY store/go.mod store/go.sum ./store/
+COPY x/evidence/go.mod x/evidence/go.sum ./x/evidence/
+COPY x/feegrant/go.mod x/feegrant/go.sum ./x/feegrant/
+COPY x/tx/go.mod x/tx/go.sum ./x/tx/
+COPY x/upgrade/go.mod x/upgrade/go.sum ./x/upgrade/
 
+# Private InjectiveLabs modules come from the file proxy staged on the host by
+# scripts/prepare-docker-go-modules.sh, so no credentials enter the image.
+COPY .modcache/ /modcache/
+ENV GOPROXY=file:///modcache,https://proxy.golang.org,direct \
+    GONOPROXY=none \
+    GONOSUMDB=github.com/InjectiveLabs
 RUN go mod download
 
 # Add source files

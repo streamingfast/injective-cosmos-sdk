@@ -69,6 +69,9 @@ func TestSlashingMsgs(t *testing.T) {
 		),
 		startupCfg, &stakingKeeper, &bankKeeper, &slashingKeeper)
 	require.NoError(t, err)
+	// Simulate runs on a copy of the last committed state, so commit genesis first.
+	_, err = app.Commit()
+	require.NoError(t, err)
 
 	baseApp := app.BaseApp
 

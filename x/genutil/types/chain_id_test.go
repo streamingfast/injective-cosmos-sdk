@@ -65,7 +65,9 @@ func TestParseChainIDFromGenesis(t *testing.T) {
 				"chain-id": 1,
 			}`,
 			"",
-			"invalid character '}' looking for beginning of object key string",
+			// Only the stable part: Go 1.27 reports this trailing comma as
+			// "invalid character ',' looking for beginning of value".
+			"invalid character",
 		},
 		{
 			"invalid json",

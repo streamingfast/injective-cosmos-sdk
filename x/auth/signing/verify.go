@@ -38,6 +38,8 @@ func APISignModeToInternal(mode signingv1beta1.SignMode) (signing.SignMode, erro
 		return signing.SignMode_SIGN_MODE_DIRECT_AUX, nil
 	case signingv1beta1.SignMode_SIGN_MODE_EIP712_V2:
 		return signing.SignMode_SIGN_MODE_EIP712_V2, nil
+	case signingv1beta1.SignMode_SIGN_MODE_EIP712_V3:
+		return signing.SignMode_SIGN_MODE_EIP712_V3, nil
 	default:
 		return signing.SignMode_SIGN_MODE_UNSPECIFIED, fmt.Errorf("unsupported sign mode %s", mode)
 	}
@@ -56,6 +58,8 @@ func internalSignModeToAPI(mode signing.SignMode) (signingv1beta1.SignMode, erro
 		return signingv1beta1.SignMode_SIGN_MODE_DIRECT_AUX, nil
 	case signing.SignMode_SIGN_MODE_EIP712_V2:
 		return signingv1beta1.SignMode_SIGN_MODE_EIP712_V2, nil
+	case signing.SignMode_SIGN_MODE_EIP712_V3:
+		return signingv1beta1.SignMode_SIGN_MODE_EIP712_V3, nil
 	default:
 		return signingv1beta1.SignMode_SIGN_MODE_UNSPECIFIED, fmt.Errorf("unsupported sign mode %s", mode)
 	}
