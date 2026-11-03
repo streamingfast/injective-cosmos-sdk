@@ -3,7 +3,6 @@ package keeper
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -15,7 +14,9 @@ import (
 	v1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 )
 
-// SubmitProposal creates a new proposal given an array of messages
+// SubmitProposal creates a new proposal given an array of messages.
+// Proposal handlers are not executed during submission because their side effects
+// may extend beyond the cached SDK store.
 func (keeper Keeper) SubmitProposal(ctx context.Context, messages []sdk.Msg, metadata, title, summary string, proposer sdk.AccAddress, expedited bool) (meterResult v1.Proposal, err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	defer keeper.Meter(ctx).FuncTiming(&sdkCtx, "SubmitProposal")(&err)
@@ -69,22 +70,6 @@ func (keeper Keeper) SubmitProposal(ctx context.Context, messages []sdk.Msg, met
 		if handler == nil {
 			return v1.Proposal{}, errorsmod.Wrap(types.ErrUnroutableProposalMsg, sdk.MsgTypeURL(msg))
 		}
-
-		// Only if it's a MsgExecLegacyContent do we try to execute the
-		// proposal in a cached context.
-		// For other Msgs, we do not verify the proposal messages any further.
-		// They may fail upon execution.
-		// ref: https://github.com/cosmos/cosmos-sdk/pull/10868#discussion_r784872842
-		if msg, ok := msg.(*v1.MsgExecLegacyContent); ok {
-			cacheCtx, _ := sdkCtx.CacheContext()
-			if _, err := handler(cacheCtx, msg); err != nil {
-				if errors.Is(types.ErrNoProposalHandlerExists, err) {
-					return v1.Proposal{}, err
-				}
-				return v1.Proposal{}, errorsmod.Wrap(types.ErrInvalidProposalContent, err.Error())
-			}
-		}
-
 	}
 
 	proposalID, err := keeper.ProposalID.Next(sdkCtx)

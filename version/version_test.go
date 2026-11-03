@@ -82,8 +82,15 @@ func TestCLI(t *testing.T) {
 
 		// The SDK version appears to not be set during this test, so we'll ignore it here.
 
+		// Since Go 1.27, test binaries report their module dependencies too.
+		// They depend on the build, so only check that each one decoded.
+		for _, dep := range info.BuildDeps {
+			require.NotEmpty(t, dep.String())
+		}
+
 		// Now clear out the non-empty fields, so we can compare against a fixed value.
 		info.GoVersion = ""
+		info.BuildDeps = nil
 
 		want := version.Info{
 			Name:      testName,

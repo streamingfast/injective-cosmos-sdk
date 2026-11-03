@@ -321,9 +321,27 @@ func (k Keeper) UnbondingCanComplete(ctx context.Context, id uint64) (err error)
 	return nil
 }
 
+// completeUnbondingEntry pays an entry or discards its backing on any payout
+// error. The caller must cache both this operation and claim removal so they
+// commit together.
+func (k Keeper) completeUnbondingEntry(ctx context.Context, delAddr sdk.AccAddress, amt sdk.Coins) (discarded bool, err error) {
+	err = k.bankKeeper.UndelegateCoinsFromModuleToAccount(ctx, types.NotBondedPoolName, delAddr, amt)
+	if err == nil {
+		return false, nil
+	}
+	// Removing the liability must also remove its backing and reduce supply.
+	if err = k.bankKeeper.BurnCoins(ctx, types.NotBondedPoolName, amt); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (k Keeper) unbondingDelegationEntryCanComplete(ctx context.Context, id uint64) (err error) {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	defer k.Meter(ctx).FuncTiming(&sdkCtx, "unbondingDelegationEntryCanComplete")(&err)
+
+	// Releasing a hold must not commit a payout without removing its claim.
+	sdkCtx, writeCache := sdkCtx.CacheContext()
 
 	ubd, err := k.GetUnbondingDelegationByUnbondingID(sdkCtx, id)
 	if err != nil {
@@ -360,10 +378,14 @@ func (k Keeper) unbondingDelegationEntryCanComplete(ctx context.Context, id uint
 		// track undelegation only when remaining or truncated shares are non-zero
 		if !ubd.Entries[i].Balance.IsZero() {
 			amt := sdk.NewCoin(bondDenom, ubd.Entries[i].Balance)
-			if err = k.bankKeeper.UndelegateCoinsFromModuleToAccount(
-				sdkCtx, types.NotBondedPoolName, delegatorAddress, sdk.NewCoins(amt),
-			); err != nil {
+			discarded, err := k.completeUnbondingEntry(sdkCtx, delegatorAddress, sdk.NewCoins(amt))
+			if err != nil {
 				return err
+			}
+			if discarded {
+				if err = k.storeService.OpenKVStore(sdkCtx).Delete(types.GetUnbondingTypeKey(id)); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -379,10 +401,16 @@ func (k Keeper) unbondingDelegationEntryCanComplete(ctx context.Context, id uint
 
 	// set the unbonding delegation or remove it if there are no more entries
 	if len(ubd.Entries) == 0 {
-		return k.RemoveUnbondingDelegation(sdkCtx, ubd)
+		err = k.RemoveUnbondingDelegation(sdkCtx, ubd)
+	} else {
+		err = k.SetUnbondingDelegation(sdkCtx, ubd)
+	}
+	if err != nil {
+		return err
 	}
 
-	return k.SetUnbondingDelegation(sdkCtx, ubd)
+	writeCache()
+	return nil
 }
 
 func (k Keeper) redelegationEntryCanComplete(ctx context.Context, id uint64) (err error) {

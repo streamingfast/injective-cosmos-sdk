@@ -3,9 +3,11 @@ package tx
 import (
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
 	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
@@ -114,6 +116,53 @@ func TestFactory_getSimSignatureData(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := Factory{}.getSimSignatureData(tt.pk)
 			require.IsType(t, tt.wantType, got)
+		})
+	}
+}
+
+func TestNewFactoryCLISignMode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		signModeStr string
+		want        signing.SignMode
+	}{
+		{"", signing.SignMode_SIGN_MODE_UNSPECIFIED},
+		{flags.SignModeDirect, signing.SignMode_SIGN_MODE_DIRECT},
+		{flags.SignModeLegacyAminoJSON, signing.SignMode_SIGN_MODE_LEGACY_AMINO_JSON},
+		{flags.SignModeDirectAux, signing.SignMode_SIGN_MODE_DIRECT_AUX},
+		{flags.SignModeTextual, signing.SignMode_SIGN_MODE_TEXTUAL},
+		{flags.SignModeEIP191, signing.SignMode_SIGN_MODE_EIP_191},
+		{flags.SignModeEIP712, signing.SignMode_SIGN_MODE_EIP712_V2},
+		{flags.SignModeEIP712V3, signing.SignMode_SIGN_MODE_EIP712_V3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.signModeStr, func(t *testing.T) {
+			t.Parallel()
+
+			cmd := &cobra.Command{}
+			flags.AddTxFlagsToCmd(cmd)
+
+			f, err := NewFactoryCLI(client.Context{}.WithSignModeStr(tt.signModeStr), cmd.Flags())
+			require.NoError(t, err)
+			require.Equal(t, tt.want, f.SignMode())
+		})
+	}
+}
+
+func TestNewFactoryCLIRejectsUnknownSignMode(t *testing.T) {
+	t.Parallel()
+
+	for _, signModeStr := range []string{"eip-712-v4", "EIP-712-V3", "direct ", "unknown"} {
+		t.Run(signModeStr, func(t *testing.T) {
+			t.Parallel()
+
+			cmd := &cobra.Command{}
+			flags.AddTxFlagsToCmd(cmd)
+
+			_, err := NewFactoryCLI(client.Context{}.WithSignModeStr(signModeStr), cmd.Flags())
+			require.ErrorContains(t, err, "unsupported sign mode")
 		})
 	}
 }

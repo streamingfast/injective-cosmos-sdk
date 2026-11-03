@@ -1,5 +1,13 @@
 package types
 
+type contextKey string
+
+// optional callbacks to be stored and retrieved via Context.Value from inside ante handlers chain
+var (
+	CommitCbCtxKey contextKey = "commit"
+	UnlockCbCtxKey contextKey = "unlock"
+)
+
 // AnteHandler authenticates transactions, before their internal messages are handled.
 // If newCtx.IsZero(), ctx is used instead.
 type AnteHandler func(ctx Context, tx Tx, simulate bool) (newCtx Context, err error)

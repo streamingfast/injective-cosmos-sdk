@@ -169,7 +169,7 @@ func DrainChunks(chunks <-chan io.ReadCloser) {
 
 // ValidRestoreHeight will check height is valid for snapshot restore or not
 func ValidRestoreHeight(format uint32, height uint64) error {
-	if format != snapshottypes.CurrentFormat {
+	if !snapshottypes.IsRestorableFormat(format) {
 		return errors.Wrapf(snapshottypes.ErrUnknownFormat, "format %v", format)
 	}
 
